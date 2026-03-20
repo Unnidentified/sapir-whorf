@@ -108,6 +108,20 @@ On macOS, use `install-launchd`.
 ## Hosting
 Run it normally behind a reverse proxy (like nginx)
 
+## Deploy with Docker Compose
+
+You need Docker or Podman and Docker Compose installed on your system.
+
+Run the container:
+
+```
+$ git clone https://git.bwaaa.monster/omnisearch
+$ cd omnisearch
+$ docker compose up -d --build
+```
+
+By default it can be reached on port 5000.
+
 ## Customisation
 To make your own changes while still being able to receive upstream updates:
 
