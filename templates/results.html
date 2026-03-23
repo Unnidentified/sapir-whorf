@@ -20,13 +20,14 @@
                 Omni<span>Search</span>
             </h1>
             <form action="/search" method="GET" class="search-form">
+                <input name="engine" type="hidden" value="{{selected_engine}}">
                 <input name="q" type="text" class="search-box" autocomplete="off" placeholder="Search the web..."
                 value="{{query}}">
             </form>
         </header>
         <nav class="nav-tabs">
             <div class="nav-container">
-                <a href="/search?q={{query}}" class="active">
+                <a href="{{search_href}}" class="active">
                     All
                 </a>
                 <a href="/images?q={{query}}">
@@ -38,6 +39,16 @@
             <aside class="sidebar-spacer">
             </aside>
             <main class="results-container">
+                {{if exists engine_filters}}
+                <nav class="engine-filter-list">
+                    {{for filter in engine_filters}}
+                    <a href="{{filter[0]}}" class="{{filter[2]}}">
+                        {{filter[1]}}
+                    </a>
+                    {{endfor}}
+                </nav>
+                {{endif}}
+
                 {{if exists engine_warnings}}
                 <section class="engine-warning-list">
                     {{for warning in engine_warnings}}
@@ -62,6 +73,9 @@
                         <span class="url">
                             {{result[1]}}
                         </span>
+                    <span class="result-sources">
+                        {{result[4]}}
+                    </span>
                     </div>
                     <a href="{{result[0]}}">
                         {{result[2]}}
@@ -75,48 +89,15 @@
                 </div>
                 {{endfor}}
 
+                {{if exists pagination_links}}
                 <nav class="pagination">
-                    <a class="pagination-btn prev" href="/search?q={{query}}&p={{prev_page}}">
-                        &larr;
+                    {{for link in pagination_links}}
+                    <a class="{{link[2]}}" href="{{link[0]}}">
+                        {{link[1]}}
                     </a>
-                    
-                    {{if two_prev_page != 0}}
-                    <a class="pagination-btn prev" href="/search?q={{query}}&p={{two_prev_page}}">
-                         {{two_prev_page}}
-                    </a>
-                    {{endif}}
-
-                    {{if prev_page != 0}}
-                    <a class="pagination-btn prev" href="/search?q={{query}}&p={{prev_page}}">
-                         {{prev_page}}
-                    </a>
-                    {{endif}}
-
-                    <a class="pagination-current" href="/search?q={{query}}&p={{page}}">
-                         {{page}}
-                    </a>
-                    <a class="pagination-btn next" href="/search?q={{query}}&p={{next_page}}">
-                         {{next_page}}
-                    </a>
-                    <a class="pagination-btn next" href="/search?q={{query}}&p={{two_next_page}}">
-                         {{two_next_page}}
-                    </a>
-
-                    {{if prev_page == 0}}
-                    <a class="pagination-btn prev" href="/search?q={{query}}&p=4">
-                         4
-                    </a>
-                    {{endif}}
-
-                    {{if two_prev_page == 0}}
-                    <a class="pagination-btn prev" href="/search?q={{query}}&p=5">
-                         5
-                    </a>
-                    {{endif}}
-                    <a class="pagination-btn next" href="/search?q={{query}}&p={{next_page}}">
-                          &rarr;
-                    </a>
+                    {{endfor}}
                 </nav>
+                {{endif}}
             </main>
             <aside class="infobox-sidebar">
             {{if exists infoboxes}}

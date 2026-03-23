@@ -294,6 +294,12 @@ h1 span {
     display: block;
     margin-bottom: 4px;
 }
+.result-sources {
+    color:var(--text-secondary);
+    display:block;
+    font-size:0.78rem;
+    margin-bottom:8px;
+}
 
 @media (max-width: 768px) {
     .result-favicon {
@@ -312,6 +318,27 @@ h1 span {
 }
 .results-container {
     grid-column:2;
+}
+.engine-filter-list {
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:24px;
+}
+.engine-filter {
+    background:var(--bg-card);
+    color:var(--text-secondary);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:6px 12px;
+    text-decoration:none;
+    font-size:0.85rem;
+    font-weight:600;
+}
+.engine-filter.active {
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--bg-main);
 }
 .engine-warning-list {
     display:flex;
@@ -439,21 +466,14 @@ h1 span {
 
 
 .pagination-current {
-    background: var(--bg-card);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    padding: 4px 12px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-size: 1.2rem;
-    font-weight: 600;
-    transition: all 0.2s;
-    touch-action: manipulation;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-main);
 }
 
 .pagination-current:hover {
-    background: var(--border);
-    border-color: var(--text-secondary);
+    background: var(--accent);
+    border-color: var(--accent);
 }
 
 
