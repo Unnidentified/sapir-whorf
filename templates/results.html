@@ -55,9 +55,14 @@
 
                 {{for result in results}}
                 <div class="result">
-                    <span class="url">
-                        {{result[1]}}
-                    </span>
+                    <div class="result-header">
+                        <div class="result-favicon"
+                            style="background-image: url('https://{{result[4]}}/favicon.ico');">
+                        </div>
+                        <span class="url">
+                            {{result[1]}}
+                        </span>
+                    </div>
                     <a href="{{result[0]}}">
                         {{result[2]}}
                     </a>

@@ -53,7 +53,31 @@ static InfoBox fetch_unit_wrapper(char *query) {
 static InfoBox fetch_currency_wrapper(char *query) {
   return fetch_currency_data(query);
 }
+char *get_base_url(const char *input) {
+    if (!input) return NULL;
 
+    const char *start = input;
+
+    const char *protocol_pos = strstr(input, "://");
+    if (protocol_pos) {
+        start = protocol_pos + 3;
+    }
+
+    const char *end = start;
+    while (*end && *end != '/' && *end != '?' && *end != '#') {
+        end++;
+    }
+
+    size_t len = end - start;
+
+    char *domain = (char *)malloc(len + 1);
+    if (!domain) return NULL;
+
+    strncpy(domain, start, len);
+    domain[len] = '\0';
+
+    return domain;
+}
 static int is_calculator_query(const char *query) {
   if (!query)
     return 0;
@@ -150,6 +174,7 @@ static int add_infobox_to_collection(InfoBox *infobox, char ****collection,
   (*collection)[current_count][2] =
       infobox->extract ? strdup(infobox->extract) : NULL;
   (*collection)[current_count][3] = infobox->url ? strdup(infobox->url) : NULL;
+  (*collection)[current_count][4] = infobox->url ? strdup(infobox->url) : NULL;
   (*inner_counts)[current_count] = INFOBOX_FIELD_COUNT;
 
   return current_count + 1;
@@ -490,6 +515,7 @@ int results_handler(UrlParams *params) {
           continue;
         }
         char *pretty_url = pretty_display_url(display_url);
+        char *base_url = get_base_url(display_url);
 
         results_matrix[unique_count][0] = strdup(display_url);
         results_matrix[unique_count][1] = strdup(pretty_url);
@@ -499,10 +525,12 @@ int results_handler(UrlParams *params) {
         results_matrix[unique_count][3] =
             all_results[i][j].snippet ? strdup(all_results[i][j].snippet)
                                       : strdup("");
+        results_matrix[unique_count][4] = strdup(base_url);
 
         results_inner_counts[unique_count] = INFOBOX_FIELD_COUNT;
 
         free(pretty_url);
+        free(base_url);
         free(all_results[i][j].url);
         free(all_results[i][j].title);
         free(all_results[i][j].snippet);
