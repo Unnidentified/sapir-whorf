@@ -277,12 +277,38 @@ h1 span {
     align-items: center;
     gap: 8px;
     margin-bottom: 2px;
+    position: relative;
 }
 .result-favicon {
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    object-fit: contain;
+    background-size: cover;
+    background-position: center;
+    position: absolute;
+    left: -24px;
+}
+.url {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    display: block;
+    margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+    .result-favicon {
+        width: 14px;
+        height: 14px;
+        left: -20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .result-favicon {
+        width: 12px;
+        height: 12px;
+        left: -16px;
+    }
 }
 .results-container {
     grid-column:2;
@@ -318,12 +344,6 @@ h1 span {
     text-decoration:none;
     font-size:1.25rem;
     display:inline-block;
-    margin-bottom:4px;
-}
-.url {
-    color:var(--text-secondary);
-    font-size:0.85rem;
-    display:block;
     margin-bottom:4px;
 }
 .desc {
@@ -438,6 +458,10 @@ h1 span {
 
 
 @media (max-width:1200px) {
+    body {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
     .content-layout {
         grid-template-columns:1fr;
         padding:20px 30px;
@@ -459,6 +483,10 @@ h1 span {
 }
 
 @media (max-width:768px) {
+    body {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
     header {
         flex-direction:column;
         gap:12px;
