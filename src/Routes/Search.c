@@ -28,7 +28,7 @@ typedef struct {
 } InfoBoxHandler;
 
 enum {
-  RESULT_FIELD_COUNT = 5,
+  RESULT_FIELD_COUNT = 6,
   LINK_FIELD_COUNT = 3,
   PAGER_WINDOW_SIZE = 5,
 };
@@ -741,6 +741,7 @@ int results_handler(UrlParams *params) {
           continue;
         }
         char *pretty_url = pretty_display_url(display_url);
+        char *base_url = get_base_url(display_url);
 
         results_matrix[unique_count][0] = strdup(display_url);
         results_matrix[unique_count][1] = strdup(pretty_url);
@@ -750,12 +751,14 @@ int results_handler(UrlParams *params) {
         results_matrix[unique_count][3] =
             all_results[i][j].snippet ? strdup(all_results[i][j].snippet)
                                       : strdup("");
-        results_matrix[unique_count][4] = NULL;
+        results_matrix[unique_count][4] = strdup(base_url ? base_url : "");
+        results_matrix[unique_count][5] = NULL;
 
         source_masks[unique_count] = (1u << i);
         results_inner_counts[unique_count] = RESULT_FIELD_COUNT;
 
         free(pretty_url);
+        free(base_url);
         free(all_results[i][j].url);
         free(all_results[i][j].title);
         free(all_results[i][j].snippet);
@@ -766,10 +769,10 @@ int results_handler(UrlParams *params) {
     }
 
     for (int i = 0; i < unique_count; i++) {
-      results_matrix[i][4] =
+      results_matrix[i][5] =
           build_result_sources(source_masks[i], jobs, enabled_engine_count);
-      if (!results_matrix[i][4])
-        results_matrix[i][4] = strdup("");
+      if (!results_matrix[i][5])
+        results_matrix[i][5] = strdup("");
     }
 
     context_set_array_of_arrays(&ctx, "results", results_matrix, unique_count,
