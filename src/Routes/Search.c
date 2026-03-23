@@ -189,6 +189,8 @@ static int add_infobox_to_collection(InfoBox *infobox, char ****collection,
 static int add_link_to_collection(const char *href, const char *label,
                                   const char *class_name, char ****collection,
                                   int **inner_counts, int current_count) {
+  char ***old_collection = *collection;
+  int *old_inner_counts = *inner_counts;
   char ***new_collection =
       (char ***)malloc(sizeof(char **) * (current_count + 1));
   int *new_inner_counts =
@@ -207,16 +209,18 @@ static int add_link_to_collection(const char *href, const char *label,
     memcpy(new_inner_counts, *inner_counts, sizeof(int) * current_count);
   }
 
-  free(*collection);
-  free(*inner_counts);
-
   *collection = new_collection;
   *inner_counts = new_inner_counts;
 
   (*collection)[current_count] =
       (char **)malloc(sizeof(char *) * LINK_FIELD_COUNT);
-  if (!(*collection)[current_count])
+  if (!(*collection)[current_count]) {
+    *collection = old_collection;
+    *inner_counts = old_inner_counts;
+    free(new_collection);
+    free(new_inner_counts);
     return current_count;
+  }
 
   (*collection)[current_count][0] = strdup(href ? href : "");
   (*collection)[current_count][1] = strdup(label ? label : "");
@@ -228,10 +232,17 @@ static int add_link_to_collection(const char *href, const char *label,
     free((*collection)[current_count][1]);
     free((*collection)[current_count][2]);
     free((*collection)[current_count]);
+    *collection = old_collection;
+    *inner_counts = old_inner_counts;
+    free(new_collection);
+    free(new_inner_counts);
     return current_count;
   }
 
   (*inner_counts)[current_count] = LINK_FIELD_COUNT;
+
+  free(old_collection);
+  free(old_inner_counts);
   return current_count + 1;
 }
 
