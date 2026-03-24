@@ -25,6 +25,12 @@ char *pretty_display_url(const char *input) {
   strncpy(temp, start, sizeof(temp) - 1);
   temp[sizeof(temp) - 1] = '\0';
 
+  char *query = strchr(temp, '?');
+  if (query) {
+    *query = '\0';
+    input_len = strlen(temp);
+  }
+
   if (input_len > 0 && temp[input_len - 1] == '/') {
     temp[input_len - 1] = '\0';
   }
