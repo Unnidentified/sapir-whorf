@@ -294,12 +294,7 @@ h1 span {
     display: block;
     margin-bottom: 4px;
 }
-.result-sources {
-    color:var(--text-secondary);
-    display:block;
-    font-size:0.78rem;
-    margin-bottom:8px;
-}
+
 
 @media (max-width: 768px) {
     .result-favicon {

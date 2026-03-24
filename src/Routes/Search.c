@@ -377,39 +377,6 @@ static char *build_search_href(const char *query, const char *engine_id,
   return href;
 }
 
-static char *build_result_sources(unsigned int source_mask, ScrapeJob *jobs,
-                                  int job_count) {
-  size_t needed = 1;
-  int source_count = 0;
-
-  for (int i = 0; i < job_count; i++) {
-    if (source_mask & (1u << i)) {
-      needed += strlen(jobs[i].engine->name);
-      if (source_count > 0)
-        needed += strlen(" · ");
-      source_count++;
-    }
-  }
-
-  char *sources = (char *)malloc(needed);
-  if (!sources)
-    return NULL;
-
-  sources[0] = '\0';
-  source_count = 0;
-
-  for (int i = 0; i < job_count; i++) {
-    if (source_mask & (1u << i)) {
-      if (source_count > 0)
-        strcat(sources, " · ");
-      strcat(sources, jobs[i].engine->name);
-      source_count++;
-    }
-  }
-
-  return sources;
-}
-
 int results_handler(UrlParams *params) {
   TemplateContext ctx = new_context();
   char *raw_query = "";
@@ -674,17 +641,13 @@ int results_handler(UrlParams *params) {
     char ***results_matrix = (char ***)malloc(sizeof(char **) * total_results);
     int *results_inner_counts = (int *)malloc(sizeof(int) * total_results);
     char **seen_urls = (char **)malloc(sizeof(char *) * total_results);
-    unsigned int *source_masks =
-        (unsigned int *)calloc(total_results, sizeof(unsigned int));
-    if (!results_matrix || !results_inner_counts || !seen_urls || !source_masks) {
+    if (!results_matrix || !results_inner_counts || !seen_urls) {
       if (results_matrix)
         free(results_matrix);
       if (results_inner_counts)
         free(results_inner_counts);
       if (seen_urls)
         free(seen_urls);
-      if (source_masks)
-        free(source_masks);
       char *html = render_template("results.html", &ctx);
       if (html) {
         send_response(html);
@@ -712,7 +675,6 @@ int results_handler(UrlParams *params) {
         for (int k = 0; k < unique_count; k++) {
           if (strcmp(seen_urls[k], display_url) == 0) {
             is_duplicate = 1;
-            source_masks[k] |= (1u << i);
             break;
           }
         }
@@ -752,9 +714,8 @@ int results_handler(UrlParams *params) {
             all_results[i][j].snippet ? strdup(all_results[i][j].snippet)
                                       : strdup("");
         results_matrix[unique_count][4] = strdup(base_url ? base_url : "");
-        results_matrix[unique_count][5] = NULL;
+        results_matrix[unique_count][5] = strdup("");
 
-        source_masks[unique_count] = (1u << i);
         results_inner_counts[unique_count] = RESULT_FIELD_COUNT;
 
         free(pretty_url);
@@ -766,13 +727,6 @@ int results_handler(UrlParams *params) {
         unique_count++;
       }
       free(all_results[i]);
-    }
-
-    for (int i = 0; i < unique_count; i++) {
-      results_matrix[i][5] =
-          build_result_sources(source_masks[i], jobs, enabled_engine_count);
-      if (!results_matrix[i][5])
-        results_matrix[i][5] = strdup("");
     }
 
     context_set_array_of_arrays(&ctx, "results", results_matrix, unique_count,
@@ -843,7 +797,6 @@ int results_handler(UrlParams *params) {
       free(seen_urls[i]);
     }
     free(seen_urls);
-    free(source_masks);
     free(results_matrix);
     free(results_inner_counts);
   } else {
