@@ -92,6 +92,8 @@ int load_config(const char *filename, Config *config) {
           config->cache_ttl_search = atoi(value);
         } else if (strcmp(key, "ttl_infobox") == 0) {
           config->cache_ttl_infobox = atoi(value);
+        } else if (strcmp(key, "ttl_image") == 0) {
+          config->cache_ttl_image = atoi(value);
         }
       } else if (strcmp(section, "engines") == 0) {
         if (strcmp(key, "engines") == 0) {

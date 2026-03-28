@@ -11,14 +11,19 @@
 static char cache_dir[BUFFER_SIZE_MEDIUM] = {0};
 static int cache_ttl_search_val = DEFAULT_CACHE_TTL_SEARCH;
 static int cache_ttl_infobox_val = DEFAULT_CACHE_TTL_INFOBOX;
+static int cache_ttl_image_val = DEFAULT_CACHE_TTL_IMAGE;
 
 void set_cache_ttl_search(int ttl) { cache_ttl_search_val = ttl; }
 
 void set_cache_ttl_infobox(int ttl) { cache_ttl_infobox_val = ttl; }
 
+void set_cache_ttl_image(int ttl) { cache_ttl_image_val = ttl; }
+
 int get_cache_ttl_search(void) { return cache_ttl_search_val; }
 
 int get_cache_ttl_infobox(void) { return cache_ttl_infobox_val; }
+
+int get_cache_ttl_image(void) { return cache_ttl_image_val; }
 
 static void md5_hash(const char *str, char *output) {
   unsigned char hash[EVP_MAX_MD_SIZE];

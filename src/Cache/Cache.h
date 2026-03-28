@@ -17,7 +17,9 @@ char *cache_compute_key(const char *query, int page, const char *engine_name);
 
 void set_cache_ttl_search(int ttl);
 void set_cache_ttl_infobox(int ttl);
+void set_cache_ttl_image(int ttl);
 int get_cache_ttl_search(void);
 int get_cache_ttl_infobox(void);
+int get_cache_ttl_image(void);
 
 #endif

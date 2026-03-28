@@ -52,6 +52,7 @@ int main() {
                 .cache_dir = DEFAULT_CACHE_DIR,
                 .cache_ttl_search = DEFAULT_CACHE_TTL_SEARCH,
                 .cache_ttl_infobox = DEFAULT_CACHE_TTL_INFOBOX,
+                .cache_ttl_image = DEFAULT_CACHE_TTL_IMAGE,
                 .engines = ""};
 
   if (load_config("config.ini", &cfg) != 0) {
@@ -72,6 +73,7 @@ int main() {
 
   set_cache_ttl_search(cfg.cache_ttl_search);
   set_cache_ttl_infobox(cfg.cache_ttl_infobox);
+  set_cache_ttl_image(cfg.cache_ttl_image);
 
   if (cfg.proxy_list_file[0] != '\0') {
     if (load_proxy_list(cfg.proxy_list_file) < 0) {

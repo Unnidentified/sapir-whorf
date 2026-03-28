@@ -6,6 +6,7 @@
 #define DEFAULT_CACHE_DIR "/tmp/omnisearch_cache"
 #define DEFAULT_CACHE_TTL_SEARCH 3600
 #define DEFAULT_CACHE_TTL_INFOBOX 86400
+#define DEFAULT_CACHE_TTL_IMAGE 604800
 #define DEFAULT_MAX_PROXY_RETRIES 3
 
 #define BUFFER_SIZE_SMALL 256
@@ -42,6 +43,7 @@ typedef struct {
   char cache_dir[512];
   int cache_ttl_search;
   int cache_ttl_infobox;
+  int cache_ttl_image;
   char engines[512];
 } Config;
 
