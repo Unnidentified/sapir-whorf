@@ -50,7 +50,7 @@ On Alpine, `shadow` is needed for the user creation process during the install.
 ### NixOS
 Add the flake to your inputs and import the module. That is all you need.
 Here's an example of using the modules in a flake:
-```
+```nix
 # flake.nix
 {
   inputs = {
