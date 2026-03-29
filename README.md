@@ -23,7 +23,7 @@ Depending on your system, you may first need to install libcurl and libxml2.
 
 ### Debian/Ubuntu
 ```
-# apt install libxml2-dev libcurl4-openssl-dev
+# apt install build-essential libssl-dev libxml2-dev libcurl4-openssl-dev
 ```
 
 ### Fedora
