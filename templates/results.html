@@ -8,7 +8,9 @@
             OmniSearch - {{query}}
         </title>
         <link rel="stylesheet" href="static/main.css">
-	<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+        {{if theme == "light"}}<link rel="stylesheet" href="static/theme-light.css">{{endif}}
+        {{if theme == "dark"}}<link rel="stylesheet" href="static/theme-dark.css">{{endif}}
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="search" 
         type="application/opensearchdescription+xml" 
         title="OmniSearch" href="/opensearch.xml">
@@ -24,6 +26,7 @@
                 <input name="q" type="text" class="search-box" autocomplete="off" placeholder="Search the web..."
                 value="{{query}}">
             </form>
+            <a href="/settings?q={{query}}" class="nav-settings-icon" title="Settings"></a>
         </header>
         <nav class="nav-tabs">
             <div class="nav-container">
@@ -32,6 +35,9 @@
                 </a>
                 <a href="/images?q={{query}}">
                     Images
+                </a>
+                <a href="/settings?q={{query}}" class="nav-settings-link">
+                    Settings
                 </a>
             </div>
         </nav>

@@ -13,6 +13,8 @@
 #include "Routes/ImageProxy.h"
 #include "Routes/Images.h"
 #include "Routes/Search.h"
+#include "Routes/Settings.h"
+#include "Routes/SettingsSave.h"
 #include "Scraping/Scraping.h"
 
 Config global_config;
@@ -97,6 +99,8 @@ int main() {
   set_handler("/search", results_handler);
   set_handler("/images", images_handler);
   set_handler("/proxy", image_proxy_handler);
+  set_handler("/settings", settings_handler);
+  set_handler("/save_settings", settings_save_handler);
 
   fprintf(stderr, "[INFO] Starting Omnisearch on %s:%d\n", cfg.host, cfg.port);
 

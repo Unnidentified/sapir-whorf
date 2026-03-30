@@ -7,6 +7,7 @@
 #include "../Scraping/Scraping.h"
 #include "../Utility/Display.h"
 #include "../Utility/Unescape.h"
+#include "../Utility/Utility.h"
 #include "Config.h"
 #include <ctype.h>
 #include <pthread.h>
@@ -401,12 +402,17 @@ int results_handler(UrlParams *params) {
   }
 
   context_set(&ctx, "query", raw_query);
+
+  char *theme = get_theme("");
+  context_set(&ctx, "theme", theme);
+  free(theme);
+
   char page_str[16];
   snprintf(page_str, sizeof(page_str), "%d", page);
   context_set(&ctx, "page", page_str);
 
   if (!raw_query || strlen(raw_query) == 0) {
-    send_response("<h1>No query provided</h1>");
+    send_redirect("/");
     free_context(&ctx);
     return -1;
   }

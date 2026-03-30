@@ -8,7 +8,9 @@
             OmniSearch
         </title>
         <link rel="stylesheet" href="static/main.css">
-	<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+        {{if theme == "light"}}<link rel="stylesheet" href="static/theme-light.css">{{endif}}
+        {{if theme == "dark"}}<link rel="stylesheet" href="static/theme-dark.css">{{endif}}
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="search" 
         type="application/opensearchdescription+xml" 
         title="OmniSearch" href="/opensearch.xml">
@@ -30,11 +32,13 @@
                             Search
                         </button>
                         <button type="submit" name="btnI" value="1" class="btn-secondary">
-                    	    Surprise me
-			              </div>
+                            Surprise me
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
+        <a href="/settings" class="home-settings-btn" title="Settings"></a>
     </body>
 
 </html>

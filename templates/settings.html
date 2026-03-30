@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+        <title>
+            OmniSearch - Settings
+        </title>
+        <link rel="stylesheet" href="static/main.css">
+        {{if theme == "light"}}<link rel="stylesheet" href="static/theme-light.css">{{endif}}
+        {{if theme == "dark"}}<link rel="stylesheet" href="static/theme-dark.css">{{endif}}
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+        <link rel="search"
+        type="application/opensearchdescription+xml"
+        title="OmniSearch" href="/opensearch.xml">
+    </head>
+
+    <body class="settings-view">
+        <header>
+            <h1>
+                Omni<span>Search</span>
+            </h1>
+            <form action="/search" method="GET" class="search-form">
+                <input name="q" type="text" class="search-box" autocomplete="off" placeholder="Search the web..."
+                value="{{query}}">
+            </form>
+            <a href="/settings?q={{query}}" class="nav-settings-icon active" title="Settings"></a>
+        </header>
+        <nav class="nav-tabs">
+            <div class="nav-container">
+                <a href="/search?q={{query}}">
+                    All
+                </a>
+                <a href="/images?q={{query}}">
+                    Images
+                </a>
+                <a href="/settings" class="active nav-settings-link">
+                    Settings
+                </a>
+            </div>
+        </nav>
+        <div class="settings-layout">
+            <main class="settings-container">
+                <form action="/save_settings" method="GET">
+                    <input type="hidden" name="q" value="{{query}}">
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">Theme</h3>
+                        <p class="settings-section-desc">Choose your preferred colour scheme.</p>
+                        <div class="settings-field">
+                            <label class="settings-label" for="theme">Appearance</label>
+                            <select id="theme" name="theme" class="settings-select">
+                                <option value="system" {{if theme == "system"}}selected{{endif}}>System</option>
+                                <option value="light" {{if theme == "light"}}selected{{endif}}>Light</option>
+                                <option value="dark" {{if theme == "dark"}}selected{{endif}}>Dark</option>
+                            </select>
+                        </div>
+                    </section>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">Save Settings</button>
+                    </div>
+                </form>
+            </main>
+        </div>
+    </body>
+
+</html>

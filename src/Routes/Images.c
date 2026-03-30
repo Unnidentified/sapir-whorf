@@ -1,6 +1,7 @@
 #include "Images.h"
 #include "../Scraping/ImageScraping.h"
 #include "../Utility/Unescape.h"
+#include "../Utility/Utility.h"
 #include "Config.h"
 
 int images_handler(UrlParams *params) {
@@ -29,6 +30,11 @@ int images_handler(UrlParams *params) {
   snprintf(two_prev_str, sizeof(two_prev_str), "%d", page > 2 ? page - 2 : 0);
   snprintf(two_next_str, sizeof(two_next_str), "%d", page + 2);
   context_set(&ctx, "query", raw_query);
+
+  char *theme = get_theme("");
+  context_set(&ctx, "theme", theme);
+  free(theme);
+
   context_set(&ctx, "page", page_str);
   context_set(&ctx, "prev_page", prev_str);
   context_set(&ctx, "next_page", next_str);
@@ -39,7 +45,7 @@ int images_handler(UrlParams *params) {
   context_set(&ctx, "query", display_query);
 
   if (!raw_query || strlen(raw_query) == 0) {
-    send_response("<h1>No query provided</h1>");
+    send_redirect("/");
     if (display_query)
       free(display_query);
     free_context(&ctx);

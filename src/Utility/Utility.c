@@ -1,4 +1,7 @@
 #include "Utility.h"
+#include <beaker.h>
+#include <stdlib.h>
+#include <string.h>
 
 int hex_to_int(char c) {
   if (c >= '0' && c <= '9')
@@ -8,4 +11,15 @@ int hex_to_int(char c) {
   if (c >= 'A' && c <= 'F')
     return c - 'A' + 10;
   return -1;
+}
+
+char *get_theme(const char *default_theme) {
+  char *cookie = get_cookie("theme");
+  if (cookie &&
+      (strcmp(cookie, "light") == 0 ||
+       strcmp(cookie, "dark") == 0)) {
+    return cookie;
+  }
+  free(cookie);
+  return strdup(default_theme);
 }
