@@ -28,7 +28,9 @@
             </form>
             {{endif}}
             {{if query != ""}}
-            <a href="/settings?q={{query}}" class="nav-settings-icon active" title="Settings"></a>
+            <a href="/search?q={{query}}" class="nav-settings-icon active" title="Settings"></a>
+            {{else}}
+            <a href="/" class="nav-settings-icon active" title="Settings"></a>
             {{endif}}
         </header>
         {{if query != ""}}
