@@ -31,6 +31,23 @@ static int is_blank_char(char c) {
   return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
+static const char *str_case_str(const char *haystack, const char *needle) {
+  size_t nlen = strlen(needle);
+  for (; *haystack; haystack++) {
+    if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
+      size_t i;
+      for (i = 1; i < nlen; i++) {
+        if (tolower((unsigned char)haystack[i]) !=
+            tolower((unsigned char)needle[i]))
+          break;
+      }
+      if (i == nlen)
+        return haystack;
+    }
+  }
+  return NULL;
+}
+
 static void trim_copy(char *dest, size_t dest_size, const char *src,
                       size_t src_len) {
   while (src_len > 0 && is_blank_char(*src)) {
@@ -53,7 +70,7 @@ static void trim_copy(char *dest, size_t dest_size, const char *src,
 }
 
 static void get_client_key(char *client_key, size_t client_key_size) {
-  const char *header = strstr(current_request_buffer, "X-Forwarded-For:");
+  const char *header = str_case_str(current_request_buffer, "x-forwarded-for:");
   if (!header)
     return;
 
