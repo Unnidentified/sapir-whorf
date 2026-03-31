@@ -18,9 +18,9 @@
 
     <body class="settings-view">
         <header>
-            <h1>
+            <a href="/" class="logo-link"><h1>
                 Omni<span>Search</span>
-            </h1>
+            </h1></a>
             {{if query != ""}}
             <form action="/search" method="GET" class="search-form">
                 <input name="q" type="text" class="search-box" autocomplete="off" placeholder="Search the web..."

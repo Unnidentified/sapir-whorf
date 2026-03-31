@@ -178,6 +178,16 @@ h1 {
 h1 span {
     color:var(--accent);
 }
+.logo-link {
+    text-decoration:none;
+    color:inherit;
+}
+header .logo-link {
+    transition:transform 0.2s;
+}
+header .logo-link:hover {
+    transform:scale(1.03);
+}
 .search-box {
     width: 100%;
     padding: 12px 24px;
