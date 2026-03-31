@@ -24,7 +24,8 @@ static int response_is_startpage_captcha(const ScrapeJob *job,
 
   return response_contains(response, "<title>Startpage Captcha</title>") ||
          response_contains(response, "Startpage Captcha") ||
-         response_contains(response, "/static-pages-assets/page-data/captcha/");
+         response_contains(response, "/static-pages-assets/page-data/captcha/") ||
+         response_contains(response, ">Startpage Blocked</title>");
 }
 
 static int response_looks_like_results_page(const ScrapeJob *job,
