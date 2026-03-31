@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}">
     
     <head>
         <meta charset="UTF-8">
@@ -24,21 +24,21 @@
                 </h1>
                 <form action="/search" class="home-search-form">
                     <div class="search-input-wrapper">
-                        <input name="q" type="text" class="search-box" placeholder="Search the web..."
+                        <input name="q" type="text" class="search-box" placeholder="{{l("search_placeholder")}}"
                         autofocus autocomplete="off">
                     </div>
                     <div class="buttons">
                         <button type="submit" class="btn-primary">
-                            Search
+                            {{l("search_button")}}
                         </button>
                         <button type="submit" name="btnI" value="1" class="btn-secondary">
-                            Surprise me
+                            {{l("surprise_me_button")}}
                         </button>
                     </div>
                 </form>
             </div>
         </div>
-        <a href="/settings" class="home-settings-btn" title="Settings"></a>
+        <a href="/settings" class="home-settings-btn" title="{{l("settings_tab")}}"></a>
     </body>
 
 </html>

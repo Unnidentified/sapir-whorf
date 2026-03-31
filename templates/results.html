@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}">
     
     <head>
         <meta charset="UTF-8">
@@ -23,21 +23,21 @@
             </h1></a>
             <form action="/search" method="GET" class="search-form">
                 <input name="engine" type="hidden" value="{{selected_engine}}">
-                <input name="q" type="text" class="search-box" autocomplete="off" placeholder="Search the web..."
+                <input name="q" type="text" class="search-box" autocomplete="off" placeholder="{{l("search_placeholder")}}"
                 value="{{query}}">
             </form>
-            <a href="/settings?q={{query}}" class="nav-settings-icon" title="Settings"></a>
+            <a href="/settings?q={{query}}" class="nav-settings-icon" title="{{l("settings_tab")}}"></a>
         </header>
         <nav class="nav-tabs">
             <div class="nav-container">
                 <a href="{{search_href}}" class="active">
-                    All
+                    {{l("all_tab")}}
                 </a>
                 <a href="/images?q={{query}}">
-                    Images
+                    {{l("images_tab")}}
                 </a>
                 <a href="/settings?q={{query}}" class="nav-settings-link">
-                    Settings
+                    {{l("settings_tab")}}
                 </a>
             </div>
         </nav>
@@ -88,7 +88,7 @@
                         {{result[3]}}
                     </p>
                     <span>
-                        <a class="cached" href="https://web.archive.org/web/{{result[0]|safe}}">View Cached</a>
+                        <a class="cached" href="https://web.archive.org/web/{{result[0]|safe}}">{{l("view_cached")}}</a>
                     </span>
                 </div>
                 {{endfor}}
@@ -117,9 +117,9 @@
                          <div class="infobox-content"> <p class="infobox-summary">
                                  {{info[2]|safe}}
                              </p>
-                             <a class="read-more" href="{{info[3]}}">
-                                 Read More
-                             </a>
+<a class="read-more" href="{{info[3]}}">
+                                  {{l("read_more")}}
+                              </a>
                          </div>
                      </div>
                  </section>

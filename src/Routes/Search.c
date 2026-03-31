@@ -419,6 +419,10 @@ int results_handler(UrlParams *params) {
   context_set(&ctx, "theme", theme);
   free(theme);
 
+  char *locale = get_locale("en_uk");
+  beaker_set_locale(&ctx, locale);
+  free(locale);
+
   char page_str[16];
   snprintf(page_str, sizeof(page_str), "%d", page);
   context_set(&ctx, "page", page_str);

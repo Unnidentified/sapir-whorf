@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}">
 
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
         <title>
-            OmniSearch - Settings
+            OmniSearch - {{l("settings_title")}}
         </title>
         <link rel="stylesheet" href="static/main.css">
         {{if theme == "light"}}<link rel="stylesheet" href="static/theme-light.css">{{endif}}
@@ -23,27 +23,27 @@
             </h1></a>
             {{if query != ""}}
             <form action="/search" method="GET" class="search-form">
-                <input name="q" type="text" class="search-box" autocomplete="off" placeholder="Search the web..."
+                <input name="q" type="text" class="search-box" autocomplete="off" placeholder="{{l("search_placeholder")}}"
                 value="{{query}}">
             </form>
             {{endif}}
             {{if query != ""}}
-            <a href="/search?q={{query}}" class="nav-settings-icon active" title="Settings"></a>
+            <a href="/search?q={{query}}" class="nav-settings-icon active" title="{{l("settings_tab")}}"></a>
             {{else}}
-            <a href="/" class="nav-settings-icon active" title="Settings"></a>
+            <a href="/" class="nav-settings-icon active" title="{{l("settings_tab")}}"></a>
             {{endif}}
         </header>
         {{if query != ""}}
         <nav class="nav-tabs">
             <div class="nav-container">
                 <a href="/search?q={{query}}">
-                    All
+                    {{l("all_tab")}}
                 </a>
                 <a href="/images?q={{query}}">
-                    Images
+                    {{l("images_tab")}}
                 </a>
                 <a href="/settings" class="active nav-settings-link">
-                    Settings
+                    {{l("settings_tab")}}
                 </a>
             </div>
         </nav>
@@ -53,19 +53,31 @@
                 <form action="/save_settings" method="GET">
                     <input type="hidden" name="q" value="{{query}}">
                     <section class="settings-section">
-                        <h3 class="settings-section-title">Theme</h3>
-                        <p class="settings-section-desc">Choose your preferred colour scheme.</p>
+                        <h3 class="settings-section-title">{{l("theme_label")}}</h3>
+                        <p class="settings-section-desc">{{l("theme_desc")}}</p>
                         <div class="settings-field">
-                            <label class="settings-label" for="theme">Appearance</label>
+                            <label class="settings-label" for="theme">{{l("theme_label")}}</label>
                             <select id="theme" name="theme" class="settings-select">
-                                <option value="system" {{if theme == "system"}}selected{{endif}}>System</option>
-                                <option value="light" {{if theme == "light"}}selected{{endif}}>Light</option>
-                                <option value="dark" {{if theme == "dark"}}selected{{endif}}>Dark</option>
+                                <option value="system" {{if theme == "system"}}selected{{endif}}>{{l("theme_system")}}</option>
+                                <option value="light" {{if theme == "light"}}selected{{endif}}>{{l("theme_light")}}</option>
+                                <option value="dark" {{if theme == "dark"}}selected{{endif}}>{{l("theme_dark")}}</option>
+                            </select>
+                        </div>
+                    </section>
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">{{l("language_label")}}</h3>
+                        <p class="settings-section-desc">{{l("language_desc")}}</p>
+                        <div class="settings-field">
+                            <label class="settings-label" for="locale">{{l("display_language_label")}}</label>
+                            <select id="locale" name="locale" class="settings-select">
+                                {{for loc in locales}}
+                                <option value="{{loc[0]}}" {{if __locale_id == loc[0]}}selected{{endif}}>{{loc[1]}}</option>
+                                {{endfor}}
                             </select>
                         </div>
                     </section>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">Save Settings</button>
+                        <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
                     </div>
                 </form>
             </main>

@@ -67,6 +67,13 @@ int main() {
 
   global_config = cfg;
 
+  int loaded = beaker_load_locales();
+  if (loaded > 0) {
+    fprintf(stderr, "[INFO] Loaded %d locales\n", loaded);
+  } else {
+    fprintf(stderr, "[WARN] No locales loaded (make sure to run from omnisearch directory)\n");
+  }
+
   apply_engines_config(cfg.engines);
 
   if (cache_init(cfg.cache_dir) != 0) {
@@ -119,6 +126,7 @@ int main() {
 
   curl_global_cleanup();
   xmlCleanupParser();
+  beaker_free_locales();
   free_proxy_list();
   cache_shutdown();
   return EXIT_SUCCESS;

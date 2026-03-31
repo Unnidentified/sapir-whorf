@@ -5,6 +5,7 @@
 #include "../Utility/Unescape.h"
 #include "../Utility/Utility.h"
 #include "Config.h"
+#include <beaker.h>
 
 static char *build_images_request_cache_key(const char *query, int page,
                                             const char *client_key) {
@@ -45,6 +46,10 @@ int images_handler(UrlParams *params) {
   char *theme = get_theme("");
   context_set(&ctx, "theme", theme);
   free(theme);
+
+  char *locale = get_locale("en_uk");
+  beaker_set_locale(&ctx, locale);
+  free(locale);
 
   context_set(&ctx, "page", page_str);
   context_set(&ctx, "prev_page", prev_str);

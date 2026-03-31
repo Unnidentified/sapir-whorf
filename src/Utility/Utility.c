@@ -23,3 +23,12 @@ char *get_theme(const char *default_theme) {
   free(cookie);
   return strdup(default_theme);
 }
+
+char *get_locale(const char *default_locale) {
+  char *cookie = get_cookie("locale");
+  if (cookie && beaker_get_locale_meta(cookie) != NULL) {
+    return cookie;
+  }
+  free(cookie);
+  return strdup(default_locale);
+}

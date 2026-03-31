@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}">
     
     <head>
         <meta charset="UTF-8">
@@ -19,21 +19,21 @@
                 Omni<span>Search</span>
             </h1></a>
             <form action="/images" method="GET" class="search-form">
-                <input name="q" autocomplete="off"="text" class="search-box" placeholder="Search for images..."
+                <input name="q" autocomplete="off"="text" class="search-box" placeholder="{{l("search_placeholder")}}"
                 value="{{query}}">
             </form>
-            <a href="/settings?q={{query}}" class="nav-settings-icon" title="Settings"></a>
+            <a href="/settings?q={{query}}" class="nav-settings-icon" title="{{l("settings_tab")}}"></a>
         </header>
         <nav class="nav-tabs">
             <div class="nav-container">
                 <a href="/search?q={{query}}">
-                    All
+                    {{l("all_tab")}}
                 </a>
                 <a href="/images?q={{query}}" class="active">
-                    Images
+                    {{l("images_tab")}}
                 </a>
                 <a href="/settings?q={{query}}" class="nav-settings-link">
-                    Settings
+                    {{l("settings_tab")}}
                 </a>
             </div>
         </nav>
@@ -46,10 +46,10 @@
                         <div class="image-overlay">
                             <div class="overlay-buttons">
                                 <a href="{{img[3]}}" target="_blank" class="overlay-btn primary">
-                                    View Image
+                                    {{l("view_image")}}
                                 </a>
                                 <a href="{{img[2]}}" target="_blank" class="overlay-btn secondary">
-                                    Visit Site
+                                    {{l("visit_site")}}
                                 </a>
                             </div>
                         </div>
