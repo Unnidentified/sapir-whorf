@@ -100,6 +100,16 @@ int load_config(const char *filename, Config *config) {
           strncpy(config->engines, value, sizeof(config->engines) - 1);
           config->engines[sizeof(config->engines) - 1] = '\0';
         }
+      } else if (strcmp(section, "rate_limit") == 0) {
+        if (strcmp(key, "search_requests") == 0) {
+          config->rate_limit_search_requests = atoi(value);
+        } else if (strcmp(key, "search_interval") == 0) {
+          config->rate_limit_search_interval = atoi(value);
+        } else if (strcmp(key, "images_requests") == 0) {
+          config->rate_limit_images_requests = atoi(value);
+        } else if (strcmp(key, "images_interval") == 0) {
+          config->rate_limit_images_interval = atoi(value);
+        }
       }
     }
   }

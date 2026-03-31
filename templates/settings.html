@@ -21,12 +21,17 @@
             <h1>
                 Omni<span>Search</span>
             </h1>
+            {{if query != ""}}
             <form action="/search" method="GET" class="search-form">
                 <input name="q" type="text" class="search-box" autocomplete="off" placeholder="Search the web..."
                 value="{{query}}">
             </form>
+            {{endif}}
+            {{if query != ""}}
             <a href="/settings?q={{query}}" class="nav-settings-icon active" title="Settings"></a>
+            {{endif}}
         </header>
+        {{if query != ""}}
         <nav class="nav-tabs">
             <div class="nav-container">
                 <a href="/search?q={{query}}">
@@ -40,6 +45,7 @@
                 </a>
             </div>
         </nav>
+        {{endif}}
         <div class="settings-layout">
             <main class="settings-container">
                 <form action="/save_settings" method="GET">

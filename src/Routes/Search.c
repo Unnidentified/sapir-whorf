@@ -1,9 +1,11 @@
 #include "Search.h"
+#include "../Cache/Cache.h"
 #include "../Infobox/Calculator.h"
 #include "../Infobox/CurrencyConversion.h"
 #include "../Infobox/Dictionary.h"
 #include "../Infobox/UnitConversion.h"
 #include "../Infobox/Wikipedia.h"
+#include "../Limiter/RateLimit.h"
 #include "../Scraping/Scraping.h"
 #include "../Utility/Display.h"
 #include "../Utility/Unescape.h"
@@ -378,7 +380,17 @@ static char *build_search_href(const char *query, const char *engine_id,
   return href;
 }
 
+static char *build_search_request_cache_key(const char *query,
+                                            const char *engine_id, int page,
+                                            const char *client_key) {
+  char scope_key[BUFFER_SIZE_MEDIUM];
+  snprintf(scope_key, sizeof(scope_key), "search_request:%s:%s",
+           engine_id ? engine_id : "all", client_key ? client_key : "unknown");
+  return cache_compute_key(query, page, scope_key);
+}
+
 int results_handler(UrlParams *params) {
+  extern Config global_config;
   TemplateContext ctx = new_context();
   char *raw_query = "";
   const char *selected_engine_id = "all";
@@ -474,6 +486,47 @@ int results_handler(UrlParams *params) {
     }
   }
 
+  char client_key[BUFFER_SIZE_SMALL];
+  rate_limit_get_client_key(client_key, sizeof(client_key));
+
+  char *request_cache_key = build_search_request_cache_key(
+      raw_query, selected_engine_id, page, client_key);
+  int request_is_cached = 0;
+
+  if (request_cache_key && get_cache_ttl_search() > 0) {
+    char *cached_marker = NULL;
+    size_t cached_marker_size = 0;
+
+    if (cache_get(request_cache_key, (time_t)get_cache_ttl_search(),
+                  &cached_marker, &cached_marker_size) == 0) {
+      request_is_cached = 1;
+    }
+
+    free(cached_marker);
+  }
+
+  if (engine_idx > 0 && !request_is_cached) {
+    RateLimitConfig rate_limit_config = {
+        .max_requests = global_config.rate_limit_search_requests,
+        .interval_seconds = global_config.rate_limit_search_interval,
+    };
+    RateLimitResult rate_limit_result =
+        rate_limit_check("search", &rate_limit_config);
+    if (rate_limit_result.limited) {
+      char response[256];
+      snprintf(response, sizeof(response),
+               "<h1>Slow down!</h1><p>Too many searches from you!</p>");
+      send_response(response);
+      free(request_cache_key);
+      free_context(&ctx);
+      return -1;
+    }
+
+    if (request_cache_key && get_cache_ttl_search() > 0) {
+      cache_set(request_cache_key, "1", 1);
+    }
+  }
+
   int filter_engine_count = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
     if (ENGINE_REGISTRY[i].enabled)
@@ -551,6 +604,7 @@ int results_handler(UrlParams *params) {
             }
           }
         }
+        free(request_cache_key);
         free_context(&ctx);
         if (redirect_url) {
           send_redirect(redirect_url);
@@ -569,6 +623,7 @@ int results_handler(UrlParams *params) {
         }
       }
     }
+    free(request_cache_key);
     free_context(&ctx);
     send_response("<h1>No results found</h1>");
     return 0;
@@ -668,6 +723,7 @@ int results_handler(UrlParams *params) {
           }
         }
       }
+      free(request_cache_key);
       free_context(&ctx);
       return 0;
     }
@@ -816,6 +872,8 @@ int results_handler(UrlParams *params) {
       free(all_results[i]);
     }
   }
+
+  free(request_cache_key);
 
   if (page == 1) {
     for (int i = 0; i < HANDLER_COUNT; i++) {

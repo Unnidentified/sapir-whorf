@@ -45,6 +45,10 @@ typedef struct {
   int cache_ttl_infobox;
   int cache_ttl_image;
   char engines[512];
+  int rate_limit_search_requests;
+  int rate_limit_search_interval;
+  int rate_limit_images_requests;
+  int rate_limit_images_interval;
 } Config;
 
 int load_config(const char *filename, Config *config);
