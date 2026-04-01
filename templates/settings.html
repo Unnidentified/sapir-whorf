@@ -76,6 +76,19 @@
                             </select>
                         </div>
                     </section>
+                    {{if has_enabled_engines}}
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">{{l("engines_label")}}</h3>
+                        <p class="settings-section-desc">{{l("engines_desc")}}</p>
+                        <input type="hidden" name="engines_present" value="1">
+                        {{for eng in enabled_engines}}
+                        <div class="settings-field">
+                            <label class="settings-label" for="engine_{{eng[0]}}">{{eng[1]}}</label>
+                            <input type="checkbox" id="engine_{{eng[0]}}" name="engine_{{eng[0]}}" value="1" class="settings-checkbox" {{eng[2]}}>
+                        </div>
+                        {{endfor}}
+                    </section>
+                    {{endif}}
                     <div class="settings-actions">
                         <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
                     </div>

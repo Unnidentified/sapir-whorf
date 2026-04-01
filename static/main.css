@@ -815,6 +815,13 @@ header .logo-link:hover {
     border-color:var(--accent);
 }
 
+.settings-checkbox {
+    width:18px;
+    height:18px;
+    accent-color:var(--accent);
+    cursor:pointer;
+}
+
 .settings-actions {
     display:flex;
     gap:12px;
