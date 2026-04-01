@@ -32,8 +32,6 @@ typedef struct {
 
 enum {
   RESULT_FIELD_COUNT = 6,
-  LINK_FIELD_COUNT = 3,
-  PAGER_WINDOW_SIZE = 5,
 };
 
 static InfoBox fetch_wiki_wrapper(char *query) {
@@ -189,66 +187,6 @@ static int add_infobox_to_collection(InfoBox *infobox, char ****collection,
   return current_count + 1;
 }
 
-static int add_link_to_collection(const char *href, const char *label,
-                                  const char *class_name, char ****collection,
-                                  int **inner_counts, int current_count) {
-  char ***old_collection = *collection;
-  int *old_inner_counts = *inner_counts;
-  char ***new_collection =
-      (char ***)malloc(sizeof(char **) * (current_count + 1));
-  int *new_inner_counts =
-      (int *)malloc(sizeof(int) * (current_count + 1));
-
-  if (!new_collection || !new_inner_counts) {
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  if (*collection && current_count > 0) {
-    memcpy(new_collection, *collection, sizeof(char **) * current_count);
-  }
-  if (*inner_counts && current_count > 0) {
-    memcpy(new_inner_counts, *inner_counts, sizeof(int) * current_count);
-  }
-
-  *collection = new_collection;
-  *inner_counts = new_inner_counts;
-
-  (*collection)[current_count] =
-      (char **)malloc(sizeof(char *) * LINK_FIELD_COUNT);
-  if (!(*collection)[current_count]) {
-    *collection = old_collection;
-    *inner_counts = old_inner_counts;
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  (*collection)[current_count][0] = strdup(href ? href : "");
-  (*collection)[current_count][1] = strdup(label ? label : "");
-  (*collection)[current_count][2] = strdup(class_name ? class_name : "");
-
-  if (!(*collection)[current_count][0] || !(*collection)[current_count][1] ||
-      !(*collection)[current_count][2]) {
-    free((*collection)[current_count][0]);
-    free((*collection)[current_count][1]);
-    free((*collection)[current_count][2]);
-    free((*collection)[current_count]);
-    *collection = old_collection;
-    *inner_counts = old_inner_counts;
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  (*inner_counts)[current_count] = LINK_FIELD_COUNT;
-
-  free(old_collection);
-  free(old_inner_counts);
-  return current_count + 1;
-}
-
 static int add_warning_to_collection(const char *engine_name,
                                      const char *warning_message,
                                      char ****collection, int **inner_counts,
@@ -385,6 +323,16 @@ static char *build_search_href(const char *query, const char *engine_id,
   return href;
 }
 
+typedef struct {
+  const char *query;
+  const char *engine_id;
+} SearchHrefData;
+
+static char *search_href_builder(int page, void *data) {
+  SearchHrefData *d = (SearchHrefData *)data;
+  return build_search_href(d->query, d->engine_id, page);
+}
+
 static char *build_search_request_cache_key(const char *query,
                                             const char *engine_id, int page,
                                             const char *client_key) {
@@ -435,6 +383,16 @@ int results_handler(UrlParams *params) {
   char page_str[16];
   snprintf(page_str, sizeof(page_str), "%d", page);
   context_set(&ctx, "page", page_str);
+
+  char prev_str[16], next_str[16], two_prev_str[16], two_next_str[16];
+  snprintf(prev_str, sizeof(prev_str), "%d", page > 1 ? page - 1 : 0);
+  snprintf(next_str, sizeof(next_str), "%d", page + 1);
+  snprintf(two_prev_str, sizeof(two_prev_str), "%d", page > 2 ? page - 2 : 0);
+  snprintf(two_next_str, sizeof(two_next_str), "%d", page + 2);
+  context_set(&ctx, "prev_page", prev_str);
+  context_set(&ctx, "next_page", next_str);
+  context_set(&ctx, "two_prev_page", two_prev_str);
+  context_set(&ctx, "two_next_page", two_next_str);
 
   if (!raw_query || strlen(raw_query) == 0) {
     send_redirect("/");
@@ -810,43 +768,10 @@ int results_handler(UrlParams *params) {
 
     char ***pager_matrix = NULL;
     int *pager_inner_counts = NULL;
-    int pager_count = 0;
-    int pager_start = page <= 3 ? 1 : page - 2;
-    int pager_end = pager_start + PAGER_WINDOW_SIZE - 1;
-
-    if (page > 3) {
-      char *first_href = build_search_href(raw_query, selected_engine_id, 1);
-      pager_count = add_link_to_collection(first_href, "First", "pagination-btn",
-                                           &pager_matrix, &pager_inner_counts,
-                                           pager_count);
-      free(first_href);
-    }
-
-    if (page > 1) {
-      char *prev_href =
-          build_search_href(raw_query, selected_engine_id, page - 1);
-      pager_count = add_link_to_collection(prev_href, "Prev", "pagination-btn",
-                                           &pager_matrix, &pager_inner_counts,
-                                           pager_count);
-      free(prev_href);
-    }
-
-    for (int i = pager_start; i <= pager_end; i++) {
-      char label[16];
-      snprintf(label, sizeof(label), "%d", i);
-      char *page_href = build_search_href(raw_query, selected_engine_id, i);
-      pager_count = add_link_to_collection(
-          page_href, label,
-          i == page ? "pagination-btn pagination-current" : "pagination-btn",
-          &pager_matrix, &pager_inner_counts, pager_count);
-      free(page_href);
-    }
-
-    char *next_href = build_search_href(raw_query, selected_engine_id, page + 1);
-    pager_count = add_link_to_collection(next_href, "Next", "pagination-btn",
-                                         &pager_matrix, &pager_inner_counts,
-                                         pager_count);
-    free(next_href);
+    SearchHrefData href_data = { .query = raw_query, .engine_id = selected_engine_id };
+    int pager_count = build_pagination(page, locale, search_href_builder,
+                                       &href_data, &pager_matrix,
+                                       &pager_inner_counts);
 
     if (pager_count > 0) {
       context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix,

@@ -15,6 +15,30 @@ static char *build_images_request_cache_key(const char *query, int page,
   return cache_compute_key(query, page, scope_key);
 }
 
+static char *build_images_href(const char *query, int page) {
+  const char *safe_query = query ? query : "";
+  size_t needed = strlen("/images?q=") + strlen(safe_query) + 1;
+  if (page > 1)
+    needed += strlen("&p=") + 16;
+
+  char *href = (char *)malloc(needed);
+  if (!href)
+    return NULL;
+
+  snprintf(href, needed, "/images?q=%s", safe_query);
+  if (page > 1) {
+    char page_buf[16];
+    snprintf(page_buf, sizeof(page_buf), "%d", page);
+    strcat(href, "&p=");
+    strcat(href, page_buf);
+  }
+  return href;
+}
+
+static char *images_href_builder(int page, void *data) {
+  return build_images_href((const char *)data, page);
+}
+
 int images_handler(UrlParams *params) {
   extern Config global_config;
   TemplateContext ctx = new_context();
@@ -33,14 +57,6 @@ int images_handler(UrlParams *params) {
     }
   }
 
-  char page_str[16], prev_str[16], next_str[16], two_prev_str[16],
-      two_next_str[16];
-
-  snprintf(page_str, sizeof(page_str), "%d", page);
-  snprintf(prev_str, sizeof(prev_str), "%d", page > 1 ? page - 1 : 0);
-  snprintf(next_str, sizeof(next_str), "%d", page + 1);
-  snprintf(two_prev_str, sizeof(two_prev_str), "%d", page > 2 ? page - 2 : 0);
-  snprintf(two_next_str, sizeof(two_next_str), "%d", page + 2);
   context_set(&ctx, "query", raw_query);
 
   char *theme = get_theme("");
@@ -55,11 +71,15 @@ int images_handler(UrlParams *params) {
   const char *error_images_msg = beaker_get_locale_value(locale, "error_images");
   if (!error_images_msg) error_images_msg = "Error fetching images";
 
-  context_set(&ctx, "page", page_str);
-  context_set(&ctx, "prev_page", prev_str);
-  context_set(&ctx, "next_page", next_str);
-  context_set(&ctx, "two_prev_page", two_prev_str);
-  context_set(&ctx, "two_next_page", two_next_str);
+  char ***pager_matrix = NULL;
+  int *pager_inner_counts = NULL;
+  int pager_count = build_pagination(page, locale, images_href_builder,
+                                     (void *)raw_query, &pager_matrix,
+                                     &pager_inner_counts);
+  if (pager_count > 0) {
+    context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix,
+                                pager_count, pager_inner_counts);
+  }
 
   char *display_query = url_decode_query(raw_query);
   context_set(&ctx, "query", display_query);
@@ -169,6 +189,16 @@ int images_handler(UrlParams *params) {
   }
   free(image_matrix);
   free(inner_counts);
+
+  if (pager_count > 0) {
+    for (int i = 0; i < pager_count; i++) {
+      for (int j = 0; j < LINK_FIELD_COUNT; j++)
+        free(pager_matrix[i][j]);
+      free(pager_matrix[i]);
+    }
+    free(pager_matrix);
+    free(pager_inner_counts);
+  }
 
   free_image_results(results, result_count);
   free(request_cache_key);
