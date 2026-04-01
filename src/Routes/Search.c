@@ -296,15 +296,20 @@ static int add_warning_to_collection(const char *engine_name,
   return current_count + 1;
 }
 
-static const char *warning_message_for_job(const ScrapeJob *job) {
+static const char *warning_message_for_job(const ScrapeJob *job, const char *locale) {
   switch (job->status) {
-  case SCRAPE_STATUS_FETCH_ERROR:
-    return "request failed before OmniSearch could read search results.";
-  case SCRAPE_STATUS_PARSE_MISMATCH:
-    return "returned search results in a format OmniSearch could not parse.";
-  case SCRAPE_STATUS_BLOCKED:
-    return "returned a captcha or another blocking page instead of search "
-           "results.";
+  case SCRAPE_STATUS_FETCH_ERROR: {
+    const char *msg = beaker_get_locale_value(locale, "warning_fetch_error");
+    return msg ? msg : "request failed before OmniSearch could read search results.";
+  }
+  case SCRAPE_STATUS_PARSE_MISMATCH: {
+    const char *msg = beaker_get_locale_value(locale, "warning_parse_mismatch");
+    return msg ? msg : "returned search results in a format OmniSearch could not parse.";
+  }
+  case SCRAPE_STATUS_BLOCKED: {
+    const char *msg = beaker_get_locale_value(locale, "warning_blocked");
+    return msg ? msg : "returned a captcha or another blocking page instead of search results.";
+  }
   default:
     return NULL;
   }
@@ -421,7 +426,11 @@ int results_handler(UrlParams *params) {
 
   char *locale = get_locale("en_uk");
   beaker_set_locale(&ctx, locale);
-  free(locale);
+
+  const char *rate_limit_msg = beaker_get_locale_value(locale, "rate_limit");
+  if (!rate_limit_msg) rate_limit_msg = "Slow down! Too many searches from you!";
+  const char *no_results_msg = beaker_get_locale_value(locale, "no_results");
+  if (!no_results_msg) no_results_msg = "No results found";
 
   char page_str[16];
   snprintf(page_str, sizeof(page_str), "%d", page);
@@ -518,8 +527,7 @@ int results_handler(UrlParams *params) {
         rate_limit_check("search", &rate_limit_config);
     if (rate_limit_result.limited) {
       char response[256];
-      snprintf(response, sizeof(response),
-               "<h1>Slow down!</h1><p>Too many searches from you!</p>");
+      snprintf(response, sizeof(response), "<h1>%s</h1>", rate_limit_msg);
       send_response(response);
       free(request_cache_key);
       free_context(&ctx);
@@ -629,7 +637,9 @@ int results_handler(UrlParams *params) {
     }
     free(request_cache_key);
     free_context(&ctx);
-    send_response("<h1>No results found</h1>");
+    char no_results_html[128];
+    snprintf(no_results_html, sizeof(no_results_html), "<h1>%s</h1>", no_results_msg);
+    send_response(no_results_html);
     return 0;
   }
   
@@ -661,7 +671,7 @@ int results_handler(UrlParams *params) {
 
   int warning_count = 0;
   for (int i = 0; i < enabled_engine_count; i++) {
-    if (warning_message_for_job(&jobs[i]))
+    if (warning_message_for_job(&jobs[i], locale))
       warning_count++;
   }
 
@@ -671,7 +681,7 @@ int results_handler(UrlParams *params) {
     int warning_index = 0;
 
     for (int i = 0; i < enabled_engine_count; i++) {
-      const char *warning_message = warning_message_for_job(&jobs[i]);
+      const char *warning_message = warning_message_for_job(&jobs[i], locale);
       if (!warning_message)
         continue;
 
@@ -886,6 +896,7 @@ int results_handler(UrlParams *params) {
       }
     }
   }
+  free(locale);
   free_context(&ctx);
 
   return 0;

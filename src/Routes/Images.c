@@ -49,7 +49,11 @@ int images_handler(UrlParams *params) {
 
   char *locale = get_locale("en_uk");
   beaker_set_locale(&ctx, locale);
-  free(locale);
+
+  const char *rate_limit_msg = beaker_get_locale_value(locale, "rate_limit");
+  if (!rate_limit_msg) rate_limit_msg = "Slow down! Too many image searches from you!";
+  const char *error_images_msg = beaker_get_locale_value(locale, "error_images");
+  if (!error_images_msg) error_images_msg = "Error fetching images";
 
   context_set(&ctx, "page", page_str);
   context_set(&ctx, "prev_page", prev_str);
@@ -96,8 +100,7 @@ int images_handler(UrlParams *params) {
         rate_limit_check("images", &rate_limit_config);
     if (rate_limit_result.limited) {
       char response[256];
-      snprintf(response, sizeof(response),
-               "<h1>Slow down!</h1><p>Too many image searches from you!</p>");
+      snprintf(response, sizeof(response), "<h1>%s</h1>", rate_limit_msg);
       send_response(response);
       free(request_cache_key);
       free(display_query);
@@ -115,7 +118,9 @@ int images_handler(UrlParams *params) {
 
   if (scrape_images(raw_query, page, &results, &result_count) != 0 ||
       !results) {
-    send_response("<h1>Error fetching images</h1>");
+    char error_html[128];
+    snprintf(error_html, sizeof(error_html), "<h1>%s</h1>", error_images_msg);
+    send_response(error_html);
     free(request_cache_key);
     free(display_query);
     free_context(&ctx);
