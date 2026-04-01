@@ -538,6 +538,14 @@ header .logo-link:hover {
     border-color: var(--accent);
 }
 
+[dir="rtl"] .pagination-btn.prev {
+    transform: scaleX(-1);
+}
+
+[dir="rtl"] .pagination-btn.next {
+    transform: scaleX(-1);
+}
+
 
 @media (max-width:1200px) {
     .content-layout {

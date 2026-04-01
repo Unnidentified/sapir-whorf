@@ -192,7 +192,7 @@ int build_pagination(int page,
 
   if (page > 1) {
     char *href = href_builder(page - 1, data);
-    count = add_link_to_collection(href, "<", "pagination-btn prev",
+    count = add_link_to_collection(href, "←", "pagination-btn prev",
                                    out_matrix, out_inner_counts, count);
     free(href);
   }
@@ -209,7 +209,7 @@ int build_pagination(int page,
   }
 
   char *href = href_builder(page + 1, data);
-  count = add_link_to_collection(href, ">", "pagination-btn next",
+  count = add_link_to_collection(href, "→", "pagination-btn next",
                                  out_matrix, out_inner_counts, count);
   free(href);
 
