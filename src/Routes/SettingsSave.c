@@ -1,11 +1,18 @@
 #include "SettingsSave.h"
+#include "../Scraping/Scraping.h"
+#include "../Utility/Utility.h"
 #include <stdlib.h>
 #include <string.h>
+
+#define MAX_ENGINE_IDS ENGINE_COUNT
 
 int settings_save_handler(UrlParams *params) {
   const char *theme = "";
   const char *locale = "";
   const char *query = "";
+  int engines_present = 0;
+  char selected_ids[ENGINE_COUNT][32];
+  int selected_count = 0;
 
   if (params) {
     for (int i = 0; i < params->count; i++) {
@@ -15,6 +22,19 @@ int settings_save_handler(UrlParams *params) {
         locale = params->params[i].value;
       } else if (strcmp(params->params[i].key, "q") == 0) {
         query = params->params[i].value;
+      } else if (strcmp(params->params[i].key, "engines_present") == 0) {
+        engines_present = 1;
+      } else if (strncmp(params->params[i].key, "engine_", 7) == 0 &&
+                 strcmp(params->params[i].value, "1") == 0) {
+        const char *engine_id = params->params[i].key + 7;
+        if (engine_id[0] != '\0' && is_engine_id_enabled(engine_id) &&
+            selected_count < ENGINE_COUNT) {
+          strncpy(selected_ids[selected_count], engine_id,
+                  sizeof(selected_ids[selected_count]) - 1);
+          selected_ids[selected_count][sizeof(selected_ids[selected_count]) - 1] =
+              '\0';
+          selected_count++;
+        }
       }
     }
   }
@@ -24,6 +44,18 @@ int settings_save_handler(UrlParams *params) {
   }
   if (strlen(locale) > 0) {
     set_cookie("locale", locale, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
+  }
+
+  if (engines_present) {
+    char cookie_value[512];
+    cookie_value[0] = '\0';
+    for (int i = 0; i < selected_count; i++) {
+      if (i > 0)
+        strcat(cookie_value, ",");
+      strcat(cookie_value, selected_ids[i]);
+    }
+    set_cookie("engines", cookie_value, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
+               false, false);
   }
 
   char redirect_url[512];

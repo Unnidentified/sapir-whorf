@@ -290,6 +290,13 @@ static const SearchEngine *find_enabled_engine(const char *engine_id) {
   return NULL;
 }
 
+static int engine_allowed_for_user(const SearchEngine *eng, char **user_ids,
+                                   int user_count, int has_pref) {
+  if (!has_pref)
+    return 1;
+  return user_engines_contains(eng->id, user_ids, user_count);
+}
+
 static char *build_search_href(const char *query, const char *engine_id,
                                int page) {
   const char *safe_query = query ? query : "";
@@ -350,6 +357,10 @@ int results_handler(UrlParams *params) {
   int page = 1;
   int btnI = 0;
 
+  char **user_engines = NULL;
+  int user_engine_count = 0;
+  int has_user_pref = (get_user_engines(&user_engines, &user_engine_count) == 0);
+
   if (params) {
     for (int i = 0; i < params->count; i++) {
       if (strcmp(params->params[i].key, "q") == 0) {
@@ -396,6 +407,11 @@ int results_handler(UrlParams *params) {
 
   if (!raw_query || strlen(raw_query) == 0) {
     send_redirect("/");
+    if (has_user_pref) {
+      for (int i = 0; i < user_engine_count; i++)
+        free(user_engines[i]);
+      free(user_engines);
+    }
     free_context(&ctx);
     return -1;
   }
@@ -412,7 +428,9 @@ int results_handler(UrlParams *params) {
   int enabled_engine_count = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
     if (ENGINE_REGISTRY[i].enabled &&
-        (!selected_engine || &ENGINE_REGISTRY[i] == selected_engine)) {
+        (!selected_engine || &ENGINE_REGISTRY[i] == selected_engine) &&
+        engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
+                                user_engine_count, has_user_pref)) {
       enabled_engine_count++;
     }
   }
@@ -439,7 +457,9 @@ int results_handler(UrlParams *params) {
   int engine_idx = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
     if (ENGINE_REGISTRY[i].enabled &&
-        (!selected_engine || &ENGINE_REGISTRY[i] == selected_engine)) {
+        (!selected_engine || &ENGINE_REGISTRY[i] == selected_engine) &&
+        engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
+                                user_engine_count, has_user_pref)) {
       all_results[engine_idx] = NULL;
       jobs[engine_idx].engine = &ENGINE_REGISTRY[i];
       jobs[engine_idx].query = raw_query;
@@ -488,6 +508,11 @@ int results_handler(UrlParams *params) {
       snprintf(response, sizeof(response), "<h1>%s</h1>", rate_limit_msg);
       send_response(response);
       free(request_cache_key);
+      if (has_user_pref) {
+        for (int i = 0; i < user_engine_count; i++)
+          free(user_engines[i]);
+        free(user_engines);
+      }
       free_context(&ctx);
       return -1;
     }
@@ -499,7 +524,9 @@ int results_handler(UrlParams *params) {
 
   int filter_engine_count = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
-    if (ENGINE_REGISTRY[i].enabled)
+    if (ENGINE_REGISTRY[i].enabled &&
+        engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
+                                user_engine_count, has_user_pref))
       filter_engine_count++;
   }
 
@@ -516,7 +543,9 @@ int results_handler(UrlParams *params) {
     free(all_href);
 
     for (int i = 0; i < ENGINE_COUNT; i++) {
-      if (!ENGINE_REGISTRY[i].enabled)
+      if (!ENGINE_REGISTRY[i].enabled ||
+          !engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
+                                   user_engine_count, has_user_pref))
         continue;
 
       char *filter_href =
@@ -575,6 +604,11 @@ int results_handler(UrlParams *params) {
           }
         }
         free(request_cache_key);
+        if (has_user_pref) {
+          for (int i = 0; i < user_engine_count; i++)
+            free(user_engines[i]);
+          free(user_engines);
+        }
         free_context(&ctx);
         if (redirect_url) {
           send_redirect(redirect_url);
@@ -594,6 +628,11 @@ int results_handler(UrlParams *params) {
       }
     }
     free(request_cache_key);
+    if (has_user_pref) {
+      for (int i = 0; i < user_engine_count; i++)
+        free(user_engines[i]);
+      free(user_engines);
+    }
     free_context(&ctx);
     char no_results_html[128];
     snprintf(no_results_html, sizeof(no_results_html), "<h1>%s</h1>", no_results_msg);
@@ -696,6 +735,11 @@ int results_handler(UrlParams *params) {
         }
       }
       free(request_cache_key);
+      if (has_user_pref) {
+        for (int i = 0; i < user_engine_count; i++)
+          free(user_engines[i]);
+        free(user_engines);
+      }
       free_context(&ctx);
       return 0;
     }
@@ -822,6 +866,11 @@ int results_handler(UrlParams *params) {
     }
   }
   free(locale);
+  if (has_user_pref) {
+    for (int i = 0; i < user_engine_count; i++)
+      free(user_engines[i]);
+    free(user_engines);
+  }
   free_context(&ctx);
 
   return 0;
