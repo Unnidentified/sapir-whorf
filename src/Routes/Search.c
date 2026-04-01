@@ -813,7 +813,7 @@ int results_handler(UrlParams *params) {
     char ***pager_matrix = NULL;
     int *pager_inner_counts = NULL;
     SearchHrefData href_data = { .query = raw_query, .engine_id = selected_engine_id };
-    int pager_count = build_pagination(page, locale, search_href_builder,
+    int pager_count = build_pagination(page, search_href_builder,
                                        &href_data, &pager_matrix,
                                        &pager_inner_counts);
 

@@ -73,7 +73,7 @@ int images_handler(UrlParams *params) {
 
   char ***pager_matrix = NULL;
   int *pager_inner_counts = NULL;
-  int pager_count = build_pagination(page, locale, images_href_builder,
+  int pager_count = build_pagination(page, images_href_builder,
                                      (void *)raw_query, &pager_matrix,
                                      &pager_inner_counts);
   if (pager_count > 0) {

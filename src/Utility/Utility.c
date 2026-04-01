@@ -178,7 +178,7 @@ int add_link_to_collection(const char *href, const char *label,
   return current_count + 1;
 }
 
-int build_pagination(int page, const char *locale,
+int build_pagination(int page,
                      char *(*href_builder)(int page, void *data), void *data,
                      char ****out_matrix, int **out_inner_counts) {
   enum { PAGER_WINDOW_SIZE = 5 };
