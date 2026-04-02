@@ -12,11 +12,89 @@
 #include "../Utility/Utility.h"
 #include "Config.h"
 #include <ctype.h>
+#include <openssl/evp.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#define URL_HASH_TABLE_SIZE 64
+
+typedef struct UrlHashEntry {
+  char *url;
+  struct UrlHashEntry *next;
+} UrlHashEntry;
+
+typedef struct {
+  UrlHashEntry *buckets[URL_HASH_TABLE_SIZE];
+} UrlHashTable;
+
+static void url_hash_init(UrlHashTable *ht) {
+  for (int i = 0; i < URL_HASH_TABLE_SIZE; i++) {
+    ht->buckets[i] = NULL;
+  }
+}
+
+static unsigned int url_hash(const char *url) {
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned int hash_len;
+  EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+  if (!ctx)
+    return 0;
+  EVP_DigestInit_ex(ctx, EVP_md5(), NULL);
+  EVP_DigestUpdate(ctx, url, strlen(url));
+  EVP_DigestFinal_ex(ctx, hash, &hash_len);
+  EVP_MD_CTX_free(ctx);
+  unsigned int h = 0;
+  for (unsigned int i = 0; i < hash_len; i++) {
+    h = h * 31 + hash[i];
+  }
+  return h % URL_HASH_TABLE_SIZE;
+}
+
+static int url_hash_contains(UrlHashTable *ht, const char *url) {
+  unsigned int idx = url_hash(url);
+  for (UrlHashEntry *e = ht->buckets[idx]; e; e = e->next) {
+    if (strcmp(e->url, url) == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static int url_hash_insert(UrlHashTable *ht, const char *url) {
+  unsigned int idx = url_hash(url);
+  for (UrlHashEntry *e = ht->buckets[idx]; e; e = e->next) {
+    if (strcmp(e->url, url) == 0) {
+      return 0;
+    }
+  }
+  UrlHashEntry *new_entry = malloc(sizeof(UrlHashEntry));
+  if (!new_entry)
+    return -1;
+  new_entry->url = strdup(url);
+  if (!new_entry->url) {
+    free(new_entry);
+    return -1;
+  }
+  new_entry->next = ht->buckets[idx];
+  ht->buckets[idx] = new_entry;
+  return 0;
+}
+
+static void url_hash_free(UrlHashTable *ht) {
+  for (int i = 0; i < URL_HASH_TABLE_SIZE; i++) {
+    UrlHashEntry *e = ht->buckets[i];
+    while (e) {
+      UrlHashEntry *next = e->next;
+      free(e->url);
+      free(e);
+      e = next;
+    }
+    ht->buckets[i] = NULL;
+  }
+}
 
 typedef struct {
   const char *query;
@@ -712,14 +790,7 @@ int results_handler(UrlParams *params) {
   if (total_results > 0) {
     char ***results_matrix = (char ***)malloc(sizeof(char **) * total_results);
     int *results_inner_counts = (int *)malloc(sizeof(int) * total_results);
-    char **seen_urls = (char **)malloc(sizeof(char *) * total_results);
-    if (!results_matrix || !results_inner_counts || !seen_urls) {
-      if (results_matrix)
-        free(results_matrix);
-      if (results_inner_counts)
-        free(results_inner_counts);
-      if (seen_urls)
-        free(seen_urls);
+    if (!results_matrix || !results_inner_counts) {
       char *html = render_template("results.html", &ctx);
       if (html) {
         send_response(html);
@@ -744,37 +815,25 @@ int results_handler(UrlParams *params) {
       return 0;
     }
     int unique_count = 0;
+    UrlHashTable url_table;
+    url_hash_init(&url_table);
 
     for (int i = 0; i < enabled_engine_count; i++) {
       for (int j = 0; j < jobs[i].results_count; j++) {
         char *display_url = all_results[i][j].url;
 
-        int is_duplicate = 0;
-        for (int k = 0; k < unique_count; k++) {
-          if (strcmp(seen_urls[k], display_url) == 0) {
-            is_duplicate = 1;
-            break;
-          }
-        }
-
-        if (is_duplicate) {
+        if (url_hash_contains(&url_table, display_url)) {
           free(all_results[i][j].url);
           free(all_results[i][j].title);
           free(all_results[i][j].snippet);
           continue;
         }
 
-        seen_urls[unique_count] = strdup(display_url);
-        if (!seen_urls[unique_count]) {
-          free(all_results[i][j].url);
-          free(all_results[i][j].title);
-          free(all_results[i][j].snippet);
-          continue;
-        }
+        url_hash_insert(&url_table, display_url);
+
         results_matrix[unique_count] =
             (char **)malloc(sizeof(char *) * RESULT_FIELD_COUNT);
         if (!results_matrix[unique_count]) {
-          free(seen_urls[unique_count]);
           free(all_results[i][j].url);
           free(all_results[i][j].title);
           free(all_results[i][j].snippet);
@@ -839,11 +898,10 @@ int results_handler(UrlParams *params) {
       for (int j = 0; j < RESULT_FIELD_COUNT; j++)
         free(results_matrix[i][j]);
       free(results_matrix[i]);
-      free(seen_urls[i]);
     }
-    free(seen_urls);
     free(results_matrix);
     free(results_inner_counts);
+    url_hash_free(&url_table);
   } else {
     char *html = render_template("results.html", &ctx);
     if (html) {
