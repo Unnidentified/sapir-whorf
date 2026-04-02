@@ -7,18 +7,82 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <openssl/evp.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 
 #define MAX_IMAGE_SIZE (10 * 1024 * 1024)
+#define DNS_CACHE_TTL 300
+
+typedef struct DnsCacheEntry {
+  char hostname[256];
+  char ip_str[INET_ADDRSTRLEN];
+  time_t resolved_at;
+  struct DnsCacheEntry *next;
+} DnsCacheEntry;
+
+static DnsCacheEntry *dns_cache = NULL;
+static pthread_mutex_t dns_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
   char *data;
   size_t size;
   size_t capacity;
 } MemoryBuffer;
+
+static int dns_cache_lookup(const char *hostname, char *out_ip) {
+  time_t now = time(NULL);
+  pthread_mutex_lock(&dns_cache_mutex);
+  for (DnsCacheEntry *e = dns_cache; e; e = e->next) {
+    if (strcmp(e->hostname, hostname) == 0) {
+      if ((now - e->resolved_at) < DNS_CACHE_TTL) {
+        strcpy(out_ip, e->ip_str);
+        pthread_mutex_unlock(&dns_cache_mutex);
+        return 0;
+      }
+      break;
+    }
+  }
+  pthread_mutex_unlock(&dns_cache_mutex);
+  return -1;
+}
+
+static void dns_cache_insert(const char *hostname, const char *ip_str) {
+  time_t now = time(NULL);
+  pthread_mutex_lock(&dns_cache_mutex);
+
+  DnsCacheEntry **cursor = &dns_cache;
+  while (*cursor) {
+    DnsCacheEntry *entry = *cursor;
+    if ((now - entry->resolved_at) >= DNS_CACHE_TTL) {
+      *cursor = entry->next;
+      free(entry);
+      continue;
+    }
+    if (strcmp(entry->hostname, hostname) == 0) {
+      strcpy(entry->ip_str, ip_str);
+      entry->resolved_at = now;
+      pthread_mutex_unlock(&dns_cache_mutex);
+      return;
+    }
+    cursor = &entry->next;
+  }
+
+  DnsCacheEntry *new_entry = malloc(sizeof(DnsCacheEntry));
+  if (new_entry) {
+    strncpy(new_entry->hostname, hostname, sizeof(new_entry->hostname) - 1);
+    new_entry->hostname[sizeof(new_entry->hostname) - 1] = '\0';
+    strcpy(new_entry->ip_str, ip_str);
+    new_entry->resolved_at = now;
+    new_entry->next = dns_cache;
+    dns_cache = new_entry;
+  }
+
+  pthread_mutex_unlock(&dns_cache_mutex);
+}
 
 static int is_private_ip(const char *ip_str) {
   struct in_addr addr;
@@ -59,7 +123,11 @@ static int is_private_ip(const char *ip_str) {
   return 0;
 }
 
-static int is_private_hostname(const char *hostname) {
+static const char *is_private_hostname(const char *hostname, char *out_ip) {
+  if (dns_cache_lookup(hostname, out_ip) == 0) {
+    return out_ip;
+  }
+
   struct addrinfo hints, *res, *p;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_INET;
@@ -67,7 +135,7 @@ static int is_private_hostname(const char *hostname) {
 
   int err = getaddrinfo(hostname, NULL, &hints, &res);
   if (err != 0) {
-    return 0;
+    return NULL;
   }
 
   for (p = res; p != NULL; p = p->ai_next) {
@@ -78,16 +146,21 @@ static int is_private_hostname(const char *hostname) {
 
       if (is_private_ip(ip_str)) {
         freeaddrinfo(res);
-        return 1;
+        return NULL;
       }
+
+      freeaddrinfo(res);
+      strcpy(out_ip, ip_str);
+      dns_cache_insert(hostname, ip_str);
+      return out_ip;
     }
   }
 
   freeaddrinfo(res);
-  return 0;
+  return NULL;
 }
 
-static int is_allowed_domain(const char *url) {
+static int is_allowed_domain(const char *url, char *resolved_ip) {
   CURLU *h = curl_url();
   if (!h) {
     return -1;
@@ -132,7 +205,7 @@ static int is_allowed_domain(const char *url) {
     *colon = '\0';
   }
 
-  if (is_private_hostname(host)) {
+  if (!is_private_hostname(host, resolved_ip)) {
     curl_url_cleanup(h);
     return 0;
   }
@@ -206,7 +279,8 @@ int image_proxy_handler(UrlParams *params) {
     return 0;
   }
 
-  int domain_check = is_allowed_domain(url);
+  char resolved_ip[INET_ADDRSTRLEN] = {0};
+  int domain_check = is_allowed_domain(url, resolved_ip);
   if (domain_check == -1) {
     send_response("Invalid URL scheme");
     return 0;
@@ -283,6 +357,31 @@ int image_proxy_handler(UrlParams *params) {
                    "Chrome/120.0.0.0 Safari/537.36");
   apply_proxy_settings(curl);
 
+  struct curl_slist *resolves = NULL;
+  if (resolved_ip[0] != '\0') {
+    CURLU *u = curl_url();
+    if (u) {
+      curl_url_set(u, CURLUPART_URL, url, 0);
+      char *rhost = NULL;
+      curl_url_get(u, CURLUPART_HOST, &rhost, 0);
+      if (rhost) {
+        char *rscheme = NULL;
+        curl_url_get(u, CURLUPART_SCHEME, &rscheme, 0);
+        int port = (rscheme && strcasecmp(rscheme, "https") == 0) ? 443 : 80;
+        if (rscheme)
+          curl_free(rscheme);
+
+        char resolve_str[512];
+        snprintf(resolve_str, sizeof(resolve_str), "%s:%d:%s", rhost, port,
+                 resolved_ip);
+        resolves = curl_slist_append(NULL, resolve_str);
+        curl_easy_setopt(curl, CURLOPT_RESOLVE, resolves);
+        curl_free(rhost);
+      }
+      curl_url_cleanup(u);
+    }
+  }
+
   CURLcode res = curl_easy_perform(curl);
 
   long response_code;
@@ -296,6 +395,8 @@ int image_proxy_handler(UrlParams *params) {
     strncpy(content_type, content_type_ptr, sizeof(content_type) - 1);
   }
 
+  if (resolves)
+    curl_slist_free_all(resolves);
   curl_easy_cleanup(curl);
 
   if (res != CURLE_OK || response_code != 200) {
