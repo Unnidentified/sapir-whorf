@@ -239,7 +239,7 @@ static void *infobox_thread_func(void *arg) {
 
   data->result = h->fetch_fn((char *)data->query);
   data->success = (data->result.title != NULL && data->result.extract != NULL &&
-                   strlen(data->result.extract) > 10);
+                   data->result.extract[0] != '\0');
   return NULL;
 }
 
