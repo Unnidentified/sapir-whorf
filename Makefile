@@ -95,9 +95,10 @@ install:
 	@echo "Example: doas/sudo make install-openrc"
 
 install-launchd: $(TARGET)
-	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(INSTALL_BIN_DIR) $(LOG_DIR)
+	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(DATA_DIR)/locales $(INSTALL_BIN_DIR) $(LOG_DIR)
 	@cp -rf templates/* $(DATA_DIR)/templates/
 	@cp -rf static/* $(DATA_DIR)/static/
+	@cp -rf locales/* $(DATA_DIR)/locales/
 	@cp -n example-config.ini $(DATA_DIR)/config.ini || true
 	install -m 755 $(TARGET) $(INSTALL_BIN_DIR)/omnisearch
 	@mkdir -p $(LAUNCHD_DIR)
@@ -116,9 +117,10 @@ install-launchd: $(TARGET)
 	@echo "Start with: sudo launchctl kickstart -k system/$(LAUNCHD_LABEL)"
 
 install-systemd: $(TARGET)
-	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(LOG_DIR) $(CACHE_DIR)
+	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(DATA_DIR)/locales $(LOG_DIR) $(CACHE_DIR)
 	@cp -rf templates/* $(DATA_DIR)/templates/
 	@cp -rf static/* $(DATA_DIR)/static/
+	@cp -rf locales/* $(DATA_DIR)/locales/
 	@cp -n example-config.ini $(DATA_DIR)/config.ini || true
 	install -m 755 $(TARGET) $(INSTALL_BIN_DIR)/omnisearch
 	@echo "Setting up user '$(USER)'..."
@@ -134,9 +136,10 @@ install-systemd: $(TARGET)
 	@echo "Run 'systemctl enable --now omnisearch' to start"
 
 install-openrc: $(TARGET)
-	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(LOG_DIR) $(CACHE_DIR)
+	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(DATA_DIR)/locales $(LOG_DIR) $(CACHE_DIR)
 	@cp -rf templates/* $(DATA_DIR)/templates/
 	@cp -rf static/* $(DATA_DIR)/static/
+	@cp -rf locales/* $(DATA_DIR)/locales/
 	@cp -n example-config.ini $(DATA_DIR)/config.ini || true
 	install -m 755 $(TARGET) $(INSTALL_BIN_DIR)/omnisearch
 	@echo "Setting up user '$(USER)'..."
@@ -152,9 +155,10 @@ install-openrc: $(TARGET)
 	@echo "Run 'rc-update add omnisearch default' to enable"
 
 install-runit: $(TARGET)
-	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(LOG_DIR) $(CACHE_DIR) $(RUNIT_DIR)/omnisearch/log/
+	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(DATA_DIR)/locales $(LOG_DIR) $(CACHE_DIR) $(RUNIT_DIR)/omnisearch/log/
 	@cp -rf templates/* $(DATA_DIR)/templates/
 	@cp -rf static/* $(DATA_DIR)/static/
+	@cp -rf locales/* $(DATA_DIR)/locales/
 	@cp -n example-config.ini $(DATA_DIR)/config.ini || true
 	install -m 755 $(TARGET) $(INSTALL_BIN_DIR)/omnisearch
 	@echo "Setting up user '$(USER)'..."
@@ -173,9 +177,10 @@ install-runit: $(TARGET)
 	@echo "Artix: ln -s $(RUNIT_DIR)/omnisearch/ /run/runit/"
 
 install-s6: $(TARGET)
-	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(LOG_DIR) $(CACHE_DIR)
+	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(DATA_DIR)/locales $(LOG_DIR) $(CACHE_DIR)
 	@cp -rf templates/* $(DATA_DIR)/templates/
 	@cp -rf static/* $(DATA_DIR)/static/
+	@cp -rf locales/* $(DATA_DIR)/locales/
 	@cp -n example-config.ini $(DATA_DIR)/config.ini || true
 	install -m 755 $(TARGET) $(INSTALL_BIN_DIR)/omnisearch
 	@echo "Setting up user '$(USER)'..."
@@ -194,9 +199,10 @@ install-s6: $(TARGET)
 	@echo "Service will start automatically"
 
 install-dinit: $(TARGET)
-	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(LOG_DIR) $(CACHE_DIR)
+	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(DATA_DIR)/locales $(LOG_DIR) $(CACHE_DIR)
 	@cp -rf templates/* $(DATA_DIR)/templates/
 	@cp -rf static/* $(DATA_DIR)/static/
+	@cp -rf locales/* $(DATA_DIR)/locales/
 	@cp -n example-config.ini $(DATA_DIR)/config.ini || true
 	install -m 755 $(TARGET) $(INSTALL_BIN_DIR)/omnisearch
 	@echo "Setting up user '$(USER)'..."
