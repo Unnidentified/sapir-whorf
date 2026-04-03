@@ -16,7 +16,7 @@ int settings_handler(UrlParams *params) {
   }
 
   char *theme = get_theme("system");
-  char *locale = get_locale("en_uk");
+  char *locale = get_locale("en_gb");
 
   LocaleInfo locales[32];
   int locale_count = beaker_get_all_locales(locales, 32);

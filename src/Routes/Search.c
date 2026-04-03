@@ -461,7 +461,7 @@ int results_handler(UrlParams *params) {
   context_set(&ctx, "theme", theme);
   free(theme);
 
-  char *locale = get_locale("en_uk");
+  char *locale = get_locale("en_gb");
   beaker_set_locale(&ctx, locale);
 
   const char *rate_limit_msg = beaker_get_locale_value(locale, "rate_limit");

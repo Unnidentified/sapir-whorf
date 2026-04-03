@@ -6,7 +6,7 @@
 int home_handler(UrlParams *params) {
   (void)params;
   char *theme = get_theme("");
-  char *locale = get_locale("en_uk");
+  char *locale = get_locale("en_gb");
 
   TemplateContext ctx = new_context();
   context_set(&ctx, "theme", theme);
