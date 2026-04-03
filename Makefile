@@ -6,10 +6,11 @@ PKG_DEPS   := libxml-2.0 libcurl openssl
 GIT_HASH  := $(shell git rev-parse --short HEAD)
 GIT_DATE  := $(shell git log -1 --format='%ad' --date='format:%y.%m.%d')
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+GIT_REMOTE := $(shell git remote get-url origin)
 
 VERSION := $(GIT_DATE)+$(GIT_HASH)_$(GIT_BRANCH)
 
-CFLAGS  := -Wall -Wextra -O2 -Isrc -DVERSION='"$(VERSION)"'
+CFLAGS  := -Wall -Wextra -O2 -Isrc -DVERSION='"$(VERSION)"' -DGIT_REMOTE='"$(GIT_REMOTE)"'
 
 ifeq ($(UNAME_S),Darwin)
 DEP_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(PKG_DEPS) 2>/dev/null)

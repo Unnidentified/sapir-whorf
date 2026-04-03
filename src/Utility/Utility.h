@@ -7,6 +7,10 @@
 #define VERSION "unknown"
 #endif
 
+#ifndef GIT_REMOTE
+#define GIT_REMOTE "https://git.bwaaa.monster/omnisearch"
+#endif
+
 #define LINK_FIELD_COUNT 3
 
 int hex_to_int(char c);
