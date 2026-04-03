@@ -3,13 +3,21 @@ UNAME_S := $(shell uname -s)
 PKG_CONFIG ?= pkg-config
 PKG_DEPS   := libxml-2.0 libcurl openssl
 
+GIT_HASH  := $(shell git rev-parse --short HEAD)
+GIT_DATE  := $(shell git log -1 --format='%ad' --date='format:%y.%m.%d')
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+
+VERSION := $(GIT_DATE)+$(GIT_HASH)_$(GIT_BRANCH)
+
+CFLAGS  := -Wall -Wextra -O2 -Isrc -DVERSION='"$(VERSION)"'
+
 ifeq ($(UNAME_S),Darwin)
 DEP_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(PKG_DEPS) 2>/dev/null)
 DEP_LIBS   := $(shell $(PKG_CONFIG) --libs $(PKG_DEPS) 2>/dev/null)
-CFLAGS  := -Wall -Wextra -O2 -Isrc $(DEP_CFLAGS)
+CFLAGS  += $(DEP_CFLAGS)
 LIBS    := -lbeaker $(DEP_LIBS) -lpthread -lm
 else
-CFLAGS  := -Wall -Wextra -O2 -Isrc -I/usr/include/libxml2
+CFLAGS  += -I/usr/include/libxml2
 LIBS    := -lbeaker -lcurl -lxml2 -lpthread -lm -lssl -lcrypto
 endif
 

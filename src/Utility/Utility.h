@@ -3,6 +3,10 @@
 
 #include <beaker.h>
 
+#ifndef VERSION
+#define VERSION "unknown"
+#endif
+
 #define LINK_FIELD_COUNT 3
 
 int hex_to_int(char c);
