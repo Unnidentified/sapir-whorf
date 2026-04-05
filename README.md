@@ -120,7 +120,7 @@ $ cd omnisearch
 $ docker compose up -d --build
 ```
 
-By default it can be reached on port 5000.
+By default it can be reached on port 8087.
 
 ## Customisation
 To make your own changes while still being able to receive upstream updates:
