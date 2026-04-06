@@ -16,6 +16,7 @@
 #include "Routes/Settings.h"
 #include "Routes/SettingsSave.h"
 #include "Scraping/Scraping.h"
+#include "Utility/Utility.h"
 
 Config global_config;
  
@@ -46,6 +47,7 @@ int main() {
   Config cfg = {.host = DEFAULT_HOST,
                 .port = DEFAULT_PORT,
                 .domain = "",
+                .default_locale = "en_gb",
                 .proxy = "",
                 .proxy_list_file = "",
                 .max_proxy_retries = DEFAULT_MAX_PROXY_RETRIES,
@@ -64,6 +66,8 @@ int main() {
   if (load_config("config.ini", &cfg) != 0) {
     fprintf(stderr, "[WARN] Could not load config file, using defaults\n");
   }
+
+  set_default_locale(cfg.default_locale);
 
   global_config = cfg;
 

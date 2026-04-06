@@ -63,7 +63,7 @@ int images_handler(UrlParams *params) {
   context_set(&ctx, "theme", theme);
   free(theme);
 
-  char *locale = get_locale("en_gb");
+  char *locale = get_locale(NULL);
   beaker_set_locale(&ctx, locale);
 
   const char *rate_limit_msg = beaker_get_locale_value(locale, "rate_limit");

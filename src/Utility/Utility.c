@@ -5,6 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+static char global_default_locale[32] = "en_gb";
+
+void set_default_locale(const char *locale) {
+  if (locale && strlen(locale) > 0) {
+    strncpy(global_default_locale, locale, sizeof(global_default_locale) - 1);
+    global_default_locale[sizeof(global_default_locale) - 1] = '\0';
+  }
+}
+
 int hex_to_int(char c) {
   if (c >= '0' && c <= '9')
     return c - '0';
@@ -32,7 +41,8 @@ char *get_locale(const char *default_locale) {
     return cookie;
   }
   free(cookie);
-  return strdup(default_locale);
+  const char *fallback = default_locale ? default_locale : global_default_locale;
+  return strdup(fallback);
 }
 
 static int engine_id_casecmp(const char *a, const char *b) {

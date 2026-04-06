@@ -68,6 +68,9 @@ int load_config(const char *filename, Config *config) {
         } else if (strcmp(key, "domain") == 0) {
           strncpy(config->domain, value, sizeof(config->domain) - 1);
           config->domain[sizeof(config->domain) - 1] = '\0';
+        } else if (strcmp(key, "locale") == 0) {
+          strncpy(config->default_locale, value, sizeof(config->default_locale) - 1);
+          config->default_locale[sizeof(config->default_locale) - 1] = '\0';
         }
       } else if (strcmp(section, "proxy") == 0) {
         if (strcmp(key, "proxy") == 0) {

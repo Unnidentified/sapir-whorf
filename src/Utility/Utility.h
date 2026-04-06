@@ -15,6 +15,7 @@
 
 int hex_to_int(char c);
 char *get_theme(const char *default_theme);
+void set_default_locale(const char *locale);
 char *get_locale(const char *default_locale);
 
 int is_engine_id_enabled(const char *engine_id);
