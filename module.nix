@@ -20,6 +20,7 @@ let
         host = ${cfg.settings.server.host}
         port = ${toString cfg.settings.server.port}
         domain = ${cfg.settings.server.domain}
+        ${lib.optionalString (cfg.settings.server.locale != null) "locale = ${cfg.settings.server.locale}"}
 
         [proxy]
         ${lib.optionalString (cfg.settings.proxy.proxy != null) "proxy = \"${cfg.settings.proxy.proxy}\""}
@@ -64,7 +65,11 @@ in
         };
         domain = lib.mkOption {
           type = lib.types.str;
-          default = "http://localhost:8087";
+          default = "http://localhost:${toString cfg.settings.server.port}";
+        };
+        locale = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
         };
       };
       proxy = {
@@ -122,6 +127,7 @@ in
         BindReadOnlyPaths = [
           "${pkg}/share/omnisearch/templates:/var/lib/omnisearch/templates"
           "${pkg}/share/omnisearch/static:/var/lib/omnisearch/static"
+          "${pkg}/share/omnisearch/locales:/var/lib/omnisearch/locales"
           "${finalConfigFile}:/var/lib/omnisearch/config.ini"
         ];
 
