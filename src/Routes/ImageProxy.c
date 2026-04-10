@@ -301,6 +301,13 @@ int image_proxy_handler(UrlParams *params) {
   int cache_ttl = get_cache_ttl_image();
 
   if (cache_get(cache_key, cache_ttl, &cached_data, &cached_size) == 0) {
+    if (!cached_data || cached_size == 0) {
+      free(cached_data);
+      free(cache_key);
+      send_response("Empty cached image response");
+      return 0;
+    }
+
     char content_type[64] = {0};
 
     const char *ext = strrchr(url, '.');
@@ -403,6 +410,13 @@ int image_proxy_handler(UrlParams *params) {
     free(buf.data);
     free(cache_key);
     send_response("Failed to fetch image");
+    return 0;
+  }
+
+  if (buf.size == 0) {
+    free(buf.data);
+    free(cache_key);
+    send_response("Empty image response");
     return 0;
   }
 
