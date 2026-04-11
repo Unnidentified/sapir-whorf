@@ -23,6 +23,7 @@
 
 *, *::before, *::after {
     box-sizing: border-box;
+    font-family: sans-serif;
 }
 
 html {
@@ -34,7 +35,6 @@ body {
     background-image:radial-gradient(circle at top end, var(--bg-card) 0%, var(--bg-main) 100%);
     background-attachment:fixed;
     color:var(--text-primary);
-    font-family:system-ui,-apple-system,sans-serif;
     margin:0;
     padding:0;
     min-height:100%;
