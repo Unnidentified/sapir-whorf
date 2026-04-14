@@ -1,6 +1,7 @@
 #include "Search.h"
 #include "../Cache/Cache.h"
 #include "../Infobox/Calculator.h"
+#include "../Infobox/ColourCode.h"
 #include "../Infobox/CurrencyConversion.h"
 #include "../Infobox/Dictionary.h"
 #include "../Infobox/UnitConversion.h"
@@ -216,11 +217,16 @@ static int is_calculator_query(const char *query) {
   return 0;
 }
 
+static InfoBox fetch_colour_wrapper(char *query) {
+  return fetch_colour_data(query);
+}
+
 static InfoBoxHandler handlers[] = {
     {is_dictionary_query, fetch_dict_wrapper, NULL},
     {is_calculator_query, fetch_calc_wrapper, NULL},
     {is_unit_conv_query, fetch_unit_wrapper, NULL},
     {is_currency_query, fetch_currency_wrapper, NULL},
+    {is_colour_code_query, fetch_colour_wrapper, NULL},
     {always_true, fetch_wiki_wrapper, construct_wiki_url},
 };
 enum { HANDLER_COUNT = sizeof(handlers) / sizeof(handlers[0]) };
