@@ -116,10 +116,12 @@
                          <img src="{{info[1]}}" alt="{{info[0]}}" class="infobox-image">
                          <div class="infobox-content"> <p class="infobox-summary">
                                  {{info[2]|safe}}
-                             </p>
-<a class="read-more" href="{{info[3]}}">
+                         </p>
+                         {{if info[3] != "#"}}
+                             <a class="read-more" href="{{info[3]}}">
                                  {{l("read_more")}}
                              </a>
+                         {{endif}}
                          </div>
                      </div>
                  </section>
