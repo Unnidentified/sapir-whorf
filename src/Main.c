@@ -88,6 +88,7 @@ int main() {
   }
 
   set_default_locale(cfg.default_locale);
+  init_themes("static");
 
   global_config = cfg;
 

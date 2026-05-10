@@ -6,6 +6,8 @@
 #include "../Utility/Utility.h"
 #include "Config.h"
 #include <beaker.h>
+#include <stdlib.h>
+#include <string.h>
 
 static char *build_images_request_cache_key(const char *query, int page,
                                             const char *client_key) {
@@ -67,15 +69,18 @@ int images_handler(UrlParams *params) {
   beaker_set_locale(&ctx, locale);
 
   const char *rate_limit_msg = beaker_get_locale_value(locale, "rate_limit");
-  if (!rate_limit_msg) rate_limit_msg = "Slow down! Too many image searches from you!";
-  const char *error_images_msg = beaker_get_locale_value(locale, "error_images");
-  if (!error_images_msg) error_images_msg = "Error fetching images";
+  if (!rate_limit_msg)
+    rate_limit_msg = "Slow down! Too many image searches from you!";
+  const char *error_images_msg =
+      beaker_get_locale_value(locale, "error_images");
+  if (!error_images_msg)
+    error_images_msg = "Error fetching images";
 
   char ***pager_matrix = NULL;
   int *pager_inner_counts = NULL;
-  int pager_count = build_pagination(page, images_href_builder,
-                                     (void *)raw_query, &pager_matrix,
-                                     &pager_inner_counts);
+  int pager_count =
+      build_pagination(page, images_href_builder, (void *)raw_query,
+                       &pager_matrix, &pager_inner_counts);
   if (pager_count > 0) {
     context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix,
                                 pager_count, pager_inner_counts);

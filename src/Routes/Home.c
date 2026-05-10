@@ -2,11 +2,16 @@
 #include "../Utility/Utility.h"
 #include <beaker.h>
 #include <stdlib.h>
+#include <string.h>
 
 int home_handler(UrlParams *params) {
   (void)params;
   char *theme = get_theme("");
   char *locale = get_locale(NULL);
+
+  char **themes = NULL;
+  int themes_count = 0;
+  get_available_themes(&themes, &themes_count);
 
   TemplateContext ctx = new_context();
   context_set(&ctx, "theme", theme);

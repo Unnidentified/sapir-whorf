@@ -32,7 +32,8 @@ int settings_handler(UrlParams *params) {
 
   char **user_engines = NULL;
   int user_engine_count = 0;
-  int has_user_pref = (get_user_engines(&user_engines, &user_engine_count) == 0);
+  int has_user_pref =
+      (get_user_engines(&user_engines, &user_engine_count) == 0);
 
   int enabled_count = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
@@ -77,7 +78,34 @@ int settings_handler(UrlParams *params) {
   context_set(&ctx, "query", query);
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "locale", locale);
-  context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count, inner_counts);
+  context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count,
+                              inner_counts);
+
+  char **themes = NULL;
+  int themes_count = 0;
+  get_available_themes(&themes, &themes_count);
+
+  if (themes_count > 0) {
+    char ***theme_ptrs = malloc(sizeof(char **) * themes_count);
+    int *theme_inner = malloc(sizeof(int) * themes_count);
+    for (int i = 0; i < themes_count; i++) {
+      theme_ptrs[i] = malloc(sizeof(char *) * 2);
+      theme_ptrs[i][0] = themes[i];
+      theme_ptrs[i][1] = strdup(themes[i]);
+      if (theme_ptrs[i][1][0] >= 'a' && theme_ptrs[i][1][0] <= 'z') {
+        theme_ptrs[i][1][0] = theme_ptrs[i][1][0] - 'a' + 'A';
+      }
+      theme_inner[i] = 2;
+    }
+    context_set_array_of_arrays(&ctx, "themes", theme_ptrs, themes_count,
+                                theme_inner);
+    for (int i = 0; i < themes_count; i++) {
+      free(theme_ptrs[i][1]);
+      free(theme_ptrs[i]);
+    }
+    free(theme_ptrs);
+    free(theme_inner);
+  }
 
   if (enabled_count > 0) {
     context_set_array_of_arrays(&ctx, "enabled_engines", engine_data,
