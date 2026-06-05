@@ -19,17 +19,38 @@
 #include "Utility/Utility.h"
 
 Config global_config;
- 
+
 int handle_opensearch(UrlParams *params) {
   (void)params;
-  extern Config global_config;
   TemplateContext ctx = new_context();
-  context_set(&ctx, "domain", global_config.domain);
+
+  const char *http_host = beaker_get_header("Host");
+  if (http_host == NULL) {
+    http_host = "localhost";
+  }
+
+  const char *req_scheme =
+      "https"; // not sure if it's a good idea to just assume https, but you
+               // should probably be using https for anything other than testing
+               // or local network anyways.
+
+  if (strncmp(http_host, "localhost", 9) == 0 ||
+      strncmp(http_host, "127.", 4) == 0 ||
+      strncmp(http_host, "192.168.", 8) == 0 ||
+      strncmp(http_host, "10.", 3) == 0) {
+    req_scheme = "http";
+  }
+
+  context_set(&ctx, "domain", http_host);
+  context_set(&ctx, "scheme", req_scheme);
+
   char *rendered = render_template("opensearch.xml", &ctx);
-  serve_data(rendered, strlen(rendered), "application/opensearchdescription+xml");
+  serve_data(rendered, strlen(rendered),
+             "application/opensearchdescription+xml");
 
   free(rendered);
   free_context(&ctx);
+
   return 0;
 }
 
@@ -46,7 +67,6 @@ int main() {
 
   Config cfg = {.host = DEFAULT_HOST,
                 .port = DEFAULT_PORT,
-                .domain = "",
                 .default_locale = "en_gb",
                 .proxy = "",
                 .proxy_list_file = "",
@@ -68,6 +88,7 @@ int main() {
   }
 
   set_default_locale(cfg.default_locale);
+  init_themes("static");
 
   global_config = cfg;
 
@@ -75,7 +96,8 @@ int main() {
   if (loaded > 0) {
     fprintf(stderr, "[INFO] Loaded %d locales\n", loaded);
   } else {
-    fprintf(stderr, "[WARN] No locales loaded (make sure to run from omnisearch directory)\n");
+    fprintf(stderr, "[WARN] No locales loaded (make sure to run from "
+                    "omnisearch directory)\n");
   }
 
   apply_engines_config(cfg.engines);

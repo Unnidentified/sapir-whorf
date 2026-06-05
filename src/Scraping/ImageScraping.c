@@ -28,113 +28,82 @@ static char *build_proxy_url(const char *image_url) {
   return proxy_url;
 }
 
-static int parse_image_node(xmlNodePtr node, ImageResult *result) {
-  xmlNodePtr img_node = NULL;
-  xmlNodePtr tit_node = NULL;
-  xmlNodePtr des_node = NULL;
-  xmlNodePtr thumb_link = NULL;
+static char *extract_json_string(const char *json, const char *key) {
+  if (!json || !key)
+    return NULL;
 
-  for (xmlNodePtr child = node->children; child; child = child->next) {
-    if (child->type != XML_ELEMENT_NODE)
-      continue;
+  char search_key[64];
+  snprintf(search_key, sizeof(search_key), "\"%s\"", key);
 
-    if (xmlStrcmp(child->name, (const xmlChar *)"a") == 0) {
-      xmlChar *class = xmlGetProp(child, (const xmlChar *)"class");
-      if (class) {
-        if (xmlStrstr(class, (const xmlChar *)"thumb") != NULL) {
-          thumb_link = child;
-          for (xmlNodePtr thumb_child = child->children; thumb_child;
-               thumb_child = thumb_child->next) {
-            if (xmlStrcmp(thumb_child->name, (const xmlChar *)"div") == 0) {
-              xmlChar *div_class =
-                  xmlGetProp(thumb_child, (const xmlChar *)"class");
-              if (div_class &&
-                  xmlStrcmp(div_class, (const xmlChar *)"cico") == 0) {
-                for (xmlNodePtr cico_child = thumb_child->children; cico_child;
-                     cico_child = cico_child->next) {
-                  if (xmlStrcmp(cico_child->name, (const xmlChar *)"img") ==
-                      0) {
-                    img_node = cico_child;
-                    break;
-                  }
-                }
-              }
-              if (div_class)
-                xmlFree(div_class);
-            }
-          }
-        } else if (xmlStrstr(class, (const xmlChar *)"tit") != NULL) {
-          tit_node = child;
-        }
-        xmlFree(class);
-      }
-    } else if (xmlStrcmp(child->name, (const xmlChar *)"div") == 0) {
-      xmlChar *class = xmlGetProp(child, (const xmlChar *)"class");
-      if (class && xmlStrcmp(class, (const xmlChar *)"meta") == 0) {
-        for (xmlNodePtr meta_child = child->children; meta_child;
-             meta_child = meta_child->next) {
-          if (xmlStrcmp(meta_child->name, (const xmlChar *)"div") == 0) {
-            xmlChar *div_class =
-                xmlGetProp(meta_child, (const xmlChar *)"class");
-            if (div_class) {
-              if (xmlStrcmp(div_class, (const xmlChar *)"des") == 0) {
-                des_node = meta_child;
-              }
-              xmlFree(div_class);
-            }
-          } else if (xmlStrcmp(meta_child->name, (const xmlChar *)"a") == 0) {
-            xmlChar *a_class = xmlGetProp(meta_child, (const xmlChar *)"class");
-            if (a_class && xmlStrstr(a_class, (const xmlChar *)"tit") != NULL) {
-              tit_node = meta_child;
-            }
-            if (a_class)
-              xmlFree(a_class);
-          }
-        }
-      }
-      if (class)
-        xmlFree(class);
-    }
+  const char *key_pos = strstr(json, search_key);
+  if (!key_pos)
+    return NULL;
+
+  const char *colon = strchr(key_pos + strlen(search_key), ':');
+  if (!colon)
+    return NULL;
+
+  colon++;
+  while (*colon == ' ' || *colon == '\t' || *colon == '\n' || *colon == '\r')
+    colon++;
+
+  if (*colon != '"')
+    return NULL;
+  colon++;
+
+  size_t len = 0;
+  const char *start = colon;
+  while (*colon && *colon != '"') {
+    if (*colon == '\\' && *(colon + 1))
+      colon++;
+    colon++;
+    len++;
   }
 
-  xmlChar *iurl =
-      img_node ? xmlGetProp(img_node, (const xmlChar *)"src") : NULL;
-  xmlChar *full_url =
-      thumb_link ? xmlGetProp(thumb_link, (const xmlChar *)"href") : NULL;
-  xmlChar *title = des_node ? xmlNodeGetContent(des_node)
-                            : (tit_node ? xmlNodeGetContent(tit_node) : NULL);
-  xmlChar *rurl =
-      tit_node ? xmlGetProp(tit_node, (const xmlChar *)"href") : NULL;
+  char *result = malloc(len + 1);
+  if (!result)
+    return NULL;
 
-  if (!iurl || strlen((char *)iurl) == 0) {
-    if (iurl)
-      xmlFree(iurl);
-    if (title)
-      xmlFree(title);
-    if (rurl)
-      xmlFree(rurl);
-    if (full_url)
-      xmlFree(full_url);
+  colon = start;
+  size_t i = 0;
+  while (*colon && *colon != '"') {
+    if (*colon == '\\' && *(colon + 1))
+      colon++;
+    result[i++] = *colon++;
+  }
+  result[i] = '\0';
+
+  return result;
+}
+
+static int parse_iusc_node(xmlNodePtr node, ImageResult *result) {
+  xmlChar *m_attr = xmlGetProp(node, (const xmlChar *)"m");
+  if (!m_attr)
     return 0;
+
+  char *turl = extract_json_string((const char *)m_attr, "turl");
+  char *murl = extract_json_string((const char *)m_attr, "murl");
+  char *purl = extract_json_string((const char *)m_attr, "purl");
+  char *title = extract_json_string((const char *)m_attr, "t");
+
+  int ok = (turl != NULL && strlen(turl) > 0);
+  if (ok) {
+    char *proxy_url = build_proxy_url(turl);
+    result->thumbnail_url = proxy_url ? strdup(proxy_url) : strdup(turl);
+    free(proxy_url);
+    result->title =
+        title && strlen(title) > 0 ? strdup(title) : strdup("Image");
+    result->page_url = purl && strlen(purl) > 0 ? strdup(purl) : strdup("#");
+    result->full_url = murl && strlen(murl) > 0 ? strdup(murl) : strdup("#");
   }
 
-  char *proxy_url = build_proxy_url((char *)iurl);
-  result->thumbnail_url = proxy_url ? strdup(proxy_url) : strdup((char *)iurl);
-  free(proxy_url);
-  result->title = strdup(title ? (char *)title : "Image");
-  result->page_url = strdup(rurl ? (char *)rurl : "#");
-  result->full_url = strdup(full_url ? (char *)full_url : "#");
+  free(turl);
+  free(murl);
+  free(purl);
+  free(title);
 
-  if (iurl)
-    xmlFree(iurl);
-  if (title)
-    xmlFree(title);
-  if (rurl)
-    xmlFree(rurl);
-  if (full_url)
-    xmlFree(full_url);
-
-  return 1;
+  xmlFree(m_attr);
+  return ok;
 }
 
 int scrape_images(const char *query, int page, ImageResult **out_results,
@@ -157,13 +126,16 @@ int scrape_images(const char *query, int page, ImageResult **out_results,
 
   char url[BUFFER_SIZE_LARGE];
   int first = (page - 1) * IMAGE_RESULTS_PER_PAGE + 1;
-  snprintf(url, sizeof(url), "%s?q=%s&first=%d", BING_IMAGE_URL, encoded_query,
-           first);
+  snprintf(
+      url, sizeof(url),
+      "https://www.bing.com/images/async?q=%s&async=content&first=%d&count=%d",
+      encoded_query, first, 35);
   free(encoded_query);
 
   HttpResponse resp = http_get(
       url,
-      "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko");
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, "
+      "like Gecko) Chrome/120.0.0.0 Safari/537.36");
   if (!resp.memory) {
     return -1;
   }
@@ -183,7 +155,7 @@ int scrape_images(const char *query, int page, ImageResult **out_results,
   }
 
   xmlXPathObjectPtr xpathObj =
-      xmlXPathEvalExpression((const xmlChar *)"//div[@class='item']", xpathCtx);
+      xmlXPathEvalExpression((const xmlChar *)"//a[@class='iusc']", xpathCtx);
 
   if (!xpathObj || !xpathObj->nodesetval) {
     if (xpathObj)
@@ -210,7 +182,7 @@ int scrape_images(const char *query, int page, ImageResult **out_results,
   int count = 0;
   for (int i = 0; i < nodes && count < IMAGE_RESULTS_PER_PAGE; i++) {
     xmlNodePtr node = xpathObj->nodesetval->nodeTab[i];
-    if (parse_image_node(node, &results[count])) {
+    if (parse_iusc_node(node, &results[count])) {
       count++;
     }
   }

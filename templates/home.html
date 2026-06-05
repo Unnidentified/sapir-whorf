@@ -8,8 +8,7 @@
             OmniSearch
         </title>
         <link rel="stylesheet" href="static/main.css">
-        {{if theme == "light"}}<link rel="preload" href="static/theme-light.css" as="style"><link rel="stylesheet" href="static/theme-light.css">{{endif}}
-        {{if theme == "dark"}}<link rel="preload" href="static/theme-dark.css" as="style"><link rel="stylesheet" href="static/theme-dark.css">{{endif}}
+        <link rel="stylesheet" href="static/themes/{{theme}}.css">
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="search" 
         type="application/opensearchdescription+xml" 

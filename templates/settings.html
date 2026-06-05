@@ -8,8 +8,7 @@
             OmniSearch - {{l("settings_title")}}
         </title>
         <link rel="stylesheet" href="static/main.css">
-        {{if theme == "light"}}<link rel="preload" href="static/theme-light.css" as="style"><link rel="stylesheet" href="static/theme-light.css">{{endif}}
-        {{if theme == "dark"}}<link rel="preload" href="static/theme-dark.css" as="style"><link rel="stylesheet" href="static/theme-dark.css">{{endif}}
+        <link rel="stylesheet" href="static/themes/{{theme}}.css">
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="search"
         type="application/opensearchdescription+xml"
@@ -58,9 +57,9 @@
                         <div class="settings-field">
                             <label class="settings-label" for="theme">{{l("theme_label")}}</label>
                             <select id="theme" name="theme" class="settings-select">
-                                <option value="system" {{if theme == "system"}}selected{{endif}}>{{l("theme_system")}}</option>
-                                <option value="light" {{if theme == "light"}}selected{{endif}}>{{l("theme_light")}}</option>
-                                <option value="dark" {{if theme == "dark"}}selected{{endif}}>{{l("theme_dark")}}</option>
+                                {{for t in themes}}
+                                <option value="{{t[0]}}" {{if theme == t[0]}}selected{{endif}}>{{t[1]}}</option>
+                                {{endfor}}
                             </select>
                         </div>
                     </section>

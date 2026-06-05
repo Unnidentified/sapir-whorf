@@ -1,11 +1,80 @@
 #include "Utility.h"
 #include "../Scraping/Scraping.h"
 #include <beaker.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static char global_default_locale[32] = "en_gb";
+static char **themes_list = NULL;
+static int themes_count = 0;
+static int themes_initialized = 0;
+
+void init_themes(const char *static_path) {
+  if (themes_initialized)
+    return;
+  themes_initialized = 1;
+
+  char themes_dir[512];
+  snprintf(themes_dir, sizeof(themes_dir), "%s/themes", static_path);
+
+  DIR *dir = opendir(themes_dir);
+  if (!dir)
+    return;
+
+  struct dirent *entry;
+  int capacity = 4;
+  themes_list = malloc(sizeof(char *) * capacity);
+  themes_count = 0;
+
+  while ((entry = readdir(dir)) != NULL) {
+    size_t len = strlen(entry->d_name);
+    if (len > 4 && strcmp(entry->d_name + len - 4, ".css") == 0) {
+      if (themes_count >= capacity) {
+        capacity *= 2;
+        themes_list = realloc(themes_list, sizeof(char *) * capacity);
+      }
+      themes_list[themes_count] = strndup(entry->d_name, len - 4);
+      themes_count++;
+    }
+  }
+  closedir(dir);
+
+  for (int i = 0; i < themes_count; i++) {
+    for (int j = i + 1; j < themes_count; j++) {
+      int priority_i = 0, priority_j = 0;
+      if (strcmp(themes_list[i], "system") == 0)
+        priority_i = 0;
+      else if (strcmp(themes_list[i], "light") == 0)
+        priority_i = 1;
+      else if (strcmp(themes_list[i], "dark") == 0)
+        priority_i = 2;
+      else
+        priority_i = 3;
+      if (strcmp(themes_list[j], "system") == 0)
+        priority_j = 0;
+      else if (strcmp(themes_list[j], "light") == 0)
+        priority_j = 1;
+      else if (strcmp(themes_list[j], "dark") == 0)
+        priority_j = 2;
+      else
+        priority_j = 3;
+      if (priority_i > priority_j ||
+          (priority_i == priority_j &&
+           strcmp(themes_list[i], themes_list[j]) > 0)) {
+        char *tmp = themes_list[i];
+        themes_list[i] = themes_list[j];
+        themes_list[j] = tmp;
+      }
+    }
+  }
+}
+
+void get_available_themes(char ***out_themes, int *out_count) {
+  *out_themes = themes_list;
+  *out_count = themes_count;
+}
 
 void set_default_locale(const char *locale) {
   if (locale && strlen(locale) > 0) {
@@ -26,13 +95,16 @@ int hex_to_int(char c) {
 
 char *get_theme(const char *default_theme) {
   char *cookie = get_cookie("theme");
-  if (cookie &&
-      (strcmp(cookie, "light") == 0 ||
-       strcmp(cookie, "dark") == 0)) {
-    return cookie;
+  if (cookie && strlen(cookie) > 0) {
+    for (int i = 0; i < themes_count; i++) {
+      if (strcmp(cookie, themes_list[i]) == 0) {
+        return cookie;
+      }
+    }
   }
   free(cookie);
-  return strdup(default_theme);
+  return strdup(default_theme && strlen(default_theme) > 0 ? default_theme
+                                                           : "system");
 }
 
 char *get_locale(const char *default_locale) {
@@ -41,7 +113,8 @@ char *get_locale(const char *default_locale) {
     return cookie;
   }
   free(cookie);
-  const char *fallback = default_locale ? default_locale : global_default_locale;
+  const char *fallback =
+      default_locale ? default_locale : global_default_locale;
   return strdup(fallback);
 }
 
@@ -49,9 +122,12 @@ static int engine_id_casecmp(const char *a, const char *b) {
   while (*a && *b) {
     char la = *a;
     char lb = *b;
-    if (la >= 'A' && la <= 'Z') la = la - 'A' + 'a';
-    if (lb >= 'A' && lb <= 'Z') lb = lb - 'A' + 'a';
-    if (la != lb) return 0;
+    if (la >= 'A' && la <= 'Z')
+      la = la - 'A' + 'a';
+    if (lb >= 'A' && lb <= 'Z')
+      lb = lb - 'A' + 'a';
+    if (la != lb)
+      return 0;
     a++;
     b++;
   }
@@ -59,7 +135,8 @@ static int engine_id_casecmp(const char *a, const char *b) {
 }
 
 int is_engine_id_enabled(const char *engine_id) {
-  if (!engine_id) return 0;
+  if (!engine_id)
+    return 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
     if (ENGINE_REGISTRY[i].enabled &&
         engine_id_casecmp(ENGINE_REGISTRY[i].id, engine_id)) {
@@ -120,7 +197,8 @@ int get_user_engines(char ***out_ids, int *out_count) {
 }
 
 int user_engines_contains(const char *engine_id, char **ids, int count) {
-  if (!engine_id || !ids) return 0;
+  if (!engine_id || !ids)
+    return 0;
   for (int i = 0; i < count; i++) {
     if (engine_id_casecmp(ids[i], engine_id))
       return 1;
@@ -135,8 +213,7 @@ int add_link_to_collection(const char *href, const char *label,
   int *old_inner_counts = *inner_counts;
   char ***new_collection =
       (char ***)malloc(sizeof(char **) * (current_count + 1));
-  int *new_inner_counts =
-      (int *)malloc(sizeof(int) * (current_count + 1));
+  int *new_inner_counts = (int *)malloc(sizeof(int) * (current_count + 1));
 
   if (!new_collection || !new_inner_counts) {
     free(new_collection);
@@ -188,9 +265,8 @@ int add_link_to_collection(const char *href, const char *label,
   return current_count + 1;
 }
 
-int build_pagination(int page,
-                     char *(*href_builder)(int page, void *data), void *data,
-                     char ****out_matrix, int **out_inner_counts) {
+int build_pagination(int page, char *(*href_builder)(int page, void *data),
+                     void *data, char ****out_matrix, int **out_inner_counts) {
   enum { PAGER_WINDOW_SIZE = 5 };
 
   *out_matrix = NULL;
@@ -202,8 +278,8 @@ int build_pagination(int page,
 
   if (page > 1) {
     char *href = href_builder(page - 1, data);
-    count = add_link_to_collection(href, "←", "pagination-btn prev",
-                                   out_matrix, out_inner_counts, count);
+    count = add_link_to_collection(href, "←", "pagination-btn prev", out_matrix,
+                                   out_inner_counts, count);
     free(href);
   }
 
@@ -219,8 +295,8 @@ int build_pagination(int page,
   }
 
   char *href = href_builder(page + 1, data);
-  count = add_link_to_collection(href, "→", "pagination-btn next",
-                                 out_matrix, out_inner_counts, count);
+  count = add_link_to_collection(href, "→", "pagination-btn next", out_matrix,
+                                 out_inner_counts, count);
   free(href);
 
   return count;

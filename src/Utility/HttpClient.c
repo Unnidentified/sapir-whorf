@@ -31,6 +31,17 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb,
   return realsize;
 }
 
+static struct curl_slist *build_http_headers(void) {
+  struct curl_slist *headers = NULL;
+  headers = curl_slist_append(
+      headers,
+      "Accept: "
+      "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+  headers = curl_slist_append(headers, "Accept-Language: en-US,en;q=0.5");
+  headers = curl_slist_append(headers, "DNT: 1");
+  return headers;
+}
+
 HttpResponse http_get(const char *url, const char *user_agent) {
   HttpResponse resp = {.memory = NULL, .size = 0, .capacity = 0};
 
@@ -51,16 +62,24 @@ HttpResponse http_get(const char *url, const char *user_agent) {
     return resp;
   }
 
+  struct curl_slist *headers = build_http_headers();
+
   curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
   curl_easy_setopt(curl, CURLOPT_USERAGENT,
                    user_agent ? user_agent : "libcurl-agent/1.0");
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, CURL_TIMEOUT_SECS);
+  curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
+  curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
+  curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, CURL_DNS_TIMEOUT_SECS);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
   apply_proxy_settings(curl);
 
   CURLcode res = curl_easy_perform(curl);
+  curl_slist_free_all(headers);
   curl_easy_cleanup(curl);
 
   if (res != CURLE_OK) {
