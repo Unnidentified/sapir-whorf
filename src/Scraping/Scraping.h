@@ -26,6 +26,7 @@ typedef struct {
   int page_base;
   ParserFunc parser;
   int enabled;
+  int is_xml;
 } SearchEngine;
 
 typedef struct {
@@ -59,6 +60,7 @@ typedef struct {
 extern SearchEngine ENGINE_REGISTRY[];
 extern const int ENGINE_COUNT;
 void apply_engines_config(const char *engines_str);
+void configure_yacy_engine(const char *instance);
 
 size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
                              void *userp);

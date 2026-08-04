@@ -100,6 +100,10 @@ int load_config(const char *filename, Config *config) {
         if (strcmp(key, "engines") == 0) {
           strncpy(config->engines, value, sizeof(config->engines) - 1);
           config->engines[sizeof(config->engines) - 1] = '\0';
+        } else if (strcmp(key, "yacy_instance") == 0) {
+          strncpy(config->yacy_instance, value,
+                  sizeof(config->yacy_instance) - 1);
+          config->yacy_instance[sizeof(config->yacy_instance) - 1] = '\0';
         }
       } else if (strcmp(section, "rate_limit") == 0) {
         if (strcmp(key, "search_requests") == 0) {

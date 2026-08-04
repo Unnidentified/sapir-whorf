@@ -249,8 +249,8 @@ static int parse_mojeek(const char *engine_name, xmlDocPtr doc,
   if (!ctx)
     return 0;
 
-  xmlXPathObjectPtr obj =
-      xml_xpath_eval(ctx, "//ul[@class='results-standard']/li[starts-with(@class, 'r')]");
+  xmlXPathObjectPtr obj = xml_xpath_eval(
+      ctx, "//ul[@class='results-standard']/li[starts-with(@class, 'r')]");
 
   if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
     free_xpath_objects(ctx, obj);
@@ -268,18 +268,17 @@ static int parse_mojeek(const char *engine_name, xmlDocPtr doc,
     xmlNodePtr result_node = obj->nodesetval->nodeTab[i];
     ctx->node = result_node;
 
-    xmlXPathObjectPtr link_obj =
-        xml_xpath_eval(ctx, ".//a[@class='title']");
+    xmlXPathObjectPtr link_obj = xml_xpath_eval(ctx, ".//a[@class='title']");
     char *url =
         (link_obj && link_obj->nodesetval && link_obj->nodesetval->nodeNr > 0)
             ? (char *)xmlGetProp(link_obj->nodesetval->nodeTab[0],
                                  (xmlChar *)"href")
             : NULL;
 
-    char *title = (link_obj && link_obj->nodesetval &&
-                   link_obj->nodesetval->nodeNr > 0)
-                      ? xml_node_content(link_obj->nodesetval->nodeTab[0])
-                      : NULL;
+    char *title =
+        (link_obj && link_obj->nodesetval && link_obj->nodesetval->nodeNr > 0)
+            ? xml_node_content(link_obj->nodesetval->nodeTab[0])
+            : NULL;
 
     xmlXPathObjectPtr snippet_obj = xml_xpath_eval(ctx, ".//p[@class='s']");
     char *snippet_text =
@@ -309,6 +308,90 @@ static int parse_yahoo(const char *engine_name, xmlDocPtr doc,
                        SearchResult **out_results, int max_results);
 static int parse_mojeek(const char *engine_name, xmlDocPtr doc,
                         SearchResult **out_results, int max_results);
+
+static int parse_yacy(const char *engine_name, xmlDocPtr doc,
+                      SearchResult **out_results, int max_results) {
+  (void)engine_name;
+  int found_count = 0;
+
+  xmlXPathContextPtr ctx = create_xpath_context(doc);
+  if (!ctx)
+    return 0;
+
+  xmlXPathObjectPtr obj = xml_xpath_eval(ctx, "//item");
+
+  if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
+    free_xpath_objects(ctx, obj);
+    return 0;
+  }
+
+  int num_items = obj->nodesetval->nodeNr;
+  *out_results = alloc_results_array(num_items, max_results);
+  if (!*out_results) {
+    free_xpath_objects(ctx, obj);
+    return 0;
+  }
+
+  for (int i = 0; i < num_items && found_count < max_results; i++) {
+    xmlNodePtr item_node = obj->nodesetval->nodeTab[i];
+    ctx->node = item_node;
+
+    xmlXPathObjectPtr title_obj = xml_xpath_eval(ctx, "./title");
+    char *title = (title_obj && title_obj->nodesetval &&
+                   title_obj->nodesetval->nodeNr > 0)
+                      ? xml_node_content(title_obj->nodesetval->nodeTab[0])
+                      : NULL;
+
+    xmlXPathObjectPtr link_obj = xml_xpath_eval(ctx, "./link");
+    char *url =
+        (link_obj && link_obj->nodesetval && link_obj->nodesetval->nodeNr > 0)
+            ? xml_node_content(link_obj->nodesetval->nodeTab[0])
+            : NULL;
+
+    xmlXPathObjectPtr desc_obj = xml_xpath_eval(ctx, "./description");
+    char *snippet_text =
+        (desc_obj && desc_obj->nodesetval && desc_obj->nodesetval->nodeNr > 0)
+            ? xml_node_content(desc_obj->nodesetval->nodeTab[0])
+            : NULL;
+
+    if (url && title) {
+      assign_result(&(*out_results)[found_count], url, title, snippet_text, 0);
+      found_count++;
+    }
+
+    free_xml_node_list(title, url, snippet_text);
+    if (title_obj)
+      xmlXPathFreeObject(title_obj);
+    if (link_obj)
+      xmlXPathFreeObject(link_obj);
+    if (desc_obj)
+      xmlXPathFreeObject(desc_obj);
+  }
+
+  ctx->node = NULL;
+  free_xpath_objects(ctx, obj);
+  return found_count;
+}
+
+static char yacy_base_url[BUFFER_SIZE_LARGE];
+
+void configure_yacy_engine(const char *instance) {
+  if (!instance || instance[0] == '\0')
+    instance = DEFAULT_YACY_INSTANCE;
+
+  snprintf(yacy_base_url, sizeof(yacy_base_url),
+           "%s/"
+           "yacysearch.rss?resource=global&urlmaskfilter=.*&prefermaskfilter=&"
+           "nav=all&maximumRecords=%d&query=",
+           instance, MAX_RESULTS_PER_ENGINE);
+
+  for (int i = 0; i < ENGINE_COUNT; i++) {
+    if (strcmp(ENGINE_REGISTRY[i].id, "yacy") == 0) {
+      ENGINE_REGISTRY[i].base_url = yacy_base_url;
+      break;
+    }
+  }
+}
 
 SearchEngine ENGINE_REGISTRY[] = {
     {.id = "ddg",
@@ -350,7 +433,18 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_multiplier = 10,
      .page_base = 1,
      .parser = parse_mojeek,
-     .enabled = 1}};
+     .enabled = 1},
+    {.id = "yacy",
+     .name = "YaCy",
+     .base_url = "",
+     .host_header = NULL,
+     .referer = NULL,
+     .page_param = "startRecord",
+     .page_multiplier = 10,
+     .page_base = 0,
+     .parser = parse_yacy,
+     .enabled = 0,
+     .is_xml = 1}};
 
 const int ENGINE_COUNT = sizeof(ENGINE_REGISTRY) / sizeof(SearchEngine);
 
@@ -373,6 +467,8 @@ static int engine_id_compare(const char *engine_id, const char *config_id) {
 void apply_engines_config(const char *engines_str) {
   if (!engines_str || engines_str[0] == '\0') {
     for (int i = 0; i < ENGINE_COUNT; i++) {
+      if (engine_id_compare(ENGINE_REGISTRY[i].id, "yacy"))
+        continue;
       ENGINE_REGISTRY[i].enabled = 1;
     }
     return;
@@ -395,6 +491,8 @@ void apply_engines_config(const char *engines_str) {
 
     if (strcmp(token, "*") == 0) {
       for (int i = 0; i < ENGINE_COUNT; i++) {
+        if (engine_id_compare(ENGINE_REGISTRY[i].id, "yacy"))
+          continue;
         ENGINE_REGISTRY[i].enabled = 1;
       }
     } else if (token[0] == '-' && token[1] != '\0') {

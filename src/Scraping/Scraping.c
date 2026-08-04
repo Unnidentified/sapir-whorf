@@ -4,6 +4,7 @@
 #include "Config.h"
 #include <curl/curl.h>
 #include <libxml/HTMLparser.h>
+#include <libxml/parser.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,8 @@ static int response_is_startpage_captcha(const ScrapeJob *job,
 
   return response_contains(response, "<title>Startpage Captcha</title>") ||
          response_contains(response, "Startpage Captcha") ||
-         response_contains(response, "/static-pages-assets/page-data/captcha/") ||
+         response_contains(response,
+                           "/static-pages-assets/page-data/captcha/") ||
          response_contains(response, ">Startpage Blocked</title>");
 }
 
@@ -39,7 +41,8 @@ static int response_looks_like_results_page(const ScrapeJob *job,
   }
 
   if (strcmp(job->engine->name, "Startpage") == 0) {
-    return response_contains(response, "<title>Startpage Search Results</title>") ||
+    return response_contains(response,
+                             "<title>Startpage Search Results</title>") ||
            response_contains(response, "class=\"w-gl") ||
            response_contains(response, "data-testid=\"gl-title-link\"");
   }
@@ -53,6 +56,11 @@ static int response_looks_like_results_page(const ScrapeJob *job,
   if (strcmp(job->engine->name, "Mojeek") == 0) {
     return response_contains(response, "class=\"results-standard\"") ||
            response_contains(response, "Mojeek Search");
+  }
+
+  if (strcmp(job->engine->name, "YaCy") == 0) {
+    return response_contains(response, "<item") ||
+           response_contains(response, "<rss");
   }
 
   return 0;
@@ -72,18 +80,24 @@ static void classify_job_response(ScrapeJob *job, const char *response,
     return;
   }
 
-  xmlDocPtr doc = htmlReadMemory(response, response_size, NULL, NULL,
-                                 HTML_PARSE_RECOVER | HTML_PARSE_NOERROR |
-                                     HTML_PARSE_NOWARNING);
+  xmlDocPtr doc;
+  if (job->engine->is_xml) {
+    doc = xmlReadMemory(response, response_size, NULL, NULL,
+                        XML_PARSE_RECOVER | XML_PARSE_NOERROR |
+                            XML_PARSE_NOWARNING);
+  } else {
+    doc = htmlReadMemory(response, response_size, NULL, NULL,
+                         HTML_PARSE_RECOVER | HTML_PARSE_NOERROR |
+                             HTML_PARSE_NOWARNING);
+  }
 
   if (!doc) {
     job->status = SCRAPE_STATUS_FETCH_ERROR;
     return;
   }
 
-  job->results_count =
-      job->engine->parser(job->engine->name, doc, job->out_results,
-                          job->max_results);
+  job->results_count = job->engine->parser(job->engine->name, doc,
+                                           job->out_results, job->max_results);
   xmlFreeDoc(doc);
 
   if (job->results_count > 0) {
@@ -200,7 +214,8 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
     return -1;
   }
 
-  for (char *p = encoded_query + strlen(encoded_query) - 3; p >= encoded_query; p--) {
+  for (char *p = encoded_query + strlen(encoded_query) - 3; p >= encoded_query;
+       p--) {
     if (p[0] == '%' && p[1] == '2' && p[2] == '0') {
       *p = '+';
       memmove(p + 1, p + 3, strlen(p + 3) + 1);
@@ -279,8 +294,7 @@ int should_retry(ScrapeJob *jobs, int num_jobs) {
 int scrape_engines_parallel(ScrapeJob *jobs, int num_jobs) {
   int retries = 0;
 
-retry:
-  ;
+retry:;
   CURLM *multi_handle = curl_multi_init();
   if (!multi_handle)
     return -1;

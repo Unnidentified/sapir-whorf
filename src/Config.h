@@ -8,6 +8,7 @@
 #define DEFAULT_CACHE_TTL_INFOBOX 86400
 #define DEFAULT_CACHE_TTL_IMAGE 604800
 #define DEFAULT_MAX_PROXY_RETRIES 3
+#define DEFAULT_YACY_INSTANCE "http://127.0.0.1:8090"
 
 #define BUFFER_SIZE_SMALL 256
 #define BUFFER_SIZE_MEDIUM 512
@@ -46,6 +47,7 @@ typedef struct {
   int cache_ttl_infobox;
   int cache_ttl_image;
   char engines[512];
+  char yacy_instance[512];
   int rate_limit_search_requests;
   int rate_limit_search_interval;
   int rate_limit_images_requests;
