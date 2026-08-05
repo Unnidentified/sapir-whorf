@@ -78,6 +78,7 @@ int main() {
                 .cache_ttl_infobox = DEFAULT_CACHE_TTL_INFOBOX,
                 .cache_ttl_image = DEFAULT_CACHE_TTL_IMAGE,
                 .engines = "",
+                .yacy_instance = "",
                 .rate_limit_search_requests = 0,
                 .rate_limit_search_interval = 0,
                 .rate_limit_images_requests = 0,
@@ -101,6 +102,23 @@ int main() {
   }
 
   apply_engines_config(cfg.engines);
+  configure_yacy_engine(cfg.yacy_instance);
+
+  if (cfg.yacy_instance[0] != '\0') {
+    int yacy_enabled = 0;
+    for (int i = 0; i < ENGINE_COUNT; i++) {
+      if (strcmp(ENGINE_REGISTRY[i].id, "yacy") == 0) {
+        yacy_enabled = ENGINE_REGISTRY[i].enabled;
+        break;
+      }
+    }
+    if (!yacy_enabled) {
+      fprintf(
+          stderr,
+          "[INFO] YaCy instance configured but the yacy engine is not "
+          "enabled (add it to the engines list, e.g. engines=\"*,yacy\")\n");
+    }
+  }
 
   if (cache_init(cfg.cache_dir) != 0) {
     fprintf(stderr,
