@@ -41,6 +41,10 @@ static char *images_href_builder(int page, void *data) {
   return build_images_href((const char *)data, page);
 }
 
+static void free_pagination(char ***matrix, int *inner_counts, int count) {
+  free_string_matrix(matrix, inner_counts, count);
+}
+
 int images_handler(UrlParams *params) {
   extern Config global_config;
   TemplateContext ctx = new_context();
@@ -91,8 +95,9 @@ int images_handler(UrlParams *params) {
 
   if (!raw_query || strlen(raw_query) == 0) {
     send_redirect("/");
-    if (display_query)
-      free(display_query);
+    free_pagination(pager_matrix, pager_inner_counts, pager_count);
+    free(display_query);
+    free(locale);
     free_context(&ctx);
     return -1;
   }
@@ -128,7 +133,9 @@ int images_handler(UrlParams *params) {
       snprintf(response, sizeof(response), "<h1>%s</h1>", rate_limit_msg);
       send_response(response);
       free(request_cache_key);
+      free_pagination(pager_matrix, pager_inner_counts, pager_count);
       free(display_query);
+      free(locale);
       free_context(&ctx);
       return -1;
     }
@@ -147,36 +154,41 @@ int images_handler(UrlParams *params) {
     snprintf(error_html, sizeof(error_html), "<h1>%s</h1>", error_images_msg);
     send_response(error_html);
     free(request_cache_key);
+    free_pagination(pager_matrix, pager_inner_counts, pager_count);
     free(display_query);
+    free(locale);
     free_context(&ctx);
     return -1;
   }
 
-  char ***image_matrix = malloc(sizeof(char **) * result_count);
-  int *inner_counts = malloc(sizeof(int) * result_count);
-
-  if (!image_matrix || !inner_counts) {
-    if (image_matrix)
-      free(image_matrix);
-    if (inner_counts)
-      free(inner_counts);
-    free_image_results(results, result_count);
-    free(request_cache_key);
-    free(display_query);
-    free_context(&ctx);
-    return -1;
-  }
+  char ***image_matrix = NULL;
+  int *inner_counts = NULL;
+  int image_count = 0;
 
   for (int i = 0; i < result_count; i++) {
-    image_matrix[i] = malloc(sizeof(char *) * IMAGE_RESULT_FIELDS);
-    image_matrix[i][0] = strdup(results[i].thumbnail_url);
-    image_matrix[i][1] = strdup(results[i].title);
-    image_matrix[i][2] = strdup(results[i].page_url);
-    image_matrix[i][3] = strdup(results[i].full_url);
-    inner_counts[i] = IMAGE_RESULT_FIELDS;
+    const char *values[IMAGE_RESULT_FIELDS] = {
+        results[i].thumbnail_url,
+        results[i].title,
+        results[i].page_url,
+        results[i].full_url,
+    };
+    int new_count = append_string_row(&image_matrix, &inner_counts,
+                                      image_count, values,
+                                      IMAGE_RESULT_FIELDS);
+    if (new_count == image_count) {
+      free_string_matrix(image_matrix, inner_counts, image_count);
+      free_pagination(pager_matrix, pager_inner_counts, pager_count);
+      free_image_results(results, result_count);
+      free(request_cache_key);
+      free(display_query);
+      free(locale);
+      free_context(&ctx);
+      return -1;
+    }
+    image_count = new_count;
   }
 
-  context_set_array_of_arrays(&ctx, "images", image_matrix, result_count,
+  context_set_array_of_arrays(&ctx, "images", image_matrix, image_count,
                               inner_counts);
 
   char *rendered = render_template("images.html", &ctx);
@@ -187,27 +199,14 @@ int images_handler(UrlParams *params) {
     send_response("<h1>Error rendering image results</h1>");
   }
 
-  for (int i = 0; i < result_count; i++) {
-    for (int j = 0; j < IMAGE_RESULT_FIELDS; j++)
-      free(image_matrix[i][j]);
-    free(image_matrix[i]);
-  }
-  free(image_matrix);
-  free(inner_counts);
+  free_string_matrix(image_matrix, inner_counts, image_count);
 
-  if (pager_count > 0) {
-    for (int i = 0; i < pager_count; i++) {
-      for (int j = 0; j < LINK_FIELD_COUNT; j++)
-        free(pager_matrix[i][j]);
-      free(pager_matrix[i]);
-    }
-    free(pager_matrix);
-    free(pager_inner_counts);
-  }
+  free_pagination(pager_matrix, pager_inner_counts, pager_count);
 
   free_image_results(results, result_count);
   free(request_cache_key);
   free(display_query);
+  free(locale);
   free_context(&ctx);
 
   return 0;

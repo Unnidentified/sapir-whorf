@@ -206,63 +206,69 @@ int user_engines_contains(const char *engine_id, char **ids, int count) {
   return 0;
 }
 
+int append_string_row(char ****matrix, int **inner_counts, int row_count,
+                      const char *const *values, int field_count) {
+  if (!matrix || !inner_counts || !values || field_count <= 0)
+    return row_count;
+
+  char **row = calloc((size_t)field_count, sizeof(*row));
+  if (!row)
+    return row_count;
+
+  for (int i = 0; i < field_count; i++) {
+    row[i] = strdup(values[i] ? values[i] : "");
+    if (!row[i]) {
+      for (int j = 0; j < i; j++)
+        free(row[j]);
+      free(row);
+      return row_count;
+    }
+  }
+
+  char ***new_matrix = malloc(sizeof(*new_matrix) * (row_count + 1));
+  int *new_counts = malloc(sizeof(*new_counts) * (row_count + 1));
+  if (!new_matrix || !new_counts) {
+    free(new_matrix);
+    free(new_counts);
+    for (int i = 0; i < field_count; i++)
+      free(row[i]);
+    free(row);
+    return row_count;
+  }
+
+  if (row_count > 0) {
+    memcpy(new_matrix, *matrix, sizeof(*new_matrix) * row_count);
+    memcpy(new_counts, *inner_counts, sizeof(*new_counts) * row_count);
+  }
+
+  new_matrix[row_count] = row;
+  new_counts[row_count] = field_count;
+  free(*matrix);
+  free(*inner_counts);
+  *matrix = new_matrix;
+  *inner_counts = new_counts;
+  return row_count + 1;
+}
+
+void free_string_matrix(char ***matrix, int *inner_counts, int row_count) {
+  if (matrix) {
+    for (int i = 0; i < row_count; i++) {
+      int field_count = inner_counts ? inner_counts[i] : 0;
+      for (int j = 0; j < field_count; j++)
+        free(matrix[i][j]);
+      free(matrix[i]);
+    }
+  }
+  free(matrix);
+  free(inner_counts);
+}
+
 int add_link_to_collection(const char *href, const char *label,
                            const char *class_name, char ****collection,
                            int **inner_counts, int current_count) {
-  char ***old_collection = *collection;
-  int *old_inner_counts = *inner_counts;
-  char ***new_collection =
-      (char ***)malloc(sizeof(char **) * (current_count + 1));
-  int *new_inner_counts = (int *)malloc(sizeof(int) * (current_count + 1));
-
-  if (!new_collection || !new_inner_counts) {
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  if (*collection && current_count > 0) {
-    memcpy(new_collection, *collection, sizeof(char **) * current_count);
-  }
-  if (*inner_counts && current_count > 0) {
-    memcpy(new_inner_counts, *inner_counts, sizeof(int) * current_count);
-  }
-
-  *collection = new_collection;
-  *inner_counts = new_inner_counts;
-
-  (*collection)[current_count] =
-      (char **)malloc(sizeof(char *) * LINK_FIELD_COUNT);
-  if (!(*collection)[current_count]) {
-    *collection = old_collection;
-    *inner_counts = old_inner_counts;
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  (*collection)[current_count][0] = strdup(href ? href : "");
-  (*collection)[current_count][1] = strdup(label ? label : "");
-  (*collection)[current_count][2] = strdup(class_name ? class_name : "");
-
-  if (!(*collection)[current_count][0] || !(*collection)[current_count][1] ||
-      !(*collection)[current_count][2]) {
-    free((*collection)[current_count][0]);
-    free((*collection)[current_count][1]);
-    free((*collection)[current_count][2]);
-    free((*collection)[current_count]);
-    *collection = old_collection;
-    *inner_counts = old_inner_counts;
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  (*inner_counts)[current_count] = LINK_FIELD_COUNT;
-
-  free(old_collection);
-  free(old_inner_counts);
-  return current_count + 1;
+  const char *values[LINK_FIELD_COUNT] = {href, label, class_name};
+  return append_string_row(collection, inner_counts, current_count, values,
+                           LINK_FIELD_COUNT);
 }
 
 int build_pagination(int page, char *(*href_builder)(int page, void *data),
