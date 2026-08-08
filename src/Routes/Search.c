@@ -140,29 +140,31 @@ static InfoBox fetch_currency_wrapper(char *query) {
   return fetch_currency_data(query);
 }
 char *get_base_url(const char *input) {
-    if (!input) return NULL;
+  if (!input)
+    return NULL;
 
-    const char *start = input;
+  const char *start = input;
 
-    const char *protocol_pos = strstr(input, "://");
-    if (protocol_pos) {
-        start = protocol_pos + 3;
-    }
+  const char *protocol_pos = strstr(input, "://");
+  if (protocol_pos) {
+    start = protocol_pos + 3;
+  }
 
-    const char *end = start;
-    while (*end && *end != '/' && *end != '?' && *end != '#') {
-        end++;
-    }
+  const char *end = start;
+  while (*end && *end != '/' && *end != '?' && *end != '#') {
+    end++;
+  }
 
-    size_t len = end - start;
+  size_t len = end - start;
 
-    char *domain = (char *)malloc(len + 1);
-    if (!domain) return NULL;
+  char *domain = (char *)malloc(len + 1);
+  if (!domain)
+    return NULL;
 
-    strncpy(domain, start, len);
-    domain[len] = '\0';
+  strncpy(domain, start, len);
+  domain[len] = '\0';
 
-    return domain;
+  return domain;
 }
 static int is_calculator_query(const char *query) {
   if (!query)
@@ -252,11 +254,8 @@ static void *infobox_thread_func(void *arg) {
 static int add_infobox_to_collection(InfoBox *infobox, char ****collection,
                                      int **inner_counts, int current_count) {
   const char *values[INFOBOX_FIELD_COUNT] = {
-      infobox->title,
-      infobox->thumbnail_url,
-      infobox->extract,
-      infobox->url,
-      infobox->url,
+      infobox->title, infobox->thumbnail_url, infobox->extract,
+      infobox->url,   infobox->url,
   };
   return append_string_row(collection, inner_counts, current_count, values,
                            INFOBOX_FIELD_COUNT);
@@ -267,8 +266,7 @@ static int add_warning_to_collection(const char *engine_name,
                                      char ****collection, int **inner_counts,
                                      int current_count) {
   const char *values[] = {engine_name, warning_message};
-  return append_string_row(collection, inner_counts, current_count, values,
-                           2);
+  return append_string_row(collection, inner_counts, current_count, values, 2);
 }
 
 static void free_user_engine_list(char **user_engines, int user_engine_count) {
@@ -296,19 +294,25 @@ static void free_infobox_results(InfoBoxThreadData *data) {
   }
 }
 
-static const char *warning_message_for_job(const ScrapeJob *job, const char *locale) {
+static const char *warning_message_for_job(const ScrapeJob *job,
+                                           const char *locale) {
   switch (job->status) {
   case SCRAPE_STATUS_FETCH_ERROR: {
     const char *msg = beaker_get_locale_value(locale, "warning_fetch_error");
-    return msg ? msg : "request failed before OmniSearch could read search results.";
+    return msg ? msg
+               : "request failed before OmniSearch could read search results.";
   }
   case SCRAPE_STATUS_PARSE_MISMATCH: {
     const char *msg = beaker_get_locale_value(locale, "warning_parse_mismatch");
-    return msg ? msg : "returned search results in a format OmniSearch could not parse.";
+    return msg ? msg
+               : "returned search results in a format OmniSearch could not "
+                 "parse.";
   }
   case SCRAPE_STATUS_BLOCKED: {
     const char *msg = beaker_get_locale_value(locale, "warning_blocked");
-    return msg ? msg : "returned a captcha or another blocking page instead of search results.";
+    return msg ? msg
+               : "returned a captcha or another blocking page instead of "
+                 "search results.";
   }
   default:
     return NULL;
@@ -362,8 +366,8 @@ static int engine_allowed_for_user(const SearchEngine *eng, char **user_ids,
 static char *build_search_href(const char *query, const char *engine_id,
                                int page) {
   const char *safe_query = query ? query : "";
-  int use_engine = engine_id && engine_id[0] != '\0' &&
-                   !engine_id_matches(engine_id, "all");
+  int use_engine =
+      engine_id && engine_id[0] != '\0' && !engine_id_matches(engine_id, "all");
   size_t needed = strlen("/search?q=") + strlen(safe_query) + 1;
 
   if (use_engine)
@@ -421,7 +425,8 @@ int results_handler(UrlParams *params) {
 
   char **user_engines = NULL;
   int user_engine_count = 0;
-  int has_user_pref = (get_user_engines(&user_engines, &user_engine_count) == 0);
+  int has_user_pref =
+      (get_user_engines(&user_engines, &user_engine_count) == 0);
 
   if (params) {
     for (int i = 0; i < params->count; i++) {
@@ -449,9 +454,11 @@ int results_handler(UrlParams *params) {
   beaker_set_locale(&ctx, locale);
 
   const char *rate_limit_msg = beaker_get_locale_value(locale, "rate_limit");
-  if (!rate_limit_msg) rate_limit_msg = "Slow down! Too many searches from you!";
+  if (!rate_limit_msg)
+    rate_limit_msg = "Slow down! Too many searches from you!";
   const char *no_results_msg = beaker_get_locale_value(locale, "no_results");
-  if (!no_results_msg) no_results_msg = "No results found";
+  if (!no_results_msg)
+    no_results_msg = "No results found";
 
   char page_str[16];
   snprintf(page_str, sizeof(page_str), "%d", page);
@@ -604,9 +611,9 @@ int results_handler(UrlParams *params) {
               ? "engine-filter active"
               : "engine-filter";
 
-      filter_count = add_link_to_collection(filter_href, ENGINE_REGISTRY[i].name,
-                                            filter_class, &filter_matrix,
-                                            &filter_inner_counts, filter_count);
+      filter_count = add_link_to_collection(
+          filter_href, ENGINE_REGISTRY[i].name, filter_class, &filter_matrix,
+          &filter_inner_counts, filter_count);
       free(filter_href);
     }
 
@@ -660,11 +667,12 @@ int results_handler(UrlParams *params) {
     free_user_engine_list(user_engines, user_engine_count);
     free_context(&ctx);
     char no_results_html[128];
-    snprintf(no_results_html, sizeof(no_results_html), "<h1>%s</h1>", no_results_msg);
+    snprintf(no_results_html, sizeof(no_results_html), "<h1>%s</h1>",
+             no_results_msg);
     send_response(no_results_html);
     return 0;
   }
-  
+
   char ***infobox_matrix = NULL;
   int *infobox_inner_counts = NULL;
   int infobox_count = 0;
@@ -720,9 +728,8 @@ int results_handler(UrlParams *params) {
   }
 
   if (total_results > 0) {
-    char ***results_matrix = NULL;
-    int *results_inner_counts = NULL;
-    int unique_count = 0;
+    StringMatrix results_matrix;
+    string_matrix_init(&results_matrix);
     UrlHashTable url_table;
     url_hash_init(&url_table);
 
@@ -749,34 +756,35 @@ int results_handler(UrlParams *params) {
             base_url,
             "",
         };
-        int new_count = append_string_row(&results_matrix, &results_inner_counts,
-                                          unique_count, values,
-                                          RESULT_FIELD_COUNT);
+        int append_result =
+            string_matrix_append(&results_matrix, values, RESULT_FIELD_COUNT);
 
         free(pretty_url);
         free(base_url);
         free(all_results[i][j].url);
         free(all_results[i][j].title);
         free(all_results[i][j].snippet);
-        unique_count = new_count;
+        if (append_result != 0) {
+          continue;
+        }
       }
       free(all_results[i]);
     }
 
-    context_set_array_of_arrays(&ctx, "results", results_matrix, unique_count,
-                                results_inner_counts);
+    context_set_array_of_arrays(&ctx, "results", results_matrix.rows,
+                                results_matrix.count,
+                                results_matrix.field_counts);
 
-    char ***pager_matrix = NULL;
-    int *pager_inner_counts = NULL;
-    SearchHrefData href_data = { .query = raw_query, .engine_id = selected_engine_id };
-    int pager_count = build_pagination(page, search_href_builder,
-                                       &href_data, &pager_matrix,
-                                       &pager_inner_counts);
+    StringMatrix pager_matrix;
+    SearchHrefData href_data = {.query = raw_query,
+                                .engine_id = selected_engine_id};
+    int pagination_result = string_matrix_build_pagination(
+        page, search_href_builder, &href_data, &pager_matrix);
 
-    if (pager_count > 0) {
-      context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix,
-                                  pager_count, pager_inner_counts);
-      free_string_matrix(pager_matrix, pager_inner_counts, pager_count);
+    if (pagination_result == 0 && pager_matrix.count > 0) {
+      context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix.rows,
+                                  pager_matrix.count,
+                                  pager_matrix.field_counts);
     }
 
     char *html = render_template("results.html", &ctx);
@@ -785,7 +793,8 @@ int results_handler(UrlParams *params) {
       free(html);
     }
 
-    free_string_matrix(results_matrix, results_inner_counts, unique_count);
+    string_matrix_free(&pager_matrix);
+    string_matrix_free(&results_matrix);
     url_hash_free(&url_table);
   } else {
     char *html = render_template("results.html", &ctx);

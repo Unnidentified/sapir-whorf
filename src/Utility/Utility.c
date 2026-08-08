@@ -263,6 +263,67 @@ void free_string_matrix(char ***matrix, int *inner_counts, int row_count) {
   free(inner_counts);
 }
 
+void string_matrix_init(StringMatrix *matrix) {
+  if (matrix)
+    *matrix = (StringMatrix){0};
+}
+
+int string_matrix_append(StringMatrix *matrix, const char *const *values,
+                         int field_count) {
+  if (!matrix || !values || field_count <= 0)
+    return -1;
+
+  char **row = calloc((size_t)field_count, sizeof(*row));
+  if (!row)
+    return -1;
+
+  for (int i = 0; i < field_count; i++) {
+    row[i] = strdup(values[i] ? values[i] : "");
+    if (!row[i]) {
+      for (int j = 0; j < i; j++)
+        free(row[j]);
+      free(row);
+      return -1;
+    }
+  }
+
+  if (matrix->count == matrix->capacity) {
+    int new_capacity = matrix->capacity ? matrix->capacity * 2 : 8;
+    char ***new_rows = malloc(sizeof(*new_rows) * (size_t)new_capacity);
+    int *new_counts = malloc(sizeof(*new_counts) * (size_t)new_capacity);
+    if (!new_rows || !new_counts) {
+      free(new_rows);
+      free(new_counts);
+      for (int i = 0; i < field_count; i++)
+        free(row[i]);
+      free(row);
+      return -1;
+    }
+    if (matrix->count > 0) {
+      memcpy(new_rows, matrix->rows, sizeof(*new_rows) * matrix->count);
+      memcpy(new_counts, matrix->field_counts,
+             sizeof(*new_counts) * matrix->count);
+    }
+    free(matrix->rows);
+    free(matrix->field_counts);
+    matrix->rows = new_rows;
+    matrix->field_counts = new_counts;
+    matrix->capacity = new_capacity;
+  }
+
+  matrix->rows[matrix->count] = row;
+  matrix->field_counts[matrix->count] = field_count;
+  matrix->count++;
+  return 0;
+}
+
+void string_matrix_free(StringMatrix *matrix) {
+  if (!matrix)
+    return;
+  free_string_matrix(matrix->rows, matrix->field_counts, matrix->count);
+  *matrix = (StringMatrix){0};
+}
+
 int add_link_to_collection(const char *href, const char *label,
                            const char *class_name, char ****collection,
                            int **inner_counts, int current_count) {
@@ -273,37 +334,62 @@ int add_link_to_collection(const char *href, const char *label,
 
 int build_pagination(int page, char *(*href_builder)(int page, void *data),
                      void *data, char ****out_matrix, int **out_inner_counts) {
+  if (!out_matrix || !out_inner_counts)
+    return 0;
+
+  StringMatrix matrix;
+  if (string_matrix_build_pagination(page, href_builder, data, &matrix) != 0) {
+    *out_matrix = NULL;
+    *out_inner_counts = NULL;
+    return 0;
+  }
+
+  *out_matrix = matrix.rows;
+  *out_inner_counts = matrix.field_counts;
+  return matrix.count;
+}
+
+int string_matrix_build_pagination(int page,
+                                   char *(*href_builder)(int page, void *data),
+                                   void *data, StringMatrix *out_matrix) {
   enum { PAGER_WINDOW_SIZE = 5 };
+  if (!out_matrix || !href_builder)
+    return -1;
 
-  *out_matrix = NULL;
-  *out_inner_counts = NULL;
-  int count = 0;
-
+  string_matrix_init(out_matrix);
   int pager_start = page <= 3 ? 1 : page - 2;
   int pager_end = pager_start + PAGER_WINDOW_SIZE - 1;
 
-  if (page > 1) {
-    char *href = href_builder(page - 1, data);
-    count = add_link_to_collection(href, "←", "pagination-btn prev", out_matrix,
-                                   out_inner_counts, count);
+  for (int i = page > 1 ? pager_start - 1 : pager_start; i <= pager_end + 1;
+       i++) {
+    const char *label = NULL;
+    const char *class_name = "pagination-btn";
+    char page_label[16];
+    int target_page = i;
+
+    if (page > 1 && i == pager_start - 1) {
+      label = "←";
+      class_name = "pagination-btn prev";
+      target_page = page - 1;
+    } else if (i == pager_end + 1) {
+      label = "→";
+      class_name = "pagination-btn next";
+      target_page = page + 1;
+    } else {
+      snprintf(page_label, sizeof(page_label), "%d", i);
+      label = page_label;
+      if (i == page)
+        class_name = "pagination-btn pagination-current";
+    }
+
+    char *href = href_builder(target_page, data);
+    const char *values[LINK_FIELD_COUNT] = {href, label, class_name};
+    int result = string_matrix_append(out_matrix, values, LINK_FIELD_COUNT);
     free(href);
+    if (result != 0) {
+      string_matrix_free(out_matrix);
+      return -1;
+    }
   }
-
-  for (int i = pager_start; i <= pager_end; i++) {
-    char label[16];
-    snprintf(label, sizeof(label), "%d", i);
-    char *href = href_builder(i, data);
-    count = add_link_to_collection(
-        href, label,
-        i == page ? "pagination-btn pagination-current" : "pagination-btn",
-        out_matrix, out_inner_counts, count);
-    free(href);
-  }
-
-  char *href = href_builder(page + 1, data);
-  count = add_link_to_collection(href, "→", "pagination-btn next", out_matrix,
-                                 out_inner_counts, count);
-  free(href);
-
-  return count;
+  return 0;
 }
