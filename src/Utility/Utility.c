@@ -14,7 +14,6 @@ static int themes_initialized = 0;
 void init_themes(const char *static_path) {
   if (themes_initialized)
     return;
-  themes_initialized = 1;
 
   char themes_dir[512];
   snprintf(themes_dir, sizeof(themes_dir), "%s/themes", static_path);
@@ -26,20 +25,32 @@ void init_themes(const char *static_path) {
   struct dirent *entry;
   int capacity = 4;
   themes_list = malloc(sizeof(char *) * capacity);
+  if (!themes_list) {
+    closedir(dir);
+    return;
+  }
   themes_count = 0;
 
   while ((entry = readdir(dir)) != NULL) {
     size_t len = strlen(entry->d_name);
     if (len > 4 && strcmp(entry->d_name + len - 4, ".css") == 0) {
       if (themes_count >= capacity) {
-        capacity *= 2;
-        themes_list = realloc(themes_list, sizeof(char *) * capacity);
+        int new_capacity = capacity * 2;
+        char **new_list = realloc(themes_list, sizeof(char *) * new_capacity);
+        if (!new_list)
+          break;
+        themes_list = new_list;
+        capacity = new_capacity;
       }
-      themes_list[themes_count] = strndup(entry->d_name, len - 4);
+      char *theme = strndup(entry->d_name, len - 4);
+      if (!theme)
+        break;
+      themes_list[themes_count] = theme;
       themes_count++;
     }
   }
   closedir(dir);
+  themes_initialized = 1;
 
   for (int i = 0; i < themes_count; i++) {
     for (int j = i + 1; j < themes_count; j++) {
@@ -206,50 +217,6 @@ int user_engines_contains(const char *engine_id, char **ids, int count) {
   return 0;
 }
 
-int append_string_row(char ****matrix, int **inner_counts, int row_count,
-                      const char *const *values, int field_count) {
-  if (!matrix || !inner_counts || !values || field_count <= 0)
-    return row_count;
-
-  char **row = calloc((size_t)field_count, sizeof(*row));
-  if (!row)
-    return row_count;
-
-  for (int i = 0; i < field_count; i++) {
-    row[i] = strdup(values[i] ? values[i] : "");
-    if (!row[i]) {
-      for (int j = 0; j < i; j++)
-        free(row[j]);
-      free(row);
-      return row_count;
-    }
-  }
-
-  char ***new_matrix = malloc(sizeof(*new_matrix) * (row_count + 1));
-  int *new_counts = malloc(sizeof(*new_counts) * (row_count + 1));
-  if (!new_matrix || !new_counts) {
-    free(new_matrix);
-    free(new_counts);
-    for (int i = 0; i < field_count; i++)
-      free(row[i]);
-    free(row);
-    return row_count;
-  }
-
-  if (row_count > 0) {
-    memcpy(new_matrix, *matrix, sizeof(*new_matrix) * row_count);
-    memcpy(new_counts, *inner_counts, sizeof(*new_counts) * row_count);
-  }
-
-  new_matrix[row_count] = row;
-  new_counts[row_count] = field_count;
-  free(*matrix);
-  free(*inner_counts);
-  *matrix = new_matrix;
-  *inner_counts = new_counts;
-  return row_count + 1;
-}
-
 void free_string_matrix(char ***matrix, int *inner_counts, int row_count) {
   if (matrix) {
     for (int i = 0; i < row_count; i++) {
@@ -322,31 +289,6 @@ void string_matrix_free(StringMatrix *matrix) {
     return;
   free_string_matrix(matrix->rows, matrix->field_counts, matrix->count);
   *matrix = (StringMatrix){0};
-}
-
-int add_link_to_collection(const char *href, const char *label,
-                           const char *class_name, char ****collection,
-                           int **inner_counts, int current_count) {
-  const char *values[LINK_FIELD_COUNT] = {href, label, class_name};
-  return append_string_row(collection, inner_counts, current_count, values,
-                           LINK_FIELD_COUNT);
-}
-
-int build_pagination(int page, char *(*href_builder)(int page, void *data),
-                     void *data, char ****out_matrix, int **out_inner_counts) {
-  if (!out_matrix || !out_inner_counts)
-    return 0;
-
-  StringMatrix matrix;
-  if (string_matrix_build_pagination(page, href_builder, data, &matrix) != 0) {
-    *out_matrix = NULL;
-    *out_inner_counts = NULL;
-    return 0;
-  }
-
-  *out_matrix = matrix.rows;
-  *out_inner_counts = matrix.field_counts;
-  return matrix.count;
 }
 
 int string_matrix_build_pagination(int page,

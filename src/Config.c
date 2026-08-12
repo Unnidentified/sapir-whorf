@@ -3,6 +3,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+static char *trim(char *value) {
+  while (*value == ' ' || *value == '\t')
+    value++;
+
+  char *end = value + strlen(value);
+  while (end > value && (end[-1] == ' ' || end[-1] == '\t'))
+    end--;
+  *end = '\0';
+  return value;
+}
+
 int load_config(const char *filename, Config *config) {
   FILE *file = fopen(filename, "r");
   if (!file) {
@@ -33,51 +44,31 @@ int load_config(const char *filename, Config *config) {
     char *delimiter = strchr(line, '=');
     if (delimiter) {
       *delimiter = '\0';
-      char *key = line;
-      char *value = delimiter + 1;
+      char *key = trim(line);
+      char *value = trim(delimiter + 1);
 
-      while (*key == ' ' || *key == '\t')
-        key++;
-      while (*value == ' ' || *value == '\t')
-        value++;
-
-      char *key_end = key + strlen(key) - 1;
-      while (key_end > key && (*key_end == ' ' || *key_end == '\t')) {
-        *key_end = '\0';
-        key_end--;
-      }
-
-      char *value_end = value + strlen(value) - 1;
-      while (value_end > value && (*value_end == ' ' || *value_end == '\t' ||
-                                   *value_end == '"' || *value_end == '\'')) {
-        *value_end = '\0';
-        value_end--;
-      }
-
-      while (*value == ' ' || *value == '\t')
-        value++;
+      char *value_end = value + strlen(value);
+      while (value_end > value &&
+             (value_end[-1] == '"' || value_end[-1] == '\''))
+        *--value_end = '\0';
       while (*value == '"' || *value == '\'')
         value++;
 
       if (strcmp(section, "server") == 0) {
         if (strcmp(key, "host") == 0) {
-          strncpy(config->host, value, sizeof(config->host) - 1);
-          config->host[sizeof(config->host) - 1] = '\0';
+          snprintf(config->host, sizeof(config->host), "%s", value);
         } else if (strcmp(key, "port") == 0) {
           config->port = atoi(value);
         } else if (strcmp(key, "locale") == 0) {
-          strncpy(config->default_locale, value,
-                  sizeof(config->default_locale) - 1);
-          config->default_locale[sizeof(config->default_locale) - 1] = '\0';
+          snprintf(config->default_locale, sizeof(config->default_locale), "%s",
+                   value);
         }
       } else if (strcmp(section, "proxy") == 0) {
         if (strcmp(key, "proxy") == 0) {
-          strncpy(config->proxy, value, sizeof(config->proxy) - 1);
-          config->proxy[sizeof(config->proxy) - 1] = '\0';
+          snprintf(config->proxy, sizeof(config->proxy), "%s", value);
         } else if (strcmp(key, "list_file") == 0) {
-          strncpy(config->proxy_list_file, value,
-                  sizeof(config->proxy_list_file) - 1);
-          config->proxy_list_file[sizeof(config->proxy_list_file) - 1] = '\0';
+          snprintf(config->proxy_list_file, sizeof(config->proxy_list_file),
+                   "%s", value);
         } else if (strcmp(key, "max_retries") == 0) {
           config->max_proxy_retries = atoi(value);
         } else if (strcmp(key, "randomize_username") == 0) {
@@ -87,8 +78,7 @@ int load_config(const char *filename, Config *config) {
         }
       } else if (strcmp(section, "cache") == 0) {
         if (strcmp(key, "dir") == 0) {
-          strncpy(config->cache_dir, value, sizeof(config->cache_dir) - 1);
-          config->cache_dir[sizeof(config->cache_dir) - 1] = '\0';
+          snprintf(config->cache_dir, sizeof(config->cache_dir), "%s", value);
         } else if (strcmp(key, "ttl_search") == 0) {
           config->cache_ttl_search = atoi(value);
         } else if (strcmp(key, "ttl_infobox") == 0) {
@@ -98,12 +88,10 @@ int load_config(const char *filename, Config *config) {
         }
       } else if (strcmp(section, "engines") == 0) {
         if (strcmp(key, "engines") == 0) {
-          strncpy(config->engines, value, sizeof(config->engines) - 1);
-          config->engines[sizeof(config->engines) - 1] = '\0';
+          snprintf(config->engines, sizeof(config->engines), "%s", value);
         } else if (strcmp(key, "yacy_instance") == 0) {
-          strncpy(config->yacy_instance, value,
-                  sizeof(config->yacy_instance) - 1);
-          config->yacy_instance[sizeof(config->yacy_instance) - 1] = '\0';
+          snprintf(config->yacy_instance, sizeof(config->yacy_instance), "%s",
+                   value);
         }
       } else if (strcmp(section, "rate_limit") == 0) {
         if (strcmp(key, "search_requests") == 0) {
