@@ -217,6 +217,15 @@ int user_engines_contains(const char *engine_id, char **ids, int count) {
   return 0;
 }
 
+char *get_default_search_engine(void) {
+  char *cookie = get_cookie("default_engine");
+  if (cookie && (strcmp(cookie, "all") == 0 || is_engine_id_enabled(cookie)))
+    return cookie;
+
+  free(cookie);
+  return strdup("all");
+}
+
 void free_string_matrix(char ***matrix, int *inner_counts, int row_count) {
   if (matrix) {
     for (int i = 0; i < row_count; i++) {

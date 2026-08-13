@@ -34,6 +34,14 @@ int settings_handler(UrlParams *params) {
   int user_engine_count = 0;
   int has_user_pref =
       (get_user_engines(&user_engines, &user_engine_count) == 0);
+  char *default_engine = get_default_search_engine();
+
+  if (strcmp(default_engine, "all") != 0 && has_user_pref &&
+      !user_engines_contains(default_engine, user_engines,
+                             user_engine_count)) {
+    free(default_engine);
+    default_engine = strdup("all");
+  }
 
   int enabled_count = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
@@ -63,11 +71,13 @@ int settings_handler(UrlParams *params) {
         }
       }
 
-      engine_data[idx] = malloc(sizeof(char *) * 3);
+      engine_data[idx] = malloc(sizeof(char *) * 4);
       engine_data[idx][0] = (char *)ENGINE_REGISTRY[i].id;
       engine_data[idx][1] = (char *)ENGINE_REGISTRY[i].name;
       engine_data[idx][2] = is_selected ? "checked" : "";
-      engine_inner[idx] = 3;
+      engine_data[idx][3] =
+          strcmp(default_engine, ENGINE_REGISTRY[i].id) == 0 ? "selected" : "";
+      engine_inner[idx] = 4;
 
       idx++;
     }
@@ -78,6 +88,7 @@ int settings_handler(UrlParams *params) {
   context_set(&ctx, "query", query);
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "locale", locale);
+  context_set(&ctx, "default_engine", default_engine);
   context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count,
                               inner_counts);
 
@@ -132,6 +143,7 @@ int settings_handler(UrlParams *params) {
   send_response(rendered_html);
 
   free(rendered_html);
+  free(default_engine);
   free(theme);
   free(locale);
   free_context(&ctx);

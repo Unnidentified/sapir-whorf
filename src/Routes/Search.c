@@ -417,7 +417,11 @@ int results_handler(UrlParams *params) {
   extern Config global_config;
   TemplateContext ctx = new_context();
   char *raw_query = "";
-  const char *selected_engine_id = "all";
+  char selected_engine_id[32];
+  char *default_engine = get_default_search_engine();
+  snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
+           default_engine);
+  free(default_engine);
   int page = 1;
   int btnI = 0;
 
@@ -435,7 +439,8 @@ int results_handler(UrlParams *params) {
         if (parsed > 1)
           page = parsed;
       } else if (strcmp(params->params[i].key, "engine") == 0) {
-        selected_engine_id = params->params[i].value;
+        snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
+                 params->params[i].value);
       } else if (strcmp(params->params[i].key, "btnI") == 0) {
         btnI = atoi(params->params[i].value);
       }
@@ -481,8 +486,17 @@ int results_handler(UrlParams *params) {
   }
 
   const SearchEngine *selected_engine = find_enabled_engine(selected_engine_id);
-  if (!selected_engine)
-    selected_engine_id = "all";
+  if (selected_engine &&
+      !engine_allowed_for_user(selected_engine, user_engines,
+                               user_engine_count, has_user_pref)) {
+    selected_engine = NULL;
+  }
+  if (selected_engine) {
+    snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
+             selected_engine->id);
+  } else {
+    snprintf(selected_engine_id, sizeof(selected_engine_id), "all");
+  }
 
   context_set(&ctx, "selected_engine", selected_engine_id);
   char *search_href = build_search_href(raw_query, selected_engine_id, 1);
