@@ -7,5 +7,5 @@
 	<Url type="text/html" method="get" template="{{scheme}}://{{domain}}/search?q={searchTerms}"/>
 	<InputEncoding>UTF-8</InputEncoding>
 	<OutputEncoding>UTF-8</OutputEncoding>
-	<moz:SearchForm>{{domain}}/</moz:SearchForm>
+	<moz:SearchForm>{{scheme}}://{{domain}}/</moz:SearchForm>
 </OpenSearchDescription>
