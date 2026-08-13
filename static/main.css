@@ -822,6 +822,38 @@ header .logo-link:hover {
     height:18px;
     accent-color:var(--accent);
     cursor:pointer;
+    flex-shrink:0;
+    margin:0;
+}
+
+.settings-engine-list {
+    margin:0;
+}
+
+.settings-engine-options {
+    display:grid;
+    gap:8px;
+    margin-inline:-3px;
+}
+
+.settings-engine-option {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:12px 14px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:var(--bg-main);
+    color:var(--text-primary);
+    font-size:0.95rem;
+    cursor:pointer;
+}
+
+.settings-default-engine-field {
+    margin-top:12px;
+    padding-top:12px;
+    border-top:1px solid var(--border);
 }
 
 .settings-actions {
@@ -888,6 +920,12 @@ header .logo-link:hover {
         align-items:stretch;
         gap:8px;
     }
+    .settings-engine-options {
+        margin-inline:0;
+    }
+    .settings-engine-option {
+        padding-inline:7px;
+    }
     .settings-actions {
         flex-direction:column;
     }
@@ -936,5 +974,3 @@ header .logo-link:hover {
         flex-direction: column;
     }
 }
-
-
