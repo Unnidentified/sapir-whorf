@@ -287,8 +287,7 @@ static void free_search_results(SearchResult **all_results, ScrapeJob *jobs,
 
 static void free_infobox_results(InfoBoxThreadData *data) {
   for (int i = 0; i < HANDLER_COUNT; i++) {
-    if (data[i].success)
-      free_infobox(&data[i].result);
+    free_infobox(&data[i].result);
   }
 }
 
