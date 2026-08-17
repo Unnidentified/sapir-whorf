@@ -140,29 +140,31 @@ static InfoBox fetch_currency_wrapper(char *query) {
   return fetch_currency_data(query);
 }
 char *get_base_url(const char *input) {
-    if (!input) return NULL;
+  if (!input)
+    return NULL;
 
-    const char *start = input;
+  const char *start = input;
 
-    const char *protocol_pos = strstr(input, "://");
-    if (protocol_pos) {
-        start = protocol_pos + 3;
-    }
+  const char *protocol_pos = strstr(input, "://");
+  if (protocol_pos) {
+    start = protocol_pos + 3;
+  }
 
-    const char *end = start;
-    while (*end && *end != '/' && *end != '?' && *end != '#') {
-        end++;
-    }
+  const char *end = start;
+  while (*end && *end != '/' && *end != '?' && *end != '#') {
+    end++;
+  }
 
-    size_t len = end - start;
+  size_t len = end - start;
 
-    char *domain = (char *)malloc(len + 1);
-    if (!domain) return NULL;
+  char *domain = (char *)malloc(len + 1);
+  if (!domain)
+    return NULL;
 
-    strncpy(domain, start, len);
-    domain[len] = '\0';
+  strncpy(domain, start, len);
+  domain[len] = '\0';
 
-    return domain;
+  return domain;
 }
 static int is_calculator_query(const char *query) {
   if (!query)
@@ -249,88 +251,65 @@ static void *infobox_thread_func(void *arg) {
   return NULL;
 }
 
-static int add_infobox_to_collection(InfoBox *infobox, char ****collection,
-                                     int **inner_counts, int current_count) {
-  *collection =
-      (char ***)realloc(*collection, sizeof(char **) * (current_count + 1));
-  *inner_counts =
-      (int *)realloc(*inner_counts, sizeof(int) * (current_count + 1));
-
-  (*collection)[current_count] =
-      (char **)malloc(sizeof(char *) * INFOBOX_FIELD_COUNT);
-  (*collection)[current_count][0] =
-      infobox->title ? strdup(infobox->title) : NULL;
-  (*collection)[current_count][1] =
-      infobox->thumbnail_url ? strdup(infobox->thumbnail_url) : NULL;
-  (*collection)[current_count][2] =
-      infobox->extract ? strdup(infobox->extract) : NULL;
-  (*collection)[current_count][3] = infobox->url ? strdup(infobox->url) : NULL;
-  (*collection)[current_count][4] = infobox->url ? strdup(infobox->url) : NULL;
-  (*inner_counts)[current_count] = INFOBOX_FIELD_COUNT;
-
-  return current_count + 1;
+static int add_infobox_to_collection(InfoBox *infobox,
+                                     StringMatrix *collection) {
+  const char *values[INFOBOX_FIELD_COUNT] = {
+      infobox->title, infobox->thumbnail_url, infobox->extract,
+      infobox->url,   infobox->url,
+  };
+  return string_matrix_append(collection, values, INFOBOX_FIELD_COUNT);
 }
 
 static int add_warning_to_collection(const char *engine_name,
                                      const char *warning_message,
-                                     char ****collection, int **inner_counts,
-                                     int current_count) {
-  char ***new_collection =
-      (char ***)malloc(sizeof(char **) * (current_count + 1));
-  int *new_inner_counts =
-      (int *)malloc(sizeof(int) * (current_count + 1));
-
-  if (!new_collection || !new_inner_counts) {
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  if (*collection && current_count > 0) {
-    memcpy(new_collection, *collection, sizeof(char **) * current_count);
-  }
-  if (*inner_counts && current_count > 0) {
-    memcpy(new_inner_counts, *inner_counts, sizeof(int) * current_count);
-  }
-
-  free(*collection);
-  free(*inner_counts);
-
-  *collection = new_collection;
-  *inner_counts = new_inner_counts;
-
-  (*collection)[current_count] = (char **)malloc(sizeof(char *) * 2);
-  if (!(*collection)[current_count])
-    return current_count;
-
-  (*collection)[current_count][0] = strdup(engine_name ? engine_name : "");
-  (*collection)[current_count][1] =
-      strdup(warning_message ? warning_message : "");
-
-  if (!(*collection)[current_count][0] || !(*collection)[current_count][1]) {
-    free((*collection)[current_count][0]);
-    free((*collection)[current_count][1]);
-    free((*collection)[current_count]);
-    return current_count;
-  }
-
-  (*inner_counts)[current_count] = 2;
-  return current_count + 1;
+                                     StringMatrix *collection) {
+  const char *values[] = {engine_name, warning_message};
+  return string_matrix_append(collection, values, 2);
 }
 
-static const char *warning_message_for_job(const ScrapeJob *job, const char *locale) {
+static void free_user_engine_list(char **user_engines, int user_engine_count) {
+  for (int i = 0; i < user_engine_count; i++)
+    free(user_engines[i]);
+  free(user_engines);
+}
+
+static void free_search_results(SearchResult **all_results, ScrapeJob *jobs,
+                                int job_count) {
+  for (int i = 0; i < job_count; i++) {
+    for (int j = 0; all_results[i] && j < jobs[i].results_count; j++) {
+      free(all_results[i][j].url);
+      free(all_results[i][j].title);
+      free(all_results[i][j].snippet);
+    }
+    free(all_results[i]);
+  }
+}
+
+static void free_infobox_results(InfoBoxThreadData *data) {
+  for (int i = 0; i < HANDLER_COUNT; i++) {
+    free_infobox(&data[i].result);
+  }
+}
+
+static const char *warning_message_for_job(const ScrapeJob *job,
+                                           const char *locale) {
   switch (job->status) {
   case SCRAPE_STATUS_FETCH_ERROR: {
     const char *msg = beaker_get_locale_value(locale, "warning_fetch_error");
-    return msg ? msg : "request failed before OmniSearch could read search results.";
+    return msg ? msg
+               : "request failed before OmniSearch could read search results.";
   }
   case SCRAPE_STATUS_PARSE_MISMATCH: {
     const char *msg = beaker_get_locale_value(locale, "warning_parse_mismatch");
-    return msg ? msg : "returned search results in a format OmniSearch could not parse.";
+    return msg ? msg
+               : "returned search results in a format OmniSearch could not "
+                 "parse.";
   }
   case SCRAPE_STATUS_BLOCKED: {
     const char *msg = beaker_get_locale_value(locale, "warning_blocked");
-    return msg ? msg : "returned a captcha or another blocking page instead of search results.";
+    return msg ? msg
+               : "returned a captcha or another blocking page instead of "
+                 "search results.";
   }
   default:
     return NULL;
@@ -384,8 +363,8 @@ static int engine_allowed_for_user(const SearchEngine *eng, char **user_ids,
 static char *build_search_href(const char *query, const char *engine_id,
                                int page) {
   const char *safe_query = query ? query : "";
-  int use_engine = engine_id && engine_id[0] != '\0' &&
-                   !engine_id_matches(engine_id, "all");
+  int use_engine =
+      engine_id && engine_id[0] != '\0' && !engine_id_matches(engine_id, "all");
   size_t needed = strlen("/search?q=") + strlen(safe_query) + 1;
 
   if (use_engine)
@@ -437,13 +416,18 @@ int results_handler(UrlParams *params) {
   extern Config global_config;
   TemplateContext ctx = new_context();
   char *raw_query = "";
-  const char *selected_engine_id = "all";
+  char selected_engine_id[32];
+  char *default_engine = get_default_search_engine();
+  snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
+           default_engine);
+  free(default_engine);
   int page = 1;
   int btnI = 0;
 
   char **user_engines = NULL;
   int user_engine_count = 0;
-  int has_user_pref = (get_user_engines(&user_engines, &user_engine_count) == 0);
+  int has_user_pref =
+      (get_user_engines(&user_engines, &user_engine_count) == 0);
 
   if (params) {
     for (int i = 0; i < params->count; i++) {
@@ -454,7 +438,8 @@ int results_handler(UrlParams *params) {
         if (parsed > 1)
           page = parsed;
       } else if (strcmp(params->params[i].key, "engine") == 0) {
-        selected_engine_id = params->params[i].value;
+        snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
+                 params->params[i].value);
       } else if (strcmp(params->params[i].key, "btnI") == 0) {
         btnI = atoi(params->params[i].value);
       }
@@ -471,9 +456,11 @@ int results_handler(UrlParams *params) {
   beaker_set_locale(&ctx, locale);
 
   const char *rate_limit_msg = beaker_get_locale_value(locale, "rate_limit");
-  if (!rate_limit_msg) rate_limit_msg = "Slow down! Too many searches from you!";
+  if (!rate_limit_msg)
+    rate_limit_msg = "Slow down! Too many searches from you!";
   const char *no_results_msg = beaker_get_locale_value(locale, "no_results");
-  if (!no_results_msg) no_results_msg = "No results found";
+  if (!no_results_msg)
+    no_results_msg = "No results found";
 
   char page_str[16];
   snprintf(page_str, sizeof(page_str), "%d", page);
@@ -491,18 +478,24 @@ int results_handler(UrlParams *params) {
 
   if (!raw_query || strlen(raw_query) == 0) {
     send_redirect("/");
-    if (has_user_pref) {
-      for (int i = 0; i < user_engine_count; i++)
-        free(user_engines[i]);
-      free(user_engines);
-    }
+    free(locale);
+    free_user_engine_list(user_engines, user_engine_count);
     free_context(&ctx);
     return -1;
   }
 
   const SearchEngine *selected_engine = find_enabled_engine(selected_engine_id);
-  if (!selected_engine)
-    selected_engine_id = "all";
+  if (selected_engine &&
+      !engine_allowed_for_user(selected_engine, user_engines,
+                               user_engine_count, has_user_pref)) {
+    selected_engine = NULL;
+  }
+  if (selected_engine) {
+    snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
+             selected_engine->id);
+  } else {
+    snprintf(selected_engine_id, sizeof(selected_engine_id), "all");
+  }
 
   context_set(&ctx, "selected_engine", selected_engine_id);
   char *search_href = build_search_href(raw_query, selected_engine_id, 1);
@@ -526,13 +519,6 @@ int results_handler(UrlParams *params) {
     infobox_data[i].query = raw_query;
     infobox_data[i].success = i;
     infobox_data[i].result = (InfoBox){NULL};
-  }
-
-  if (page == 1) {
-    for (int i = 0; i < HANDLER_COUNT; i++) {
-      pthread_create(&infobox_threads[i], NULL, infobox_thread_func,
-                     &infobox_data[i]);
-    }
   }
 
   ScrapeJob jobs[ENGINE_COUNT];
@@ -592,11 +578,8 @@ int results_handler(UrlParams *params) {
       snprintf(response, sizeof(response), "<h1>%s</h1>", rate_limit_msg);
       send_response(response);
       free(request_cache_key);
-      if (has_user_pref) {
-        for (int i = 0; i < user_engine_count; i++)
-          free(user_engines[i]);
-        free(user_engines);
-      }
+      free(locale);
+      free_user_engine_list(user_engines, user_engine_count);
       free_context(&ctx);
       return -1;
     }
@@ -615,15 +598,14 @@ int results_handler(UrlParams *params) {
   }
 
   if (filter_engine_count > 1) {
-    char ***filter_matrix = NULL;
-    int *filter_inner_counts = NULL;
-    int filter_count = 0;
+    StringMatrix filter_matrix;
+    string_matrix_init(&filter_matrix);
     char *all_href = build_search_href(raw_query, "all", 1);
-
-    filter_count = add_link_to_collection(
+    const char *all_values[LINK_FIELD_COUNT] = {
         all_href, "All",
-        selected_engine ? "engine-filter" : "engine-filter active",
-        &filter_matrix, &filter_inner_counts, filter_count);
+        selected_engine ? "engine-filter" : "engine-filter active"};
+
+    string_matrix_append(&filter_matrix, all_values, LINK_FIELD_COUNT);
     free(all_href);
 
     for (int i = 0; i < ENGINE_COUNT; i++) {
@@ -639,22 +621,24 @@ int results_handler(UrlParams *params) {
               ? "engine-filter active"
               : "engine-filter";
 
-      filter_count = add_link_to_collection(filter_href, ENGINE_REGISTRY[i].name,
-                                            filter_class, &filter_matrix,
-                                            &filter_inner_counts, filter_count);
+      const char *filter_values[LINK_FIELD_COUNT] = {
+          filter_href, ENGINE_REGISTRY[i].name, filter_class};
+      string_matrix_append(&filter_matrix, filter_values, LINK_FIELD_COUNT);
       free(filter_href);
     }
 
-    if (filter_count > 0) {
-      context_set_array_of_arrays(&ctx, "engine_filters", filter_matrix,
-                                  filter_count, filter_inner_counts);
-      for (int i = 0; i < filter_count; i++) {
-        for (int j = 0; j < LINK_FIELD_COUNT; j++)
-          free(filter_matrix[i][j]);
-        free(filter_matrix[i]);
-      }
-      free(filter_matrix);
-      free(filter_inner_counts);
+    if (filter_matrix.count > 0) {
+      context_set_array_of_arrays(&ctx, "engine_filters", filter_matrix.rows,
+                                  filter_matrix.count,
+                                  filter_matrix.field_counts);
+    }
+    string_matrix_free(&filter_matrix);
+  }
+
+  if (page == 1) {
+    for (int i = 0; i < HANDLER_COUNT; i++) {
+      pthread_create(&infobox_threads[i], NULL, infobox_thread_func,
+                     &infobox_data[i]);
     }
   }
 
@@ -672,27 +656,12 @@ int results_handler(UrlParams *params) {
     for (int i = 0; i < engine_idx; i++) {
       if (jobs[i].results_count > 0 && all_results[i][0].url) {
         char *redirect_url = strdup(all_results[i][0].url);
-        for (int j = 0; j < enabled_engine_count; j++) {
-          for (int k = 0; k < jobs[j].results_count; k++) {
-            free(all_results[j][k].url);
-            free(all_results[j][k].title);
-            free(all_results[j][k].snippet);
-          }
-          free(all_results[j]);
-        }
-        if (page == 1) {
-          for (int j = 0; j < HANDLER_COUNT; j++) {
-            if (infobox_data[j].success) {
-              free_infobox(&infobox_data[j].result);
-            }
-          }
-        }
+        free_search_results(all_results, jobs, engine_idx);
+        if (page == 1)
+          free_infobox_results(infobox_data);
         free(request_cache_key);
-        if (has_user_pref) {
-          for (int i = 0; i < user_engine_count; i++)
-            free(user_engines[i]);
-          free(user_engines);
-        }
+        free(locale);
+        free_user_engine_list(user_engines, user_engine_count);
         free_context(&ctx);
         if (redirect_url) {
           send_redirect(redirect_url);
@@ -701,54 +670,37 @@ int results_handler(UrlParams *params) {
         return 0;
       }
     }
-    for (int i = 0; i < enabled_engine_count; i++) {
-      free(all_results[i]);
-    }
-    if (page == 1) {
-      for (int i = 0; i < HANDLER_COUNT; i++) {
-        if (infobox_data[i].success) {
-          free_infobox(&infobox_data[i].result);
-        }
-      }
-    }
+    free_search_results(all_results, jobs, engine_idx);
+    if (page == 1)
+      free_infobox_results(infobox_data);
     free(request_cache_key);
-    if (has_user_pref) {
-      for (int i = 0; i < user_engine_count; i++)
-        free(user_engines[i]);
-      free(user_engines);
-    }
+    free(locale);
+    free_user_engine_list(user_engines, user_engine_count);
     free_context(&ctx);
     char no_results_html[128];
-    snprintf(no_results_html, sizeof(no_results_html), "<h1>%s</h1>", no_results_msg);
+    snprintf(no_results_html, sizeof(no_results_html), "<h1>%s</h1>",
+             no_results_msg);
     send_response(no_results_html);
     return 0;
   }
-  
-  char ***infobox_matrix = NULL;
-  int *infobox_inner_counts = NULL;
-  int infobox_count = 0;
+
+  StringMatrix infobox_matrix;
+  string_matrix_init(&infobox_matrix);
 
   if (page == 1) {
     for (int i = 0; i < HANDLER_COUNT; i++) {
       if (infobox_data[i].success) {
-        infobox_count =
-            add_infobox_to_collection(&infobox_data[i].result, &infobox_matrix,
-                                      &infobox_inner_counts, infobox_count);
+        add_infobox_to_collection(&infobox_data[i].result, &infobox_matrix);
       }
     }
   }
 
-  if (infobox_count > 0) {
-    context_set_array_of_arrays(&ctx, "infoboxes", infobox_matrix,
-                                infobox_count, infobox_inner_counts);
-    for (int i = 0; i < infobox_count; i++) {
-      for (int j = 0; j < INFOBOX_FIELD_COUNT; j++)
-        free(infobox_matrix[i][j]);
-      free(infobox_matrix[i]);
-    }
-    free(infobox_matrix);
-    free(infobox_inner_counts);
+  if (infobox_matrix.count > 0) {
+    context_set_array_of_arrays(&ctx, "infoboxes", infobox_matrix.rows,
+                                infobox_matrix.count,
+                                infobox_matrix.field_counts);
   }
+  string_matrix_free(&infobox_matrix);
 
   int warning_count = 0;
   for (int i = 0; i < enabled_engine_count; i++) {
@@ -757,35 +709,25 @@ int results_handler(UrlParams *params) {
   }
 
   if (warning_count > 0) {
-    char ***warning_matrix = NULL;
-    int *warning_inner_counts = NULL;
-    int warning_index = 0;
+    StringMatrix warning_matrix;
+    string_matrix_init(&warning_matrix);
 
     for (int i = 0; i < enabled_engine_count; i++) {
       const char *warning_message = warning_message_for_job(&jobs[i], locale);
       if (!warning_message)
         continue;
 
-      warning_index = add_warning_to_collection(
-          jobs[i].engine->name, warning_message, &warning_matrix,
-          &warning_inner_counts, warning_index);
+      add_warning_to_collection(jobs[i].engine->name, warning_message,
+                                &warning_matrix);
     }
 
-    if (warning_index > 0) {
-      context_set_array_of_arrays(&ctx, "engine_warnings", warning_matrix,
-                                  warning_index, warning_inner_counts);
+    if (warning_matrix.count > 0) {
+      context_set_array_of_arrays(&ctx, "engine_warnings", warning_matrix.rows,
+                                  warning_matrix.count,
+                                  warning_matrix.field_counts);
     }
 
-    if (warning_matrix) {
-      for (int i = 0; i < warning_index; i++) {
-        free(warning_matrix[i][0]);
-        free(warning_matrix[i][1]);
-        free(warning_matrix[i]);
-      }
-      free(warning_matrix);
-    }
-    if (warning_inner_counts)
-      free(warning_inner_counts);
+    string_matrix_free(&warning_matrix);
   }
 
   int total_results = 0;
@@ -794,33 +736,8 @@ int results_handler(UrlParams *params) {
   }
 
   if (total_results > 0) {
-    char ***results_matrix = (char ***)malloc(sizeof(char **) * total_results);
-    int *results_inner_counts = (int *)malloc(sizeof(int) * total_results);
-    if (!results_matrix || !results_inner_counts) {
-      char *html = render_template("results.html", &ctx);
-      if (html) {
-        send_response(html);
-        free(html);
-      }
-      for (int i = 0; i < enabled_engine_count; i++)
-        free(all_results[i]);
-      if (page == 1) {
-        for (int i = 0; i < HANDLER_COUNT; i++) {
-          if (infobox_data[i].success) {
-            free_infobox(&infobox_data[i].result);
-          }
-        }
-      }
-      free(request_cache_key);
-      if (has_user_pref) {
-        for (int i = 0; i < user_engine_count; i++)
-          free(user_engines[i]);
-        free(user_engines);
-      }
-      free_context(&ctx);
-      return 0;
-    }
-    int unique_count = 0;
+    StringMatrix results_matrix;
+    string_matrix_init(&results_matrix);
     UrlHashTable url_table;
     url_hash_init(&url_table);
 
@@ -837,61 +754,45 @@ int results_handler(UrlParams *params) {
 
         url_hash_insert(&url_table, display_url);
 
-        results_matrix[unique_count] =
-            (char **)malloc(sizeof(char *) * RESULT_FIELD_COUNT);
-        if (!results_matrix[unique_count]) {
-          free(all_results[i][j].url);
-          free(all_results[i][j].title);
-          free(all_results[i][j].snippet);
-          continue;
-        }
         char *pretty_url = pretty_display_url(display_url);
         char *base_url = get_base_url(display_url);
-
-        results_matrix[unique_count][0] = strdup(display_url);
-        results_matrix[unique_count][1] = strdup(pretty_url);
-        results_matrix[unique_count][2] = all_results[i][j].title
-                                              ? strdup(all_results[i][j].title)
-                                              : strdup("Untitled");
-        results_matrix[unique_count][3] =
-            all_results[i][j].snippet ? strdup(all_results[i][j].snippet)
-                                      : strdup("");
-        results_matrix[unique_count][4] = strdup(base_url ? base_url : "");
-        results_matrix[unique_count][5] = strdup("");
-
-        results_inner_counts[unique_count] = RESULT_FIELD_COUNT;
+        const char *values[RESULT_FIELD_COUNT] = {
+            display_url,
+            pretty_url,
+            all_results[i][j].title ? all_results[i][j].title : "Untitled",
+            all_results[i][j].snippet ? all_results[i][j].snippet : "",
+            base_url,
+            "",
+        };
+        int append_result =
+            string_matrix_append(&results_matrix, values, RESULT_FIELD_COUNT);
 
         free(pretty_url);
         free(base_url);
         free(all_results[i][j].url);
         free(all_results[i][j].title);
         free(all_results[i][j].snippet);
-
-        unique_count++;
+        if (append_result != 0) {
+          continue;
+        }
       }
       free(all_results[i]);
     }
 
-    context_set_array_of_arrays(&ctx, "results", results_matrix, unique_count,
-                                results_inner_counts);
+    context_set_array_of_arrays(&ctx, "results", results_matrix.rows,
+                                results_matrix.count,
+                                results_matrix.field_counts);
 
-    char ***pager_matrix = NULL;
-    int *pager_inner_counts = NULL;
-    SearchHrefData href_data = { .query = raw_query, .engine_id = selected_engine_id };
-    int pager_count = build_pagination(page, search_href_builder,
-                                       &href_data, &pager_matrix,
-                                       &pager_inner_counts);
+    StringMatrix pager_matrix;
+    SearchHrefData href_data = {.query = raw_query,
+                                .engine_id = selected_engine_id};
+    int pagination_result = string_matrix_build_pagination(
+        page, search_href_builder, &href_data, &pager_matrix);
 
-    if (pager_count > 0) {
-      context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix,
-                                  pager_count, pager_inner_counts);
-      for (int i = 0; i < pager_count; i++) {
-        for (int j = 0; j < LINK_FIELD_COUNT; j++)
-          free(pager_matrix[i][j]);
-        free(pager_matrix[i]);
-      }
-      free(pager_matrix);
-      free(pager_inner_counts);
+    if (pagination_result == 0 && pager_matrix.count > 0) {
+      context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix.rows,
+                                  pager_matrix.count,
+                                  pager_matrix.field_counts);
     }
 
     char *html = render_template("results.html", &ctx);
@@ -900,13 +801,8 @@ int results_handler(UrlParams *params) {
       free(html);
     }
 
-    for (int i = 0; i < unique_count; i++) {
-      for (int j = 0; j < RESULT_FIELD_COUNT; j++)
-        free(results_matrix[i][j]);
-      free(results_matrix[i]);
-    }
-    free(results_matrix);
-    free(results_inner_counts);
+    string_matrix_free(&pager_matrix);
+    string_matrix_free(&results_matrix);
     url_hash_free(&url_table);
   } else {
     char *html = render_template("results.html", &ctx);
@@ -915,26 +811,15 @@ int results_handler(UrlParams *params) {
       free(html);
     }
 
-    for (int i = 0; i < enabled_engine_count; i++) {
-      free(all_results[i]);
-    }
+    free_search_results(all_results, jobs, engine_idx);
   }
 
   free(request_cache_key);
 
-  if (page == 1) {
-    for (int i = 0; i < HANDLER_COUNT; i++) {
-      if (infobox_data[i].success) {
-        free_infobox(&infobox_data[i].result);
-      }
-    }
-  }
+  if (page == 1)
+    free_infobox_results(infobox_data);
   free(locale);
-  if (has_user_pref) {
-    for (int i = 0; i < user_engine_count; i++)
-      free(user_engines[i]);
-    free(user_engines);
-  }
+  free_user_engine_list(user_engines, user_engine_count);
   free_context(&ctx);
 
   return 0;

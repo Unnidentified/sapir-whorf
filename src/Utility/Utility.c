@@ -14,7 +14,6 @@ static int themes_initialized = 0;
 void init_themes(const char *static_path) {
   if (themes_initialized)
     return;
-  themes_initialized = 1;
 
   char themes_dir[512];
   snprintf(themes_dir, sizeof(themes_dir), "%s/themes", static_path);
@@ -26,20 +25,32 @@ void init_themes(const char *static_path) {
   struct dirent *entry;
   int capacity = 4;
   themes_list = malloc(sizeof(char *) * capacity);
+  if (!themes_list) {
+    closedir(dir);
+    return;
+  }
   themes_count = 0;
 
   while ((entry = readdir(dir)) != NULL) {
     size_t len = strlen(entry->d_name);
     if (len > 4 && strcmp(entry->d_name + len - 4, ".css") == 0) {
       if (themes_count >= capacity) {
-        capacity *= 2;
-        themes_list = realloc(themes_list, sizeof(char *) * capacity);
+        int new_capacity = capacity * 2;
+        char **new_list = realloc(themes_list, sizeof(char *) * new_capacity);
+        if (!new_list)
+          break;
+        themes_list = new_list;
+        capacity = new_capacity;
       }
-      themes_list[themes_count] = strndup(entry->d_name, len - 4);
+      char *theme = strndup(entry->d_name, len - 4);
+      if (!theme)
+        break;
+      themes_list[themes_count] = theme;
       themes_count++;
     }
   }
   closedir(dir);
+  themes_initialized = 1;
 
   for (int i = 0; i < themes_count; i++) {
     for (int j = i + 1; j < themes_count; j++) {
@@ -206,98 +217,130 @@ int user_engines_contains(const char *engine_id, char **ids, int count) {
   return 0;
 }
 
-int add_link_to_collection(const char *href, const char *label,
-                           const char *class_name, char ****collection,
-                           int **inner_counts, int current_count) {
-  char ***old_collection = *collection;
-  int *old_inner_counts = *inner_counts;
-  char ***new_collection =
-      (char ***)malloc(sizeof(char **) * (current_count + 1));
-  int *new_inner_counts = (int *)malloc(sizeof(int) * (current_count + 1));
+char *get_default_search_engine(void) {
+  char *cookie = get_cookie("default_engine");
+  if (cookie && (strcmp(cookie, "all") == 0 || is_engine_id_enabled(cookie)))
+    return cookie;
 
-  if (!new_collection || !new_inner_counts) {
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  if (*collection && current_count > 0) {
-    memcpy(new_collection, *collection, sizeof(char **) * current_count);
-  }
-  if (*inner_counts && current_count > 0) {
-    memcpy(new_inner_counts, *inner_counts, sizeof(int) * current_count);
-  }
-
-  *collection = new_collection;
-  *inner_counts = new_inner_counts;
-
-  (*collection)[current_count] =
-      (char **)malloc(sizeof(char *) * LINK_FIELD_COUNT);
-  if (!(*collection)[current_count]) {
-    *collection = old_collection;
-    *inner_counts = old_inner_counts;
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  (*collection)[current_count][0] = strdup(href ? href : "");
-  (*collection)[current_count][1] = strdup(label ? label : "");
-  (*collection)[current_count][2] = strdup(class_name ? class_name : "");
-
-  if (!(*collection)[current_count][0] || !(*collection)[current_count][1] ||
-      !(*collection)[current_count][2]) {
-    free((*collection)[current_count][0]);
-    free((*collection)[current_count][1]);
-    free((*collection)[current_count][2]);
-    free((*collection)[current_count]);
-    *collection = old_collection;
-    *inner_counts = old_inner_counts;
-    free(new_collection);
-    free(new_inner_counts);
-    return current_count;
-  }
-
-  (*inner_counts)[current_count] = LINK_FIELD_COUNT;
-
-  free(old_collection);
-  free(old_inner_counts);
-  return current_count + 1;
+  free(cookie);
+  return strdup("all");
 }
 
-int build_pagination(int page, char *(*href_builder)(int page, void *data),
-                     void *data, char ****out_matrix, int **out_inner_counts) {
+void free_string_matrix(char ***matrix, int *inner_counts, int row_count) {
+  if (matrix) {
+    for (int i = 0; i < row_count; i++) {
+      int field_count = inner_counts ? inner_counts[i] : 0;
+      for (int j = 0; j < field_count; j++)
+        free(matrix[i][j]);
+      free(matrix[i]);
+    }
+  }
+  free(matrix);
+  free(inner_counts);
+}
+
+void string_matrix_init(StringMatrix *matrix) {
+  if (matrix)
+    *matrix = (StringMatrix){0};
+}
+
+int string_matrix_append(StringMatrix *matrix, const char *const *values,
+                         int field_count) {
+  if (!matrix || !values || field_count <= 0)
+    return -1;
+
+  char **row = calloc((size_t)field_count, sizeof(*row));
+  if (!row)
+    return -1;
+
+  for (int i = 0; i < field_count; i++) {
+    row[i] = strdup(values[i] ? values[i] : "");
+    if (!row[i]) {
+      for (int j = 0; j < i; j++)
+        free(row[j]);
+      free(row);
+      return -1;
+    }
+  }
+
+  if (matrix->count == matrix->capacity) {
+    int new_capacity = matrix->capacity ? matrix->capacity * 2 : 8;
+    char ***new_rows = malloc(sizeof(*new_rows) * (size_t)new_capacity);
+    int *new_counts = malloc(sizeof(*new_counts) * (size_t)new_capacity);
+    if (!new_rows || !new_counts) {
+      free(new_rows);
+      free(new_counts);
+      for (int i = 0; i < field_count; i++)
+        free(row[i]);
+      free(row);
+      return -1;
+    }
+    if (matrix->count > 0) {
+      memcpy(new_rows, matrix->rows, sizeof(*new_rows) * matrix->count);
+      memcpy(new_counts, matrix->field_counts,
+             sizeof(*new_counts) * matrix->count);
+    }
+    free(matrix->rows);
+    free(matrix->field_counts);
+    matrix->rows = new_rows;
+    matrix->field_counts = new_counts;
+    matrix->capacity = new_capacity;
+  }
+
+  matrix->rows[matrix->count] = row;
+  matrix->field_counts[matrix->count] = field_count;
+  matrix->count++;
+  return 0;
+}
+
+void string_matrix_free(StringMatrix *matrix) {
+  if (!matrix)
+    return;
+  free_string_matrix(matrix->rows, matrix->field_counts, matrix->count);
+  *matrix = (StringMatrix){0};
+}
+
+int string_matrix_build_pagination(int page,
+                                   char *(*href_builder)(int page, void *data),
+                                   void *data, StringMatrix *out_matrix) {
   enum { PAGER_WINDOW_SIZE = 5 };
+  if (!out_matrix || !href_builder)
+    return -1;
 
-  *out_matrix = NULL;
-  *out_inner_counts = NULL;
-  int count = 0;
-
+  string_matrix_init(out_matrix);
   int pager_start = page <= 3 ? 1 : page - 2;
   int pager_end = pager_start + PAGER_WINDOW_SIZE - 1;
 
-  if (page > 1) {
-    char *href = href_builder(page - 1, data);
-    count = add_link_to_collection(href, "←", "pagination-btn prev", out_matrix,
-                                   out_inner_counts, count);
+  for (int i = page > 1 ? pager_start - 1 : pager_start; i <= pager_end + 1;
+       i++) {
+    const char *label = NULL;
+    const char *class_name = "pagination-btn";
+    char page_label[16];
+    int target_page = i;
+
+    if (page > 1 && i == pager_start - 1) {
+      label = "←";
+      class_name = "pagination-btn prev";
+      target_page = page - 1;
+    } else if (i == pager_end + 1) {
+      label = "→";
+      class_name = "pagination-btn next";
+      target_page = page + 1;
+    } else {
+      snprintf(page_label, sizeof(page_label), "%d", i);
+      label = page_label;
+      if (i == page)
+        class_name = "pagination-btn pagination-current";
+    }
+
+    char *href = href_builder(target_page, data);
+    const char *values[LINK_FIELD_COUNT] = {href, label, class_name};
+    int result = string_matrix_append(out_matrix, values, LINK_FIELD_COUNT);
     free(href);
+    if (result != 0) {
+      string_matrix_free(out_matrix);
+      return -1;
+    }
   }
-
-  for (int i = pager_start; i <= pager_end; i++) {
-    char label[16];
-    snprintf(label, sizeof(label), "%d", i);
-    char *href = href_builder(i, data);
-    count = add_link_to_collection(
-        href, label,
-        i == page ? "pagination-btn pagination-current" : "pagination-btn",
-        out_matrix, out_inner_counts, count);
-    free(href);
-  }
-
-  char *href = href_builder(page + 1, data);
-  count = add_link_to_collection(href, "→", "pagination-btn next", out_matrix,
-                                 out_inner_counts, count);
-  free(href);
-
-  return count;
+  return 0;
 }

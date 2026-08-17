@@ -1,9 +1,11 @@
 #include "Scraping.h"
 #include "../Cache/Cache.h"
 #include "../Proxy/Proxy.h"
+#include "../Utility/XmlHelper.h"
 #include "Config.h"
 #include <curl/curl.h>
 #include <libxml/HTMLparser.h>
+#include <libxml/parser.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +26,8 @@ static int response_is_startpage_captcha(const ScrapeJob *job,
 
   return response_contains(response, "<title>Startpage Captcha</title>") ||
          response_contains(response, "Startpage Captcha") ||
-         response_contains(response, "/static-pages-assets/page-data/captcha/") ||
+         response_contains(response,
+                           "/static-pages-assets/page-data/captcha/") ||
          response_contains(response, ">Startpage Blocked</title>");
 }
 
@@ -39,7 +42,8 @@ static int response_looks_like_results_page(const ScrapeJob *job,
   }
 
   if (strcmp(job->engine->name, "Startpage") == 0) {
-    return response_contains(response, "<title>Startpage Search Results</title>") ||
+    return response_contains(response,
+                             "<title>Startpage Search Results</title>") ||
            response_contains(response, "class=\"w-gl") ||
            response_contains(response, "data-testid=\"gl-title-link\"");
   }
@@ -53,6 +57,11 @@ static int response_looks_like_results_page(const ScrapeJob *job,
   if (strcmp(job->engine->name, "Mojeek") == 0) {
     return response_contains(response, "class=\"results-standard\"") ||
            response_contains(response, "Mojeek Search");
+  }
+
+  if (strcmp(job->engine->name, "YaCy") == 0) {
+    return response_contains(response, "<item") ||
+           response_contains(response, "<rss");
   }
 
   return 0;
@@ -72,18 +81,24 @@ static void classify_job_response(ScrapeJob *job, const char *response,
     return;
   }
 
-  xmlDocPtr doc = htmlReadMemory(response, response_size, NULL, NULL,
-                                 HTML_PARSE_RECOVER | HTML_PARSE_NOERROR |
-                                     HTML_PARSE_NOWARNING);
+  xmlDocPtr doc;
+  if (job->engine->is_xml) {
+    doc = xmlReadMemory(response, response_size, NULL, NULL,
+                        XML_PARSE_RECOVER | XML_PARSE_NOERROR |
+                            XML_PARSE_NOWARNING);
+  } else {
+    doc = htmlReadMemory(response, response_size, NULL, NULL,
+                         HTML_PARSE_RECOVER | HTML_PARSE_NOERROR |
+                             HTML_PARSE_NOWARNING);
+  }
 
   if (!doc) {
     job->status = SCRAPE_STATUS_FETCH_ERROR;
     return;
   }
 
-  job->results_count =
-      job->engine->parser(job->engine->name, doc, job->out_results,
-                          job->max_results);
+  job->results_count = job->engine->parser(job->engine->name, doc,
+                                           job->out_results, job->max_results);
   xmlFreeDoc(doc);
 
   if (job->results_count > 0) {
@@ -156,14 +171,26 @@ void parse_and_cache_response(ScrapeJob *job) {
   }
 }
 
-void cleanup_job_handle(ScrapeJob *job, CURL *handle) {
+static void cleanup_job_results(ScrapeJob *job) {
+  if (!job || !job->out_results)
+    return;
+
+  xml_result_free(*job->out_results, job->results_count);
+  *job->out_results = NULL;
+  job->results_count = 0;
+}
+
+static void cleanup_job_handle(ScrapeJob *job, CURL *handle) {
   struct curl_slist *headers = NULL;
-  curl_easy_getinfo(handle, CURLINFO_PRIVATE, &headers);
+  if (handle)
+    curl_easy_getinfo(handle, CURLINFO_PRIVATE, &headers);
   if (headers)
     curl_slist_free_all(headers);
 
   free(job->response.memory);
   job->response.memory = NULL;
+  job->response.size = 0;
+  job->response.capacity = 0;
 }
 
 void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
@@ -180,19 +207,25 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
 }
 
 int setup_job(ScrapeJob *job, CURLM *multi_handle) {
-  if (job->handle)
+  if (job->handle) {
+    cleanup_job_handle(job, job->handle);
     curl_easy_cleanup(job->handle);
-  if (job->response.memory)
+    job->handle = NULL;
+  } else if (job->response.memory) {
     free(job->response.memory);
+    job->response.memory = NULL;
+    job->response.size = 0;
+    job->response.capacity = 0;
+  }
 
-  job->results_count = 0;
+  cleanup_job_results(job);
   job->http_status = 0;
   job->status = SCRAPE_STATUS_PENDING;
 
-  if (check_cache_for_job(job)) {
-    job->results_count = job->results_count > 0 ? job->results_count : 0;
+  if (check_cache_for_job(job))
     return 0;
-  }
+
+  cleanup_job_results(job);
 
   char *encoded_query = curl_easy_escape(NULL, job->query, 0);
   if (!encoded_query) {
@@ -200,12 +233,17 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
     return -1;
   }
 
-  for (char *p = encoded_query + strlen(encoded_query) - 3; p >= encoded_query; p--) {
-    if (p[0] == '%' && p[1] == '2' && p[2] == '0') {
-      *p = '+';
-      memmove(p + 1, p + 3, strlen(p + 3) + 1);
+  char *read = encoded_query;
+  char *write = encoded_query;
+  while (*read) {
+    if (read[0] == '%' && read[1] == '2' && read[2] == '0') {
+      *write++ = '+';
+      read += 3;
+    } else {
+      *write++ = *read++;
     }
   }
+  *write = '\0';
 
   char *full_url =
       build_search_url(job->engine->base_url, job->engine->page_param,
@@ -228,6 +266,14 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   job->response.memory = (char *)malloc(INITIAL_BUFFER_SIZE);
   job->response.size = 0;
   job->response.capacity = INITIAL_BUFFER_SIZE;
+  if (!job->response.memory) {
+    curl_easy_cleanup(job->handle);
+    job->handle = NULL;
+    job->response.capacity = 0;
+    free(full_url);
+    job->status = SCRAPE_STATUS_FETCH_ERROR;
+    return -1;
+  }
 
   struct curl_slist *headers =
       build_request_headers(job->engine->host_header, job->engine->referer);
@@ -236,8 +282,31 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   curl_easy_setopt(job->handle, CURLOPT_PRIVATE, headers);
 
   free(full_url);
-  curl_multi_add_handle(multi_handle, job->handle);
+  CURLMcode add_result = curl_multi_add_handle(multi_handle, job->handle);
+  if (add_result != CURLM_OK) {
+    cleanup_job_handle(job, job->handle);
+    curl_easy_cleanup(job->handle);
+    job->handle = NULL;
+    job->status = SCRAPE_STATUS_FETCH_ERROR;
+    return -1;
+  }
   return 0;
+}
+
+static void cleanup_unfinished_jobs(CURLM *multi_handle, ScrapeJob *jobs,
+                                    int num_jobs) {
+  for (int i = 0; i < num_jobs; i++) {
+    if (!jobs[i].handle)
+      continue;
+
+    curl_multi_remove_handle(multi_handle, jobs[i].handle);
+    cleanup_job_handle(&jobs[i], jobs[i].handle);
+    curl_easy_cleanup(jobs[i].handle);
+    jobs[i].handle = NULL;
+
+    if (jobs[i].status == SCRAPE_STATUS_PENDING)
+      jobs[i].status = SCRAPE_STATUS_FETCH_ERROR;
+  }
 }
 
 int handle_responses(CURLM *multi_handle, ScrapeJob *jobs, int num_jobs) {
@@ -279,34 +348,30 @@ int should_retry(ScrapeJob *jobs, int num_jobs) {
 int scrape_engines_parallel(ScrapeJob *jobs, int num_jobs) {
   int retries = 0;
 
-retry:
-  ;
+retry:;
   CURLM *multi_handle = curl_multi_init();
   if (!multi_handle)
     return -1;
 
   for (int i = 0; i < num_jobs; i++) {
-    if (setup_job(&jobs[i], multi_handle) != 0 && jobs[i].handle) {
-      curl_multi_remove_handle(multi_handle, jobs[i].handle);
-      curl_easy_cleanup(jobs[i].handle);
-      jobs[i].handle = NULL;
-    }
+    setup_job(&jobs[i], multi_handle);
   }
 
   http_delay();
 
   int still_running = 0;
-  curl_multi_perform(multi_handle, &still_running);
+  CURLMcode mc = curl_multi_perform(multi_handle, &still_running);
 
-  do {
+  while (mc == CURLM_OK && still_running) {
     int numfds = 0;
-    CURLMcode mc = curl_multi_wait(multi_handle, NULL, 0, 1000, &numfds);
+    mc = curl_multi_wait(multi_handle, NULL, 0, 1000, &numfds);
     if (mc != CURLM_OK)
       break;
-    curl_multi_perform(multi_handle, &still_running);
-  } while (still_running);
+    mc = curl_multi_perform(multi_handle, &still_running);
+  }
 
   handle_responses(multi_handle, jobs, num_jobs);
+  cleanup_unfinished_jobs(multi_handle, jobs, num_jobs);
   curl_multi_cleanup(multi_handle);
 
   if (retries < max_proxy_retries && should_retry(jobs, num_jobs)) {

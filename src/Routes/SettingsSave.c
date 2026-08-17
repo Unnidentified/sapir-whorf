@@ -10,6 +10,8 @@ int settings_save_handler(UrlParams *params) {
   const char *theme = "";
   const char *locale = "";
   const char *query = "";
+  const char *default_engine = "all";
+  int default_engine_present = 0;
   int engines_present = 0;
   char selected_ids[ENGINE_COUNT][32];
   int selected_count = 0;
@@ -22,6 +24,9 @@ int settings_save_handler(UrlParams *params) {
         locale = params->params[i].value;
       } else if (strcmp(params->params[i].key, "q") == 0) {
         query = params->params[i].value;
+      } else if (strcmp(params->params[i].key, "default_engine") == 0) {
+        default_engine = params->params[i].value;
+        default_engine_present = 1;
       } else if (strcmp(params->params[i].key, "engines_present") == 0) {
         engines_present = 1;
       } else if (strncmp(params->params[i].key, "engine_", 7) == 0 &&
@@ -56,6 +61,31 @@ int settings_save_handler(UrlParams *params) {
     }
     set_cookie("engines", cookie_value, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
                false, false);
+  }
+
+  if (default_engine_present) {
+    const char *validated_default = "all";
+
+    for (int i = 0; i < ENGINE_COUNT; i++) {
+      if (!ENGINE_REGISTRY[i].enabled ||
+          strcmp(default_engine, ENGINE_REGISTRY[i].id) != 0)
+        continue;
+
+      int selected = !engines_present;
+      for (int j = 0; j < selected_count; j++) {
+        if (strcmp(selected_ids[j], ENGINE_REGISTRY[i].id) == 0) {
+          selected = 1;
+          break;
+        }
+      }
+
+      if (selected)
+        validated_default = ENGINE_REGISTRY[i].id;
+      break;
+    }
+
+    set_cookie("default_engine", validated_default,
+               "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
   }
 
   char redirect_url[512];

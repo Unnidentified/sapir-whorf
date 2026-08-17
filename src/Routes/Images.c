@@ -76,14 +76,12 @@ int images_handler(UrlParams *params) {
   if (!error_images_msg)
     error_images_msg = "Error fetching images";
 
-  char ***pager_matrix = NULL;
-  int *pager_inner_counts = NULL;
-  int pager_count =
-      build_pagination(page, images_href_builder, (void *)raw_query,
-                       &pager_matrix, &pager_inner_counts);
-  if (pager_count > 0) {
-    context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix,
-                                pager_count, pager_inner_counts);
+  StringMatrix pagination;
+  string_matrix_build_pagination(page, images_href_builder, (void *)raw_query,
+                                 &pagination);
+  if (pagination.count > 0) {
+    context_set_array_of_arrays(&ctx, "pagination_links", pagination.rows,
+                                pagination.count, pagination.field_counts);
   }
 
   char *display_query = url_decode_query(raw_query);
@@ -91,8 +89,9 @@ int images_handler(UrlParams *params) {
 
   if (!raw_query || strlen(raw_query) == 0) {
     send_redirect("/");
-    if (display_query)
-      free(display_query);
+    string_matrix_free(&pagination);
+    free(display_query);
+    free(locale);
     free_context(&ctx);
     return -1;
   }
@@ -128,7 +127,9 @@ int images_handler(UrlParams *params) {
       snprintf(response, sizeof(response), "<h1>%s</h1>", rate_limit_msg);
       send_response(response);
       free(request_cache_key);
+      string_matrix_free(&pagination);
       free(display_query);
+      free(locale);
       free_context(&ctx);
       return -1;
     }
@@ -147,37 +148,37 @@ int images_handler(UrlParams *params) {
     snprintf(error_html, sizeof(error_html), "<h1>%s</h1>", error_images_msg);
     send_response(error_html);
     free(request_cache_key);
+    string_matrix_free(&pagination);
     free(display_query);
+    free(locale);
     free_context(&ctx);
     return -1;
   }
 
-  char ***image_matrix = malloc(sizeof(char **) * result_count);
-  int *inner_counts = malloc(sizeof(int) * result_count);
-
-  if (!image_matrix || !inner_counts) {
-    if (image_matrix)
-      free(image_matrix);
-    if (inner_counts)
-      free(inner_counts);
-    free_image_results(results, result_count);
-    free(request_cache_key);
-    free(display_query);
-    free_context(&ctx);
-    return -1;
-  }
+  StringMatrix images;
+  string_matrix_init(&images);
 
   for (int i = 0; i < result_count; i++) {
-    image_matrix[i] = malloc(sizeof(char *) * IMAGE_RESULT_FIELDS);
-    image_matrix[i][0] = strdup(results[i].thumbnail_url);
-    image_matrix[i][1] = strdup(results[i].title);
-    image_matrix[i][2] = strdup(results[i].page_url);
-    image_matrix[i][3] = strdup(results[i].full_url);
-    inner_counts[i] = IMAGE_RESULT_FIELDS;
+    const char *values[IMAGE_RESULT_FIELDS] = {
+        results[i].thumbnail_url,
+        results[i].title,
+        results[i].page_url,
+        results[i].full_url,
+    };
+    if (string_matrix_append(&images, values, IMAGE_RESULT_FIELDS) != 0) {
+      string_matrix_free(&images);
+      string_matrix_free(&pagination);
+      free_image_results(results, result_count);
+      free(request_cache_key);
+      free(display_query);
+      free(locale);
+      free_context(&ctx);
+      return -1;
+    }
   }
 
-  context_set_array_of_arrays(&ctx, "images", image_matrix, result_count,
-                              inner_counts);
+  context_set_array_of_arrays(&ctx, "images", images.rows, images.count,
+                              images.field_counts);
 
   char *rendered = render_template("images.html", &ctx);
   if (rendered) {
@@ -187,27 +188,13 @@ int images_handler(UrlParams *params) {
     send_response("<h1>Error rendering image results</h1>");
   }
 
-  for (int i = 0; i < result_count; i++) {
-    for (int j = 0; j < IMAGE_RESULT_FIELDS; j++)
-      free(image_matrix[i][j]);
-    free(image_matrix[i]);
-  }
-  free(image_matrix);
-  free(inner_counts);
-
-  if (pager_count > 0) {
-    for (int i = 0; i < pager_count; i++) {
-      for (int j = 0; j < LINK_FIELD_COUNT; j++)
-        free(pager_matrix[i][j]);
-      free(pager_matrix[i]);
-    }
-    free(pager_matrix);
-    free(pager_inner_counts);
-  }
+  string_matrix_free(&images);
+  string_matrix_free(&pagination);
 
   free_image_results(results, result_count);
   free(request_cache_key);
   free(display_query);
+  free(locale);
   free_context(&ctx);
 
   return 0;

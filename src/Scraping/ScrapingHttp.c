@@ -89,11 +89,14 @@ struct curl_slist *build_request_headers(const char *host_header,
   struct curl_slist *headers = NULL;
   char host_buf[BUFFER_SIZE_MEDIUM], ref_buf[BUFFER_SIZE_MEDIUM];
 
-  snprintf(host_buf, sizeof(host_buf), "Host: %s", host_header);
-  snprintf(ref_buf, sizeof(ref_buf), "Referer: %s", referer);
-
-  headers = curl_slist_append(headers, host_buf);
-  headers = curl_slist_append(headers, ref_buf);
+  if (host_header && host_header[0] != '\0') {
+    snprintf(host_buf, sizeof(host_buf), "Host: %s", host_header);
+    headers = curl_slist_append(headers, host_buf);
+  }
+  if (referer && referer[0] != '\0') {
+    snprintf(ref_buf, sizeof(ref_buf), "Referer: %s", referer);
+    headers = curl_slist_append(headers, ref_buf);
+  }
   headers = curl_slist_append(
       headers,
       "Accept: "
