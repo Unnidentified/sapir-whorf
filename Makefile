@@ -7,8 +7,9 @@ GIT_HASH  := $(shell git rev-parse --short HEAD)
 GIT_DATE  := $(shell git log -1 --format='%ad' --date='format:%y.%m.%d')
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 GIT_REMOTE := $(shell git remote get-url origin)
+GIT_TAG   := $(shell git describe --tags --exact-match HEAD 2>/dev/null)
 
-VERSION := $(GIT_DATE)+$(GIT_HASH)_$(GIT_BRANCH)
+VERSION := $(if $(GIT_TAG),$(GIT_TAG),$(GIT_DATE)+$(GIT_HASH)_$(GIT_BRANCH))
 
 CFLAGS  := -Wall -Wextra -O2 -Isrc -DVERSION='"$(VERSION)"' -DGIT_REMOTE='"$(GIT_REMOTE)"'
 
