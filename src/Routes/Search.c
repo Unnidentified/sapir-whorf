@@ -486,8 +486,8 @@ int results_handler(UrlParams *params) {
 
   const SearchEngine *selected_engine = find_enabled_engine(selected_engine_id);
   if (selected_engine &&
-      !engine_allowed_for_user(selected_engine, user_engines,
-                               user_engine_count, has_user_pref)) {
+      !engine_allowed_for_user(selected_engine, user_engines, user_engine_count,
+                               has_user_pref)) {
     selected_engine = NULL;
   }
   if (selected_engine) {
@@ -717,8 +717,16 @@ int results_handler(UrlParams *params) {
       if (!warning_message)
         continue;
 
-      add_warning_to_collection(jobs[i].engine->name, warning_message,
-                                &warning_matrix);
+      if (jobs[i].http_status >= 400) {
+        char warning_with_status[BUFFER_SIZE_LARGE];
+        snprintf(warning_with_status, sizeof(warning_with_status),
+                 "%s (HTTP %ld)", warning_message, jobs[i].http_status);
+        add_warning_to_collection(jobs[i].engine->name, warning_with_status,
+                                  &warning_matrix);
+      } else {
+        add_warning_to_collection(jobs[i].engine->name, warning_message,
+                                  &warning_matrix);
+      }
     }
 
     if (warning_matrix.count > 0) {
