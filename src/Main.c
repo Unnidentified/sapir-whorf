@@ -65,24 +65,8 @@ int main() {
 
   curl_global_init(CURL_GLOBAL_DEFAULT);
 
-  Config cfg = {.host = DEFAULT_HOST,
-                .port = DEFAULT_PORT,
-                .default_locale = "en_gb",
-                .proxy = "",
-                .proxy_list_file = "",
-                .max_proxy_retries = DEFAULT_MAX_PROXY_RETRIES,
-                .randomize_username = 0,
-                .randomize_password = 0,
-                .cache_dir = DEFAULT_CACHE_DIR,
-                .cache_ttl_search = DEFAULT_CACHE_TTL_SEARCH,
-                .cache_ttl_infobox = DEFAULT_CACHE_TTL_INFOBOX,
-                .cache_ttl_image = DEFAULT_CACHE_TTL_IMAGE,
-                .engines = "",
-                .yacy_instance = "",
-                .rate_limit_search_requests = 0,
-                .rate_limit_search_interval = 0,
-                .rate_limit_images_requests = 0,
-                .rate_limit_images_interval = 0};
+  Config cfg;
+  config_set_defaults(&cfg);
 
   if (load_config("config.ini", &cfg) != 0) {
     fprintf(stderr, "[WARN] Could not load config file, using defaults\n");

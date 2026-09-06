@@ -54,6 +54,7 @@ typedef struct {
   int rate_limit_images_interval;
 } Config;
 
+void config_set_defaults(Config *config);
 int load_config(const char *filename, Config *config);
 
 #endif
