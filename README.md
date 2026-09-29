@@ -11,7 +11,7 @@ Create a config.ini, there is an example included in the root. Or if you install
 ## Dependencies
 - libxml2
 - libcurl (may be replaced in the future with curl-impersonate)
-- beaker [(source)](https://git.bwaaa.monster/beaker/)
+- beaker [(source)](https://git.bwaaa.space/beaker/)
 
 ## First Setup
 Depending on your system, you may first need to install libcurl and libxml2.
@@ -61,7 +61,7 @@ On macOS the build uses `pkg-config` to discover `libxml2`, `libcurl` and OpenSS
 
 Install libbeaker:
 ```
-$ git clone https://git.bwaaa.monster/beaker
+$ git clone https://git.bwaaa.space/beaker
 $ cd beaker
 $ make
 # make install
@@ -71,7 +71,7 @@ On macOS `beaker` installs to `/usr/local/` by default and installs `libbeaker.d
 
 And then install omnisearch:
 ```
-$ git clone https://git.bwaaa.monster/omnisearch
+$ git clone https://git.bwaaa.space/omnisearch
 $ cd omnisearch
 $ make
 # make install-<init>
@@ -89,7 +89,7 @@ You need Docker or Podman and Docker Compose installed on your system.
 Run the container:
 
 ```
-$ git clone https://git.bwaaa.monster/omnisearch
+$ git clone https://git.bwaaa.space/omnisearch
 $ cd omnisearch
 $ docker compose up -d --build
 ```
@@ -113,6 +113,6 @@ $ git merge origin/master
 If there are conflicts in the files you modified, resolve them manually. You should also make the changes to the cloned repository, and then run the install command again if you installed omnisearch. Changes made directly to the configuration/assets folder will be overwritten on reinstall.
 
 ## Contribution
-Generate a patch with ```git format-patch HEAD~1``` and email to [gabriel@bwaaa.monster](mailto:gabriel@bwaaa.monster), beginning the subject line with [PATCH omnisearch] 
+Generate a patch with ```git format-patch HEAD~1``` and email to [frostinator33@airmail.cc](mailto:frostinator33@airmail.cc), beginning the subject line with [PATCH omnisearch] 
 
 *If you are sending a revised version of a previous patch, please use [PATCH omnisearch v2, v3, etc].*

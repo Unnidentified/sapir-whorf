@@ -8,7 +8,7 @@
 #endif
 
 #ifndef GIT_REMOTE
-#define GIT_REMOTE "https://git.bwaaa.monster/omnisearch"
+#define GIT_REMOTE "https://git.bwaaa.space/omnisearch"
 #endif
 
 #define LINK_FIELD_COUNT 3

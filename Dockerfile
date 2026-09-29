@@ -12,7 +12,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 COPY . /app
 
-RUN git clone https://git.bwaaa.monster/beaker /tmp/beaker && \
+RUN git clone https://git.bwaaa.space/beaker /tmp/beaker && \
     cd /tmp/beaker && \
     make && make install && \
     rm -rf /tmp/beaker
