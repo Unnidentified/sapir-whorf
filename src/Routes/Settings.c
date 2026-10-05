@@ -5,6 +5,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+static char *format_theme_name(const char *theme) {
+  char *label = strdup(theme ? theme : "");
+  if (!label)
+    return NULL;
+
+  int capitalise_next = 1;
+  for (size_t i = 0; label[i] != '\0'; i++) {
+    if (label[i] == '-') {
+      label[i] = ' ';
+      capitalise_next = 1;
+      continue;
+    }
+    if (capitalise_next) {
+      if (label[i] >= 'a' && label[i] <= 'z')
+        label[i] = label[i] - 'a' + 'A';
+      capitalise_next = 0;
+    }
+  }
+  return label;
+}
+
 int settings_handler(UrlParams *params) {
   const char *query = "";
   if (params) {
@@ -102,10 +123,7 @@ int settings_handler(UrlParams *params) {
     for (int i = 0; i < themes_count; i++) {
       theme_ptrs[i] = malloc(sizeof(char *) * 2);
       theme_ptrs[i][0] = themes[i];
-      theme_ptrs[i][1] = strdup(themes[i]);
-      if (theme_ptrs[i][1][0] >= 'a' && theme_ptrs[i][1][0] <= 'z') {
-        theme_ptrs[i][1][0] = theme_ptrs[i][1][0] - 'a' + 'A';
-      }
+      theme_ptrs[i][1] = format_theme_name(themes[i]);
       theme_inner[i] = 2;
     }
     context_set_array_of_arrays(&ctx, "themes", theme_ptrs, themes_count,
