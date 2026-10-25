@@ -7,3 +7,4 @@ logfile-uid     = omnisearch
 logfile-gid     = omnisearch
 restart         = yes
 restart-delay   = 5
+waits-for       = login.target
