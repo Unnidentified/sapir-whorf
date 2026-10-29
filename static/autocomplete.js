@@ -267,6 +267,34 @@
     }
   }
 
+  /* "/" focuses the search box, Esc leaves it — unless a field already has focus */
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey)
+      return;
+
+    var el = document.activeElement;
+    var tag = el && el.tagName ? el.tagName.toLowerCase() : '';
+    var typing = tag === 'input' || tag === 'textarea' || tag === 'select' ||
+                 (el && el.isContentEditable);
+
+    if (e.key === 'Escape') {
+      if (tag === 'input' && el.getAttribute && el.getAttribute('name') === 'q')
+        el.blur();
+      return;
+    }
+
+    if (e.key !== '/' || typing)
+      return;
+
+    var box = document.querySelector('form input[name="q"]');
+    if (!box)
+      return;
+
+    e.preventDefault();
+    box.focus();
+    if (box.select) box.select();
+  });
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

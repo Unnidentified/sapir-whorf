@@ -19,6 +19,10 @@ int history_handler(UrlParams *params) {
   TemplateContext ctx = new_context();
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "query", query);
+  context_set(&ctx, "chrome_action", "/search");
+  context_set(&ctx, "chrome_active", "");
+  context_set(&ctx, "chrome_engine", "");
+  context_set(&ctx, "chrome_all_href", "/");
   context_set(&ctx, "version", VERSION);
   context_set(&ctx, "git_remote", GIT_REMOTE);
   beaker_set_locale(&ctx, locale);

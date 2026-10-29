@@ -14,31 +14,16 @@
     </head>
     
     <body class="images-view">
-        <header>
-            <a href="/" class="logo-link"><h1>
-                Sym<span>Search</span>
-            </h1></a>
-            <form action="/images" method="GET" class="search-form">
-                <input name="q" type="text" autocomplete="off" class="search-box" placeholder="{{l("search_placeholder")}}"
-                value="{{query}}">
-            </form>
-            <a href="/settings?q={{query}}" class="nav-settings-icon" title="{{l("settings_tab")}}"></a>
-        </header>
-        <nav class="nav-tabs">
-            <div class="nav-container">
-                <a href="/search?q={{query}}">
-                    {{l("all_tab")}}
-                </a>
-                <a href="/images?q={{query}}" class="active">
-                    {{l("images_tab")}}
-                </a>
-                <a href="/settings?q={{query}}" class="nav-settings-link">
-                    {{l("settings_tab")}}
-                </a>
-            </div>
-        </nav>
+        {{include "_chrome.html"}}
         <main class="image-results-container">
             <div class="image-grid">
+                {{if images_state == "empty"}}
+                <div class="no-results">
+                    <p>No images found for <span class="no-results-query">{{query}}</span>.</p>
+                    <p class="no-results-hint">The image search may be busy — try again in a moment.</p>
+                </div>
+                {{endif}}
+
                 {{for img in images}}
                 <div class="image-card">
                     <div class="image-wrapper">

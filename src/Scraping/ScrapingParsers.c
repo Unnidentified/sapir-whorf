@@ -100,76 +100,6 @@ static int parse_ddg_lite(const char *engine_name, xmlDocPtr doc,
   return found_count;
 }
 
-static int parse_startpage(const char *engine_name, xmlDocPtr doc,
-                           SearchResult **out_results, int max_results) {
-  (void)engine_name;
-  int found_count = 0;
-
-  xmlXPathContextPtr ctx = create_xpath_context(doc);
-  if (!ctx)
-    return 0;
-
-  xmlXPathObjectPtr obj =
-      xml_xpath_eval(ctx, "//div[contains(@class, 'result')]");
-
-  if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
-    free_xpath_objects(ctx, obj);
-    return 0;
-  }
-
-  int num_results = obj->nodesetval->nodeNr;
-  *out_results = alloc_results_array(num_results, max_results);
-  if (!*out_results) {
-    free_xpath_objects(ctx, obj);
-    return 0;
-  }
-
-  for (int i = 0; i < num_results && found_count < max_results; i++) {
-    xmlNodePtr result_node = obj->nodesetval->nodeTab[i];
-    ctx->node = result_node;
-
-    xmlXPathObjectPtr link_obj =
-        xml_xpath_eval(ctx, ".//a[contains(@class, 'result-link')]");
-    char *url =
-        (link_obj && link_obj->nodesetval && link_obj->nodesetval->nodeNr > 0)
-            ? (char *)xmlGetProp(link_obj->nodesetval->nodeTab[0],
-                                 (xmlChar *)"href")
-            : NULL;
-
-    xmlXPathObjectPtr title_obj =
-        xml_xpath_eval(ctx, ".//h2[contains(@class, 'wgl-title')]");
-    char *title = (title_obj && title_obj->nodesetval &&
-                   title_obj->nodesetval->nodeNr > 0)
-                      ? xml_node_content(title_obj->nodesetval->nodeTab[0])
-                      : NULL;
-
-    xmlXPathObjectPtr snippet_obj =
-        xml_xpath_eval(ctx, ".//p[contains(@class, 'description')]");
-    char *snippet_text =
-        (snippet_obj && snippet_obj->nodesetval &&
-         snippet_obj->nodesetval->nodeNr > 0)
-            ? xml_node_content(snippet_obj->nodesetval->nodeTab[0])
-            : NULL;
-
-    if (url && title) {
-      assign_result(&(*out_results)[found_count], url, title, snippet_text, 0);
-      found_count++;
-    }
-
-    free_xml_node_list(title, url, snippet_text);
-    if (link_obj)
-      xmlXPathFreeObject(link_obj);
-    if (title_obj)
-      xmlXPathFreeObject(title_obj);
-    if (snippet_obj)
-      xmlXPathFreeObject(snippet_obj);
-  }
-
-  ctx->node = NULL;
-  free_xpath_objects(ctx, obj);
-  return found_count;
-}
-
 static int parse_yahoo(const char *engine_name, xmlDocPtr doc,
                        SearchResult **out_results, int max_results) {
   (void)engine_name;
@@ -240,74 +170,8 @@ static int parse_yahoo(const char *engine_name, xmlDocPtr doc,
   return found_count;
 }
 
-static int parse_mojeek(const char *engine_name, xmlDocPtr doc,
-                        SearchResult **out_results, int max_results) {
-  (void)engine_name;
-  int found_count = 0;
-
-  xmlXPathContextPtr ctx = create_xpath_context(doc);
-  if (!ctx)
-    return 0;
-
-  xmlXPathObjectPtr obj = xml_xpath_eval(
-      ctx, "//ul[@class='results-standard']/li[starts-with(@class, 'r')]");
-
-  if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
-    free_xpath_objects(ctx, obj);
-    return 0;
-  }
-
-  int num_results = obj->nodesetval->nodeNr;
-  *out_results = alloc_results_array(num_results, max_results);
-  if (!*out_results) {
-    free_xpath_objects(ctx, obj);
-    return 0;
-  }
-
-  for (int i = 0; i < num_results && found_count < max_results; i++) {
-    xmlNodePtr result_node = obj->nodesetval->nodeTab[i];
-    ctx->node = result_node;
-
-    xmlXPathObjectPtr link_obj = xml_xpath_eval(ctx, ".//a[@class='title']");
-    char *url =
-        (link_obj && link_obj->nodesetval && link_obj->nodesetval->nodeNr > 0)
-            ? (char *)xmlGetProp(link_obj->nodesetval->nodeTab[0],
-                                 (xmlChar *)"href")
-            : NULL;
-
-    char *title =
-        (link_obj && link_obj->nodesetval && link_obj->nodesetval->nodeNr > 0)
-            ? xml_node_content(link_obj->nodesetval->nodeTab[0])
-            : NULL;
-
-    xmlXPathObjectPtr snippet_obj = xml_xpath_eval(ctx, ".//p[@class='s']");
-    char *snippet_text =
-        (snippet_obj && snippet_obj->nodesetval &&
-         snippet_obj->nodesetval->nodeNr > 0)
-            ? xml_node_content(snippet_obj->nodesetval->nodeTab[0])
-            : NULL;
-
-    if (url && title) {
-      assign_result(&(*out_results)[found_count], url, title, snippet_text, 0);
-      found_count++;
-    }
-
-    free_xml_node_list(title, url, snippet_text);
-    if (link_obj)
-      xmlXPathFreeObject(link_obj);
-    if (snippet_obj)
-      xmlXPathFreeObject(snippet_obj);
-  }
-
-  ctx->node = NULL;
-  free_xpath_objects(ctx, obj);
-  return found_count;
-}
-
 static int parse_yahoo(const char *engine_name, xmlDocPtr doc,
                        SearchResult **out_results, int max_results);
-static int parse_mojeek(const char *engine_name, xmlDocPtr doc,
-                        SearchResult **out_results, int max_results);
 
 static int parse_yacy(const char *engine_name, xmlDocPtr doc,
                       SearchResult **out_results, int max_results) {
@@ -393,6 +257,191 @@ void configure_yacy_engine(const char *instance) {
   }
 }
 
+/* ---- Bing ---------------------------------------------------------- */
+
+/* Bing wraps result links in /ck/a?...&u=a1<base64url of the target> */
+static char *bing_decode_target(const char *href) {
+  if (!href)
+    return NULL;
+
+  const char *u = strstr(href, "u=a1");
+  if (!u)
+    return NULL;
+
+  const char *start = u + 4;
+  size_t len = 0;
+  while (start[len] != '\0' && start[len] != '&' && start[len] != '#')
+    len++;
+  if (len == 0)
+    return NULL;
+
+  static const char tbl[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  char *out = malloc(len + 4);
+  if (!out)
+    return NULL;
+
+  unsigned long long acc = 0;
+  int bits = 0;
+  size_t o = 0;
+  for (size_t i = 0; i < len; i++) {
+    const char *p = strchr(tbl, start[i]);
+    if (!p || start[i] == '\0') {
+      free(out);
+      return NULL;
+    }
+    acc = (acc << 6) | (unsigned long long)(p - tbl);
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[o++] = (char)((acc >> bits) & 0xFF);
+    }
+  }
+  out[o] = '\0';
+
+  if (strncmp(out, "http", 4) != 0) {
+    free(out);
+    return NULL;
+  }
+  return out;
+}
+
+static int parse_bing(const char *engine_name, xmlDocPtr doc,
+                      SearchResult **out_results, int max_results) {
+  (void)engine_name;
+  int found_count = 0;
+
+  xmlXPathContextPtr ctx = create_xpath_context(doc);
+  if (!ctx)
+    return 0;
+
+  xmlXPathObjectPtr obj =
+      xml_xpath_eval(ctx, "//li[contains(@class,'b_algo')]");
+  if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
+    free_xpath_objects(ctx, obj);
+    return 0;
+  }
+
+  int num_results = obj->nodesetval->nodeNr;
+  *out_results = alloc_results_array(num_results, max_results);
+  if (!*out_results) {
+    free_xpath_objects(ctx, obj);
+    return 0;
+  }
+
+  for (int i = 0; i < num_results && found_count < max_results; i++) {
+    ctx->node = obj->nodesetval->nodeTab[i];
+
+    xmlXPathObjectPtr link_obj = xml_xpath_eval(ctx, ".//h2/a[1]");
+    int has_link = link_obj && link_obj->nodesetval &&
+                   link_obj->nodesetval->nodeNr > 0;
+
+    char *href = has_link
+                     ? (char *)xmlGetProp(link_obj->nodesetval->nodeTab[0],
+                                          (xmlChar *)"href")
+                     : NULL;
+    char *title = has_link
+                      ? xml_node_content(link_obj->nodesetval->nodeTab[0])
+                      : NULL;
+
+    xmlXPathObjectPtr snip_obj = xml_xpath_eval(
+        ctx, ".//div[contains(@class,'b_caption')]//p[1]");
+    char *snippet = (snip_obj && snip_obj->nodesetval &&
+                     snip_obj->nodesetval->nodeNr > 0)
+                        ? xml_node_content(snip_obj->nodesetval->nodeTab[0])
+                        : NULL;
+
+    char *decoded = bing_decode_target(href);
+    const char *url = decoded ? decoded : href;
+
+    if (url && title) {
+      assign_result(&(*out_results)[found_count], (char *)url, title, snippet, 0);
+      found_count++;
+    }
+
+    free(decoded);
+    free_xml_node_list(title, href, snippet);
+    if (link_obj)
+      xmlXPathFreeObject(link_obj);
+    if (snip_obj)
+      xmlXPathFreeObject(snip_obj);
+  }
+
+  ctx->node = NULL;
+  free_xpath_objects(ctx, obj);
+  return found_count;
+}
+
+/* ---- Brave --------------------------------------------------------- */
+
+static int parse_brave(const char *engine_name, xmlDocPtr doc,
+                       SearchResult **out_results, int max_results) {
+  (void)engine_name;
+  int found_count = 0;
+
+  xmlXPathContextPtr ctx = create_xpath_context(doc);
+  if (!ctx)
+    return 0;
+
+  xmlXPathObjectPtr obj = xml_xpath_eval(
+      ctx, "//div[contains(@class,'snippet') and @data-type='web']");
+  if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
+    free_xpath_objects(ctx, obj);
+    return 0;
+  }
+
+  int num_results = obj->nodesetval->nodeNr;
+  *out_results = alloc_results_array(num_results, max_results);
+  if (!*out_results) {
+    free_xpath_objects(ctx, obj);
+    return 0;
+  }
+
+  for (int i = 0; i < num_results && found_count < max_results; i++) {
+    ctx->node = obj->nodesetval->nodeTab[i];
+
+    xmlXPathObjectPtr link_obj = xml_xpath_eval(ctx, ".//a[@href][1]");
+    int has_link = link_obj && link_obj->nodesetval &&
+                   link_obj->nodesetval->nodeNr > 0;
+
+    char *url = has_link
+                    ? (char *)xmlGetProp(link_obj->nodesetval->nodeTab[0],
+                                         (xmlChar *)"href")
+                    : NULL;
+
+    xmlXPathObjectPtr title_obj =
+        xml_xpath_eval(ctx, ".//div[contains(@class,'search-snippet-title')]");
+    char *title = (title_obj && title_obj->nodesetval &&
+                   title_obj->nodesetval->nodeNr > 0)
+                      ? xml_node_content(title_obj->nodesetval->nodeTab[0])
+                      : NULL;
+
+    xmlXPathObjectPtr snip_obj = xml_xpath_eval(
+        ctx, ".//div[contains(@class,'generic-snippet')]//div[contains(@class,'content')]");
+    char *snippet = (snip_obj && snip_obj->nodesetval &&
+                     snip_obj->nodesetval->nodeNr > 0)
+                        ? xml_node_content(snip_obj->nodesetval->nodeTab[0])
+                        : NULL;
+
+    if (url && title) {
+      assign_result(&(*out_results)[found_count], url, title, snippet, 0);
+      found_count++;
+    }
+
+    free_xml_node_list(title, url, snippet);
+    if (link_obj)
+      xmlXPathFreeObject(link_obj);
+    if (title_obj)
+      xmlXPathFreeObject(title_obj);
+    if (snip_obj)
+      xmlXPathFreeObject(snip_obj);
+  }
+
+  ctx->node = NULL;
+  free_xpath_objects(ctx, obj);
+  return found_count;
+}
+
 SearchEngine ENGINE_REGISTRY[] = {
     {.id = "ddg",
      .name = "DuckDuckGo Lite",
@@ -404,15 +453,15 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_base = 0,
      .parser = parse_ddg_lite,
      .enabled = 1},
-    {.id = "startpage",
-     .name = "Startpage",
-     .base_url = "https://www.startpage.com/sp/search?q=",
-     .host_header = "www.startpage.com",
-     .referer = "https://www.startpage.com/",
-     .page_param = "page",
-     .page_multiplier = 1,
+    {.id = "bing",
+     .name = "Bing",
+     .base_url = "https://www.bing.com/search?q=",
+     .host_header = "www.bing.com",
+     .referer = "https://www.bing.com/",
+     .page_param = "first",
+     .page_multiplier = 10,
      .page_base = 1,
-     .parser = parse_startpage,
+     .parser = parse_bing,
      .enabled = 1},
     {.id = "yahoo",
      .name = "Yahoo",
@@ -424,15 +473,15 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_base = 1,
      .parser = parse_yahoo,
      .enabled = 1},
-    {.id = "mojeek",
-     .name = "Mojeek",
-     .base_url = "https://www.mojeek.com/search?q=",
-     .host_header = "www.mojeek.com",
-     .referer = "https://www.mojeek.com/",
-     .page_param = "s",
+    {.id = "brave",
+     .name = "Brave",
+     .base_url = "https://search.brave.com/search?q=",
+     .host_header = "search.brave.com",
+     .referer = "https://search.brave.com/",
+     .page_param = "offset",
      .page_multiplier = 10,
-     .page_base = 1,
-     .parser = parse_mojeek,
+     .page_base = 0,
+     .parser = parse_brave,
      .enabled = 1},
     {.id = "yacy",
      .name = "YaCy",

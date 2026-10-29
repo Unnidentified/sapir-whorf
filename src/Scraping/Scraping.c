@@ -15,20 +15,16 @@ static int response_contains(const char *response, const char *needle) {
   return response && needle && strstr(response, needle) != NULL;
 }
 
-static int is_startpage_job(const ScrapeJob *job) {
-  return job && job->engine && strcmp(job->engine->name, "Startpage") == 0;
-}
-
-static int response_is_startpage_captcha(const ScrapeJob *job,
-                                         const char *response) {
-  if (!is_startpage_job(job))
+/* anti-bot interstitials served instead of a results page */
+static int response_is_blocked_page(const char *response) {
+  if (!response)
     return 0;
 
-  return response_contains(response, "<title>Startpage Captcha</title>") ||
+  return response_contains(response, "<title>Captcha</title>") ||
          response_contains(response, "Startpage Captcha") ||
-         response_contains(response,
-                           "/static-pages-assets/page-data/captcha/") ||
-         response_contains(response, ">Startpage Blocked</title>");
+         response_contains(response, "Ecosia Firewall") ||
+         response_contains(response, ">Robot<") ||
+         response_contains(response, "Just a moment...");
 }
 
 static int response_looks_like_results_page(const ScrapeJob *job,
@@ -41,22 +37,20 @@ static int response_looks_like_results_page(const ScrapeJob *job,
            response_contains(response, "result-snippet");
   }
 
-  if (strcmp(job->engine->name, "Startpage") == 0) {
-    return response_contains(response,
-                             "<title>Startpage Search Results</title>") ||
-           response_contains(response, "class=\"w-gl") ||
-           response_contains(response, "data-testid=\"gl-title-link\"");
+  if (strcmp(job->engine->name, "Bing") == 0) {
+    return response_contains(response, "b_algo") ||
+           response_contains(response, "b_results");
+  }
+
+  if (strcmp(job->engine->name, "Brave") == 0) {
+    return response_contains(response, "search-snippet-title") ||
+           response_contains(response, "data-type=\"web\"");
   }
 
   if (strcmp(job->engine->name, "Yahoo") == 0) {
     return response_contains(response, "algo-sr") ||
            response_contains(response, "compTitle") ||
            response_contains(response, "compText");
-  }
-
-  if (strcmp(job->engine->name, "Mojeek") == 0) {
-    return response_contains(response, "class=\"results-standard\"") ||
-           response_contains(response, "Mojeek Search");
   }
 
   if (strcmp(job->engine->name, "YaCy") == 0) {
@@ -76,7 +70,7 @@ static void classify_job_response(ScrapeJob *job, const char *response,
     return;
   }
 
-  if (response_is_startpage_captcha(job, response)) {
+  if (response_is_blocked_page(response)) {
     job->status = SCRAPE_STATUS_BLOCKED;
     return;
   }
@@ -345,8 +339,21 @@ int should_retry(ScrapeJob *jobs, int num_jobs) {
   return 0;
 }
 
+/* every engine came back with nothing — almost always a transient block */
+static int all_jobs_empty(ScrapeJob *jobs, int num_jobs) {
+  if (num_jobs <= 0)
+    return 0;
+
+  for (int i = 0; i < num_jobs; i++) {
+    if (jobs[i].results_count > 0)
+      return 0;
+  }
+  return 1;
+}
+
 int scrape_engines_parallel(ScrapeJob *jobs, int num_jobs) {
   int retries = 0;
+  int empty_retry_done = 0;
 
 retry:;
   CURLM *multi_handle = curl_multi_init();
@@ -376,6 +383,12 @@ retry:;
 
   if (retries < max_proxy_retries && should_retry(jobs, num_jobs)) {
     retries++;
+    goto retry;
+  }
+
+  /* one second chance when the whole batch came back empty */
+  if (!empty_retry_done && all_jobs_empty(jobs, num_jobs)) {
+    empty_retry_done = 1;
     goto retry;
   }
 

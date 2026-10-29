@@ -182,6 +182,12 @@ int get_user_engines(char ***out_ids, int *out_count) {
     while (*token == ' ' || *token == '\t')
       token++;
 
+    /* saved preferences from before the engine swap keep working */
+    if (strcmp(token, "startpage") == 0)
+      token = "bing";
+    else if (strcmp(token, "mojeek") == 0)
+      token = "brave";
+
     if (token[0] != '\0' && is_engine_id_enabled(token)) {
       char **new_ids = realloc(ids, sizeof(char *) * (count + 1));
       if (new_ids) {

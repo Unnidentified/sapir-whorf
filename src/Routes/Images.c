@@ -60,6 +60,10 @@ int images_handler(UrlParams *params) {
   }
 
   context_set(&ctx, "query", raw_query);
+  context_set(&ctx, "chrome_action", "/images");
+  context_set(&ctx, "chrome_active", "images");
+  context_set(&ctx, "chrome_engine", "");
+  context_set(&ctx, "chrome_all_href", "/");
 
   char *theme = get_theme("");
   context_set(&ctx, "theme", theme);
@@ -179,6 +183,7 @@ int images_handler(UrlParams *params) {
 
   context_set_array_of_arrays(&ctx, "images", images.rows, images.count,
                               images.field_counts);
+  context_set(&ctx, "images_state", images.count > 0 ? "ok" : "empty");
 
   char *rendered = render_template("images.html", &ctx);
   if (rendered) {

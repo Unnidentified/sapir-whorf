@@ -563,6 +563,12 @@ int results_handler(UrlParams *params) {
   context_set(&ctx, "selected_engine", selected_engine_id);
   char *search_href = build_search_href(raw_query, selected_engine_id, 1);
   context_set(&ctx, "search_href", search_href ? search_href : "/search");
+  context_set(&ctx, "chrome_action", "/search");
+  context_set(&ctx, "chrome_active", "all");
+  context_set(&ctx, "chrome_engine",
+              selected_engine_id ? selected_engine_id : "");
+  context_set(&ctx, "chrome_all_href",
+              search_href ? search_href : "/search");
   free(search_href);
 
   int enabled_engine_count = 0;
@@ -815,8 +821,19 @@ int results_handler(UrlParams *params) {
     UrlHashTable url_table;
     url_hash_init(&url_table);
 
+    int max_per_engine = 0;
     for (int i = 0; i < enabled_engine_count; i++) {
-      for (int j = 0; j < jobs[i].results_count; j++) {
+      if (jobs[i].results_count > max_per_engine)
+        max_per_engine = jobs[i].results_count;
+    }
+
+    /* round-robin: take one result from each engine in turn, so a single
+       source cannot bury better hits from the others */
+    for (int j = 0; j < max_per_engine; j++) {
+      for (int i = 0; i < enabled_engine_count; i++) {
+        if (j >= jobs[i].results_count)
+          continue;
+
         char *display_url = all_results[i][j].url;
 
         if (url_hash_contains(&url_table, display_url)) {
@@ -850,6 +867,9 @@ int results_handler(UrlParams *params) {
           continue;
         }
       }
+    }
+
+    for (int i = 0; i < enabled_engine_count; i++) {
       free(all_results[i]);
     }
 
@@ -873,6 +893,9 @@ int results_handler(UrlParams *params) {
     if (html) {
       send_response(html);
       free(html);
+    } else {
+      send_status("500 Internal Server Error");
+      send_response("<h1>Template rendering failed</h1>");
     }
 
     string_matrix_free(&pager_matrix);
@@ -883,6 +906,9 @@ int results_handler(UrlParams *params) {
     if (html) {
       send_response(html);
       free(html);
+    } else {
+      send_status("500 Internal Server Error");
+      send_response("<h1>Template rendering failed</h1>");
     }
 
     free_search_results(all_results, jobs, engine_idx);

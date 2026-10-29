@@ -107,10 +107,11 @@ install:
 	@echo "Example: doas/sudo make install-openrc"
 
 install-launchd: $(TARGET)
-	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(DATA_DIR)/locales $(INSTALL_BIN_DIR) $(LOG_DIR)
+	@mkdir -p $(DATA_DIR)/templates $(DATA_DIR)/static $(DATA_DIR)/locales $(DATA_DIR)/tools $(INSTALL_BIN_DIR) $(LOG_DIR)
 	@cp -rf templates/* $(DATA_DIR)/templates/
 	@cp -rf static/* $(DATA_DIR)/static/
 	@cp -rf locales/* $(DATA_DIR)/locales/
+	@cp -rf tools/* $(DATA_DIR)/tools/
 	@cp -n example-config.ini $(DATA_DIR)/config.ini || true
 	install -m 755 $(TARGET) $(INSTALL_BIN_DIR)/omnisearch
 	@mkdir -p $(LAUNCHD_DIR)
@@ -121,6 +122,11 @@ install-launchd: $(TARGET)
 		-e 's|@LAUNCHD_LABEL@|$(LAUNCHD_LABEL)|g' \
 		init/launchd/omnisearch.plist.in > $(LAUNCHD_PLIST)
 	@chmod 644 $(LAUNCHD_PLIST)
+	@sed \
+		-e 's|@DATA_DIR@|$(DATA_DIR)|g' \
+		-e 's|@LAUNCHD_LABEL@|$(LAUNCHD_LABEL)|g' \
+		init/launchd/logrotate.plist.in > $(LAUNCHD_PLIST:.plist=.logrotate.plist)
+	@chmod 644 $(LAUNCHD_PLIST:.plist=.logrotate.plist)
 	@echo ""
 	@echo "Config: $(DATA_DIR)/config.ini"
 	@echo "Installed launchd plist to $(LAUNCHD_PLIST)"
@@ -242,4 +248,12 @@ uninstall:
 	@grep -q '^$(GROUP):' /etc/group 2>/dev/null && groupdel $(GROUP) 2>/dev/null || true
 	@echo "Uninstalled omnisearch"
 
-.PHONY: all run clean rebuild info install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+check-themes:
+	@python3 tools/check_themes.py
+
+smoke:
+	@./tools/smoke.sh $(BASE)
+
+check: check-themes smoke
+
+.PHONY: all run clean rebuild info check check-themes smoke install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

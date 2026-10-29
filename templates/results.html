@@ -17,30 +17,7 @@
     </head>
     
     <body class="results-view">
-        <header>
-            <a href="/" class="logo-link"><h1>
-                Sym<span>Search</span>
-            </h1></a>
-            <form action="/search" method="GET" class="search-form">
-                <input name="engine" type="hidden" value="{{selected_engine}}">
-                <input name="q" type="text" class="search-box" autocomplete="off" placeholder="{{l("search_placeholder")}}"
-                value="{{query}}">
-            </form>
-            <a href="/settings?q={{query}}" class="nav-settings-icon" title="{{l("settings_tab")}}"></a>
-        </header>
-        <nav class="nav-tabs">
-            <div class="nav-container">
-                <a href="{{search_href}}" class="active">
-                    {{l("all_tab")}}
-                </a>
-                <a href="/images?q={{query}}">
-                    {{l("images_tab")}}
-                </a>
-                <a href="/settings?q={{query}}" class="nav-settings-link">
-                    {{l("settings_tab")}}
-                </a>
-            </div>
-        </nav>
+        {{include "_chrome.html"}}
         <div class="content-layout">
             <aside class="sidebar-spacer">
             </aside>
