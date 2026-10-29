@@ -11,6 +11,7 @@ int settings_save_handler(UrlParams *params) {
   const char *locale = "";
   const char *query = "";
   const char *title_font = "";
+  const char *custom[CUSTOM_COLOUR_COUNT] = {NULL};
   const char *default_engine = "all";
   int default_engine_present = 0;
   int engines_present = 0;
@@ -25,6 +26,16 @@ int settings_save_handler(UrlParams *params) {
         locale = params->params[i].value;
       } else if (strcmp(params->params[i].key, "titlefont") == 0) {
         title_font = params->params[i].value;
+      } else if (strncmp(params->params[i].key, "c_", 2) == 0) {
+        static const char *SLOT_KEYS[CUSTOM_COLOUR_COUNT] = {
+            "c_bg_main", "c_bg_card", "c_border", "c_text_primary",
+            "c_text_secondary", "c_text_muted", "c_accent", "c_text_dim"};
+        for (int k = 0; k < CUSTOM_COLOUR_COUNT; k++) {
+          if (strcmp(params->params[i].key, SLOT_KEYS[k]) == 0) {
+            custom[k] = params->params[i].value;
+            break;
+          }
+        }
       } else if (strcmp(params->params[i].key, "q") == 0) {
         query = params->params[i].value;
       } else if (strcmp(params->params[i].key, "default_engine") == 0) {
@@ -50,6 +61,27 @@ int settings_save_handler(UrlParams *params) {
   if (strlen(theme) > 0) {
     set_cookie("theme", theme, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
   }
+  int have_custom = 1;
+  for (int c = 0; c < CUSTOM_COLOUR_COUNT; c++) {
+    if (!custom[c])
+      have_custom = 0;
+  }
+  if (have_custom) {
+    char palette[80];
+    palette[0] = '\0';
+    for (int c = 0; c < CUSTOM_COLOUR_COUNT; c++) {
+      const char *hex = custom[c][0] == '#' ? custom[c] + 1 : custom[c];
+      if (strlen(hex) != 6)
+        continue;
+      if (c > 0)
+        strcat(palette, "-");
+      strcat(palette, hex);
+    }
+    if (strlen(palette) == 8 * 6 + 7)
+      set_cookie("customtheme", palette, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
+                 false, false);
+  }
+
   if (strcmp(title_font, "mono") == 0 || strcmp(title_font, "orbitron") == 0 ||
       strcmp(title_font, "blackout") == 0) {
     set_cookie("titlefont", title_font, "Fri, 31 Dec 2038 23:59:59 GMT", "/",

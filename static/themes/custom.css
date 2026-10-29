@@ -1,0 +1,15 @@
+/* custom — placeholder palette. Real values are injected inline from the
+   customtheme cookie; this file only exists so the theme appears in the
+   selector and so every --token is defined if the cookie is missing. */
+
+:root {
+    --bg-main: #0f0f0f;
+    --bg-card: #272a27;
+    --border: #333633;
+    --text-primary: #e6e3e0;
+    --text-secondary: #b0b0ad;
+    --text-muted: #8f8f8d;
+    --accent: #c99a75;
+    --accent-glow: #c99a751a;
+    --text-dim: #7d7d7b;
+}

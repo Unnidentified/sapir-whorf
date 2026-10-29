@@ -118,6 +118,98 @@ char *get_theme(const char *default_theme) {
                                                            : "amber");
 }
 
+/* ---------- user-defined palette ---------- */
+
+static const char *CUSTOM_DEFAULTS[CUSTOM_COLOUR_COUNT] = {
+    "0f0f0f", "272a27", "333633", "e6e3e0",
+    "b0b0ad", "8f8f8d", "c99a75", "7d7d7b"};
+
+static char *custom_slot(CustomTheme *t, int index) {
+  switch (index) {
+  case 0: return t->bg_main;
+  case 1: return t->bg_card;
+  case 2: return t->border;
+  case 3: return t->text_primary;
+  case 4: return t->text_secondary;
+  case 5: return t->text_muted;
+  case 6: return t->accent;
+  default: return t->text_dim;
+  }
+}
+
+static int is_hex6(const char *s) {
+  if (!s)
+    return 0;
+  if (*s == '#')
+    s++;
+  for (int i = 0; i < 6; i++) {
+    char c = s[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+          (c >= 'A' && c <= 'F')))
+      return 0;
+  }
+  return s[6] == '\0';
+}
+
+int parse_custom_theme_cookie(const char *value, CustomTheme *out) {
+  if (!out)
+    return -1;
+
+  for (int i = 0; i < CUSTOM_COLOUR_COUNT; i++)
+    snprintf(custom_slot(out, i), 7, "%s", CUSTOM_DEFAULTS[i]);
+
+  if (!value || value[0] == '\0')
+    return -1;
+
+  char *copy = strdup(value);
+  if (!copy)
+    return -1;
+
+  int index = 0;
+  char *saveptr = NULL;
+  char *token = strtok_r(copy, "-", &saveptr);
+  while (token && index < CUSTOM_COLOUR_COUNT) {
+    while (*token == ' ' || *token == '#')
+      token++;
+    if (is_hex6(token))
+      snprintf(custom_slot(out, index), 7, "%s", token);
+    index++;
+    token = strtok_r(NULL, "-", &saveptr);
+  }
+
+  free(copy);
+  return index == CUSTOM_COLOUR_COUNT ? 0 : -1;
+}
+
+void get_custom_theme(CustomTheme *out) {
+  char *cookie = get_cookie("customtheme");
+  parse_custom_theme_cookie(cookie, out);
+  free(cookie);
+}
+
+void context_set_custom_theme(TemplateContext *ctx, const CustomTheme *theme) {
+  if (!ctx || !theme)
+    return;
+
+  static const char *KEYS[CUSTOM_COLOUR_COUNT + 1] = {
+      "custom_bg_main", "custom_bg_card", "custom_border",
+      "custom_text_primary", "custom_text_secondary", "custom_text_muted",
+      "custom_accent", "custom_text_dim", "custom_accent_glow"};
+
+  /* beaker keeps the pointer, so these must outlive the call */
+  static __thread char values[CUSTOM_COLOUR_COUNT + 1][16];
+
+  for (int i = 0; i < CUSTOM_COLOUR_COUNT; i++)
+    snprintf(values[i], sizeof(values[i]), "#%s",
+             custom_slot((CustomTheme *)theme, i));
+
+  snprintf(values[CUSTOM_COLOUR_COUNT], sizeof(values[0]), "#%s1a",
+           theme->accent);
+
+  for (int i = 0; i < CUSTOM_COLOUR_COUNT + 1; i++)
+    context_set(ctx, KEYS[i], values[i]);
+}
+
 const char *get_title_font(void) {
   char *cookie = get_cookie("titlefont");
   const char *value = "mono";

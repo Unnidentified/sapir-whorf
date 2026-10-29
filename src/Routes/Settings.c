@@ -109,6 +109,9 @@ int settings_handler(UrlParams *params) {
   context_set(&ctx, "query", query);
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "title_font", get_title_font());
+  CustomTheme custom_theme;
+  get_custom_theme(&custom_theme);
+  context_set_custom_theme(&ctx, &custom_theme);
   context_set(&ctx, "locale", locale);
   context_set(&ctx, "default_engine", default_engine);
   context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count,
@@ -143,6 +146,11 @@ int settings_handler(UrlParams *params) {
     context_set(&ctx, "has_enabled_engines", "1");
   }
 
+  /* the template engine keeps these pointers, so they are freed after render */
+
+  char *rendered_html = render_template("settings.html", &ctx);
+  send_response(rendered_html);
+
   for (int i = 0; i < locale_count; i++) {
     free(locale_data[i]);
   }
@@ -157,9 +165,6 @@ int settings_handler(UrlParams *params) {
       free(user_engines[i]);
     free(user_engines);
   }
-
-  char *rendered_html = render_template("settings.html", &ctx);
-  send_response(rendered_html);
 
   free(rendered_html);
   free(default_engine);

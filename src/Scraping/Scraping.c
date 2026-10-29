@@ -272,7 +272,8 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   struct curl_slist *headers =
       build_request_headers(job->engine->host_header, job->engine->referer);
 
-  configure_curl_handle(job->handle, full_url, &job->response, headers);
+  configure_curl_handle(job->handle, full_url, &job->response, headers,
+                        job->engine ? job->engine->timeout_secs : 0);
   curl_easy_setopt(job->handle, CURLOPT_PRIVATE, headers);
 
   free(full_url);
@@ -356,6 +357,8 @@ int scrape_engines_parallel(ScrapeJob *jobs, int num_jobs) {
   int empty_retry_done = 0;
 
 retry:;
+  time_t batch_started = time(NULL);
+
   CURLM *multi_handle = curl_multi_init();
   if (!multi_handle)
     return -1;
@@ -370,6 +373,12 @@ retry:;
   CURLMcode mc = curl_multi_perform(multi_handle, &still_running);
 
   while (mc == CURLM_OK && still_running) {
+    /* never let one slow engine set the page latency */
+    if (time(NULL) - batch_started >= 5) {
+      mc = CURLM_OK;
+      break;
+    }
+
     int numfds = 0;
     mc = curl_multi_wait(multi_handle, NULL, 0, 1000, &numfds);
     if (mc != CURLM_OK)

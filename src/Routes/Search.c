@@ -355,6 +355,113 @@ static void clean_snippet(const char *in, char *out, size_t size) {
   snprintf(out, size, "%s", decoded);
 }
 
+/* ---------- query terms ---------- */
+
+static const char *QUERY_STOPWORDS[] = {
+    "the", "and", "for", "with", "how", "what", "when", "where", "who",
+    "why", "that", "this", "from", "into", "your", "you", "are", "was",
+    "were", "has", "have", "had", "not", "but", "all", "can", "will",
+    "its", "his", "her", "they", "them", "then", "than", "about", "over"};
+
+static int is_stopword(const char *word) {
+  for (size_t i = 0; i < sizeof(QUERY_STOPWORDS) / sizeof(QUERY_STOPWORDS[0]);
+       i++) {
+    if (strcmp(word, QUERY_STOPWORDS[i]) == 0)
+      return 1;
+  }
+  return 0;
+}
+
+/* split a query into distinct content words (lowercase, 3+ chars) */
+static int tokenize_query(const char *query, char tokens[][32], int max) {
+  int count = 0;
+  char buf[32];
+  int len = 0;
+
+  if (!query)
+    return 0;
+
+  for (const char *p = query;; p++) {
+    char c = *p;
+    int is_word = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                  (c >= '0' && c <= '9');
+
+    if (is_word) {
+      if (len < 31)
+        buf[len++] = (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
+    } else {
+      if (len >= 3) {
+        buf[len] = '\0';
+        if (!is_stopword(buf)) {
+          int dup = 0;
+          for (int i = 0; i < count; i++) {
+            if (strcmp(tokens[i], buf) == 0)
+              dup = 1;
+          }
+          if (!dup && count < max)
+            snprintf(tokens[count++], 32, "%s", buf);
+        }
+      }
+      len = 0;
+      if (c == '\0')
+        break;
+    }
+  }
+  return count;
+}
+
+static int contains_ci(const char *haystack, const char *needle) {
+  if (!haystack || !needle || !*needle)
+    return 0;
+
+  size_t n = strlen(needle);
+  for (const char *p = haystack; *p; p++) {
+    size_t i = 0;
+    while (i < n && p[i]) {
+      char a = p[i];
+      char b = needle[i];
+      if (a >= 'A' && a <= 'Z')
+        a += 32;
+      if (b >= 'A' && b <= 'Z')
+        b += 32;
+      if (a != b)
+        break;
+      i++;
+    }
+    if (i == n)
+      return 1;
+  }
+  return 0;
+}
+
+/* strip characters that break the scrapers and collapse whitespace */
+static void sanitize_query(const char *in, char *out, size_t size) {
+  out[0] = '\0';
+  if (!in || size == 0)
+    return;
+
+  size_t o = 0;
+  int pending_space = 0;
+  for (const char *p = in; *p && o + 1 < size; p++) {
+    unsigned char c = (unsigned char)*p;
+    if (c < 0x20) {
+      pending_space = 1;
+      continue;
+    }
+    if (strchr("<>{}[]|`^~", c))
+      continue;
+    if (c == ' ') {
+      pending_space = 1;
+      continue;
+    }
+    if (pending_space && o > 0)
+      out[o++] = ' ';
+    pending_space = 0;
+    out[o++] = (char)c;
+  }
+  out[o] = '\0';
+}
+
 static int candidate_cmp(const void *a, const void *b) {
   const ResultCandidate *x = (const ResultCandidate *)a;
   const ResultCandidate *y = (const ResultCandidate *)b;
@@ -484,8 +591,25 @@ static void *infobox_thread_func(void *arg) {
   }
 
   data->result = h->fetch_fn((char *)data->query);
+
+  int relevant = 1;
+  {
+    char tokens[8][32];
+    int token_count = tokenize_query(data->query, tokens, 8);
+    if (token_count > 0) {
+      relevant = 0;
+      for (int t = 0; t < token_count; t++) {
+        if (contains_ci(data->result.title, tokens[t]) ||
+            contains_ci(data->result.extract, tokens[t])) {
+          relevant = 1;
+          break;
+        }
+      }
+    }
+  }
+
   data->success = (data->result.title != NULL &&
-                   infobox_text_is_meaningful(data->result.extract));
+                   infobox_text_is_meaningful(data->result.extract) && relevant);
   return NULL;
 }
 
@@ -689,6 +813,9 @@ int results_handler(UrlParams *params) {
   char *theme = get_theme("");
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "title_font", get_title_font());
+  CustomTheme custom_theme;
+  get_custom_theme(&custom_theme);
+  context_set_custom_theme(&ctx, &custom_theme);
   free(theme);
 
   char *locale = get_locale(NULL);
@@ -757,6 +884,12 @@ int results_handler(UrlParams *params) {
     }
   }
 
+  /* engines choke on some punctuation; keep the typed text for display only */
+  char engine_query[BUFFER_SIZE_LARGE];
+  sanitize_query(raw_query, engine_query, sizeof(engine_query));
+  if (engine_query[0] == '\0')
+    snprintf(engine_query, sizeof(engine_query), "%s", raw_query);
+
   pthread_t infobox_threads[HANDLER_COUNT];
   InfoBoxThreadData infobox_data[HANDLER_COUNT];
 
@@ -777,7 +910,7 @@ int results_handler(UrlParams *params) {
                                 user_engine_count, has_user_pref)) {
       all_results[engine_idx] = NULL;
       jobs[engine_idx].engine = &ENGINE_REGISTRY[i];
-      jobs[engine_idx].query = raw_query;
+      jobs[engine_idx].query = engine_query;
       jobs[engine_idx].out_results = &all_results[engine_idx];
       jobs[engine_idx].max_results = MAX_RESULTS_PER_ENGINE;
       jobs[engine_idx].results_count = 0;
@@ -1082,6 +1215,72 @@ int results_handler(UrlParams *params) {
     for (int i = 0; i < enabled_engine_count; i++) {
       free(all_results[i]);
     }
+
+    /* prefer titles that actually contain the query terms */
+    char query_tokens[8][32];
+    int query_token_count = tokenize_query(raw_query, query_tokens, 8);
+    if (query_token_count > 0) {
+      for (int c = 0; c < cand_count; c++) {
+        int title_hits = 0;
+        int snippet_hits = 0;
+        for (int t = 0; t < query_token_count; t++) {
+          if (contains_ci(cands[c].title, query_tokens[t]))
+            title_hits++;
+          if (contains_ci(cands[c].snippet, query_tokens[t]))
+            snippet_hits++;
+        }
+        cands[c].score +=
+            0.05 * ((double)title_hits / query_token_count) +
+            0.02 * ((double)snippet_hits / query_token_count);
+      }
+    }
+
+    /* drop anything already shown on an earlier page of this query */
+    /* cache keys are hashed; a raw "seen|<client>|<query>" string is rejected */
+    char *seen_key = cache_compute_key(raw_query, 0, client_key);
+
+    char *seen_data = NULL;
+    size_t seen_size = 0;
+    int have_seen = (seen_key && page > 1 &&
+                     cache_get(seen_key, 600, &seen_data, &seen_size) == 0 &&
+                     seen_data && seen_size > 0);
+
+    /* sink, rather than delete: an empty page 2 is worse than a repeat */
+    if (have_seen) {
+      for (int c = 0; c < cand_count; c++) {
+        if (!cands[c].key || !cands[c].key[0])
+          continue;
+        char needle[BUFFER_SIZE_LARGE];
+        snprintf(needle, sizeof(needle), "\n%s\n", cands[c].key);
+        if (strstr(seen_data, needle))
+          cands[c].score -= 2.0;
+      }
+    }
+
+    size_t seen_cap = 16384;
+    char *seen_out = malloc(seen_cap);
+    if (seen_out) {
+      size_t len = 0;
+      seen_out[len++] = '\n';
+      if (have_seen && seen_size + 1 < seen_cap) {
+        memcpy(seen_out + len, seen_data, seen_size);
+        len += seen_size;
+      }
+      for (int c = 0; c < cand_count && len + 120 < seen_cap; c++) {
+        if (!cands[c].key || !cands[c].key[0])
+          continue;
+        int wrote = snprintf(seen_out + len, seen_cap - len, "%s\n",
+                             cands[c].key);
+        if (wrote > 0)
+          len += (size_t)wrote;
+      }
+      if (seen_key)
+        cache_set(seen_key, seen_out, len);
+      free(seen_out);
+    }
+    if (seen_data)
+      free(seen_data);
+    free(seen_key);
 
     qsort(cands, cand_count, sizeof(ResultCandidate), candidate_cmp);
 

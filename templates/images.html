@@ -11,6 +11,21 @@
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="stylesheet" href="static/main.css">
         <link rel="stylesheet" href="static/themes/{{theme}}.css">
+        {{if theme == "custom"}}
+        <style>
+            :root {
+                --bg-main: {{custom_bg_main}};
+                --bg-card: {{custom_bg_card}};
+                --border: {{custom_border}};
+                --text-primary: {{custom_text_primary}};
+                --text-secondary: {{custom_text_secondary}};
+                --text-muted: {{custom_text_muted}};
+                --accent: {{custom_accent}};
+                --accent-glow: {{custom_accent_glow}};
+                --text-dim: {{custom_text_dim}};
+            }
+        </style>
+        {{endif}}
     </head>
     
     <body class="images-view">

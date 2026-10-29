@@ -27,6 +27,7 @@ typedef struct {
   ParserFunc parser;
   int enabled;
   int is_xml;
+  int timeout_secs; /* 0 = CURL_TIMEOUT_SECS */
 } SearchEngine;
 
 typedef struct {
@@ -66,7 +67,8 @@ size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
                              void *userp);
 const char *get_random_user_agent(void);
 void configure_curl_handle(CURL *curl, const char *full_url,
-                           MemoryBuffer *chunk, struct curl_slist *headers);
+                           MemoryBuffer *chunk, struct curl_slist *headers,
+                           long timeout_secs);
 char *build_search_url(const char *base_url, const char *page_param,
                        int page_multiplier, int page_base,
                        const char *encoded_query, int page);

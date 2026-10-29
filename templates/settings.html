@@ -9,6 +9,21 @@
         </title>
         <link rel="stylesheet" href="static/main.css">
         <link rel="stylesheet" href="static/themes/{{theme}}.css">
+        {{if theme == "custom"}}
+        <style>
+            :root {
+                --bg-main: {{custom_bg_main}};
+                --bg-card: {{custom_bg_card}};
+                --border: {{custom_border}};
+                --text-primary: {{custom_text_primary}};
+                --text-secondary: {{custom_text_secondary}};
+                --text-muted: {{custom_text_muted}};
+                --accent: {{custom_accent}};
+                --accent-glow: {{custom_accent_glow}};
+                --text-dim: {{custom_text_dim}};
+            }
+        </style>
+        {{endif}}
         <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="search"
@@ -52,78 +67,125 @@
             <main class="settings-container">
                 <form action="/save_settings" method="GET">
                     <input type="hidden" name="q" value="{{query}}">
+
                     <section class="settings-section">
-                        <h3 class="settings-section-title">{{l("theme_label")}}</h3>
+                        <h3 class="settings-section-title">Appearance</h3>
                         <p class="settings-section-desc">{{l("theme_desc")}}</p>
-                        <div class="settings-field">
-                            <label class="settings-label" for="theme">{{l("theme_label")}}</label>
-                            <select id="theme" name="theme" class="settings-select">
-                                {{for t in themes}}
-                                <option value="{{t[0]}}" {{if theme == t[0]}}selected{{endif}}>{{t[1]}}</option>
-                                {{endfor}}
-                            </select>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label class="settings-label" for="theme">{{l("theme_label")}}</label>
+                                <select id="theme" name="theme" class="settings-select">
+                                    {{for t in themes}}
+                                    <option value="{{t[0]}}" {{if theme == t[0]}}selected{{endif}}>{{t[1]}}</option>
+                                    {{endfor}}
+                                </select>
+                            </div>
+                            <div class="settings-field">
+                                <label class="settings-label" for="titlefont">Title font</label>
+                                <select id="titlefont" name="titlefont" class="settings-select">
+                                    <option value="mono" {{if title_font == "mono"}}selected{{endif}}>Monospace</option>
+                                    <option value="orbitron" {{if title_font == "orbitron"}}selected{{endif}}>Orbitron Light</option>
+                                    <option value="blackout" {{if title_font == "blackout"}}selected{{endif}}>Blackout</option>
+                                </select>
+                            </div>
                         </div>
                     </section>
-                    <section class="settings-section">
-                        <h3 class="settings-section-title">Title font</h3>
-                        <p class="settings-section-desc">Typeface used for the &gt; sapir-whorf wordmark.</p>
-                        <div class="settings-field">
-                            <label class="settings-label" for="titlefont">Title font</label>
-                            <select id="titlefont" name="titlefont" class="settings-select">
-                                <option value="mono" {{if title_font == "mono"}}selected{{endif}}>Monospace</option>
-                                <option value="orbitron" {{if title_font == "orbitron"}}selected{{endif}}>Orbitron Light</option>
-                                <option value="blackout" {{if title_font == "blackout"}}selected{{endif}}>Blackout</option>
-                            </select>
-                        </div>
-                    </section>
+
                     <section class="settings-section">
                         <h3 class="settings-section-title">{{l("language_label")}}</h3>
                         <p class="settings-section-desc">{{l("language_desc")}}</p>
-                        <div class="settings-field">
-                            <label class="settings-label" for="locale">{{l("display_language_label")}}</label>
-                            <select id="locale" name="locale" class="settings-select">
-                                {{for loc in locales}}
-                                <option value="{{loc[0]}}" {{if __locale_id == loc[0]}}selected{{endif}}>{{loc[1]}}</option>
-                                {{endfor}}
-                            </select>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label class="settings-label" for="locale">{{l("display_language_label")}}</label>
+                                <select id="locale" name="locale" class="settings-select">
+                                    {{for loc in locales}}
+                                    <option value="{{loc[0]}}" {{if __locale_id == loc[0]}}selected{{endif}}>{{loc[1]}}</option>
+                                    {{endfor}}
+                                </select>
+                            </div>
                         </div>
                     </section>
+
                     {{if has_enabled_engines}}
-                    <section class="settings-section settings-engines-section">
+                    <section class="settings-section">
                         <h3 class="settings-section-title">{{l("engines_label")}}</h3>
                         <p class="settings-section-desc">{{l("engines_desc")}}</p>
                         <input type="hidden" name="engines_present" value="1">
-
-                        <div class="settings-engine-list">
-                            <div class="settings-engine-options">
-                                {{for eng in enabled_engines}}
-                                <label class="settings-engine-option" for="engine_{{eng[0]}}">
-                                    <span>{{eng[1]}}</span>
-                                    <input type="checkbox" id="engine_{{eng[0]}}" name="engine_{{eng[0]}}" value="1" class="settings-checkbox" {{eng[2]}}>
-                                </label>
-                                {{endfor}}
+                        <div class="settings-fields">
+                            {{for eng in enabled_engines}}
+                            <label class="settings-field settings-engine-option" for="engine_{{eng[0]}}">
+                                <span class="settings-label">{{eng[1]}}</span>
+                                <input type="checkbox" id="engine_{{eng[0]}}" name="engine_{{eng[0]}}" value="1" class="settings-checkbox" {{eng[2]}}>
+                            </label>
+                            {{endfor}}
+                            <div class="settings-field">
+                                <label class="settings-label" for="default_engine">{{l("default_engine_label")}}</label>
+                                <select id="default_engine" name="default_engine" class="settings-select">
+                                    <option value="all" {{if default_engine == "all"}}selected{{endif}}>{{l("all_engines_option")}}</option>
+                                    {{for eng in enabled_engines}}
+                                    {{if eng[2] != ""}}
+                                    <option value="{{eng[0]}}" {{eng[3]}}>{{eng[1]}}</option>
+                                    {{endif}}
+                                    {{endfor}}
+                                </select>
                             </div>
-                        </div>
-
-                        <div class="settings-field settings-default-engine-field">
-                            <label class="settings-label" for="default_engine">{{l("default_engine_label")}}</label>
-                            <select id="default_engine" name="default_engine" class="settings-select">
-                                <option value="all" {{if default_engine == "all"}}selected{{endif}}>{{l("all_engines_option")}}</option>
-                                {{for eng in enabled_engines}}
-                                {{if eng[2] != ""}}
-                                <option value="{{eng[0]}}" {{eng[3]}}>{{eng[1]}}</option>
-                                {{endif}}
-                                {{endfor}}
-                            </select>
                         </div>
                     </section>
                     {{endif}}
+
                     <div class="settings-actions">
                         <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
                     </div>
                 </form>
+                <form action="/save_settings" method="GET" id="custom-form">
+                    <input type="hidden" name="q" value="{{query}}">
+                    <input type="hidden" name="theme" value="custom">
+                        <section class="settings-section" id="custom-colours">
+                            <h3 class="settings-section-title">Custom colours</h3>
+                            <p class="settings-section-desc">Applied when Colour scheme is set to <strong>Custom</strong>. Click a swatch to open your system colour picker.</p>
+                            <div class="settings-colours">
+                                <label class="settings-colour" for="c_bg_main">
+                                    <span class="settings-colour-name">Background</span>
+                                    <span class="settings-colour-control"><input type="color" id="c_bg_main" name="c_bg_main" value="{{custom_bg_main}}" style="background:#{{custom_bg_main}}"><span class="settings-colour-hex" data-for="c_bg_main">{{custom_bg_main}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_bg_card">
+                                    <span class="settings-colour-name">Card</span>
+                                    <span class="settings-colour-control"><input type="color" id="c_bg_card" name="c_bg_card" value="{{custom_bg_card}}" style="background:#{{custom_bg_card}}"><span class="settings-colour-hex" data-for="c_bg_card">{{custom_bg_card}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_border">
+                                    <span class="settings-colour-name">Border</span>
+                                    <span class="settings-colour-control"><input type="color" id="c_border" name="c_border" value="{{custom_border}}" style="background:#{{custom_border}}"><span class="settings-colour-hex" data-for="c_border">{{custom_border}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_text_primary">
+                                    <span class="settings-colour-name">Text</span>
+                                    <span class="settings-colour-control"><input type="color" id="c_text_primary" name="c_text_primary" value="{{custom_text_primary}}" style="background:#{{custom_text_primary}}"><span class="settings-colour-hex" data-for="c_text_primary">{{custom_text_primary}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_text_secondary">
+                                    <span class="settings-colour-name">Text secondary</span>
+                                    <span class="settings-colour-control"><input type="color" id="c_text_secondary" name="c_text_secondary" value="{{custom_text_secondary}}" style="background:#{{custom_text_secondary}}"><span class="settings-colour-hex" data-for="c_text_secondary">{{custom_text_secondary}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_text_muted">
+                                    <span class="settings-colour-name">Text muted</span>
+                                    <span class="settings-colour-control"><input type="color" id="c_text_muted" name="c_text_muted" value="{{custom_text_muted}}" style="background:#{{custom_text_muted}}"><span class="settings-colour-hex" data-for="c_text_muted">{{custom_text_muted}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_accent">
+                                    <span class="settings-colour-name">Accent</span>
+                                    <span class="settings-colour-control"><input type="color" id="c_accent" name="c_accent" value="{{custom_accent}}" style="background:#{{custom_accent}}"><span class="settings-colour-hex" data-for="c_accent">{{custom_accent}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_text_dim">
+                                    <span class="settings-colour-name">Text dim</span>
+                                    <span class="settings-colour-control"><input type="color" id="c_text_dim" name="c_text_dim" value="{{custom_text_dim}}" style="background:#{{custom_text_dim}}"><span class="settings-colour-hex" data-for="c_text_dim">{{custom_text_dim}}</span></span>
+                                </label>
+                            </div>
+                        </section>
+
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">Save colours</button>
+                    </div>
+                </form>
             </main>
         </div>
+        <script src="/static/settings.js" defer></script>
         <script src="/static/autocomplete.js" defer></script>
     </body>
 

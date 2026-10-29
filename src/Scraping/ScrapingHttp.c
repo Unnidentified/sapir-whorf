@@ -54,7 +54,8 @@ const char *get_random_user_agent(void) {
 }
 
 void configure_curl_handle(CURL *curl, const char *full_url,
-                           MemoryBuffer *chunk, struct curl_slist *headers) {
+                           MemoryBuffer *chunk, struct curl_slist *headers,
+                           long timeout_secs) {
   curl_easy_setopt(curl, CURLOPT_URL, full_url);
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_callback);
@@ -65,7 +66,8 @@ void configure_curl_handle(CURL *curl, const char *full_url,
   curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
   curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, CURL_DNS_TIMEOUT_SECS);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, CURL_TIMEOUT_SECS);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT,
+                   timeout_secs > 0 ? timeout_secs : CURL_TIMEOUT_SECS);
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
   curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
 
