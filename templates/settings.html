@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{__locale_id}}" dir="{{__locale_direction}}" class="title-{{title_font}}">
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}" class="title-{{title_font}}" style="zoom: {{page_scale}}%">
 
     <head>
         <meta charset="UTF-8">
@@ -65,7 +65,12 @@
         {{endif}}
         <div class="settings-layout">
             <main class="settings-container">
-                <form action="/save_settings" method="GET">
+                <form action="/save_settings" method="GET" id="colours-form" class="colours-form">
+                    <input type="hidden" name="q" value="{{query}}">
+                    <input type="hidden" name="theme" value="custom">
+                </form>
+
+                <form action="/save_settings" method="GET" id="settings-form">
                     <input type="hidden" name="q" value="{{query}}">
 
                     <section class="settings-section">
@@ -74,19 +79,80 @@
                         <div class="settings-fields">
                             <div class="settings-field">
                                 <label class="settings-label" for="theme">{{l("theme_label")}}</label>
-                                <select id="theme" name="theme" class="settings-select">
-                                    {{for t in themes}}
-                                    <option value="{{t[0]}}" {{if theme == t[0]}}selected{{endif}}>{{t[1]}}</option>
-                                    {{endfor}}
-                                </select>
+                                <span class="select-wrap">
+                                    <select id="theme" name="theme" class="settings-select">
+                                        {{for t in themes}}
+                                        <option value="{{t[0]}}" {{if theme == t[0]}}selected{{endif}}>{{t[1]}}</option>
+                                        {{endfor}}
+                                    </select>
+                                </span>
                             </div>
                             <div class="settings-field">
                                 <label class="settings-label" for="titlefont">Title font</label>
-                                <select id="titlefont" name="titlefont" class="settings-select">
-                                    <option value="mono" {{if title_font == "mono"}}selected{{endif}}>Monospace</option>
-                                    <option value="orbitron" {{if title_font == "orbitron"}}selected{{endif}}>Orbitron Light</option>
-                                    <option value="blackout" {{if title_font == "blackout"}}selected{{endif}}>Blackout</option>
-                                </select>
+                                <span class="select-wrap">
+                                    <select id="titlefont" name="titlefont" class="settings-select">
+                                        <option value="mono" {{if title_font == "mono"}}selected{{endif}}>Monospace</option>
+                                        <option value="orbitron" {{if title_font == "orbitron"}}selected{{endif}}>Orbitron Light</option>
+                                        <option value="blackout" {{if title_font == "blackout"}}selected{{endif}}>Blackout</option>
+                                    </select>
+                                </span>
+                            </div>
+                            <div class="settings-field">
+                                <label class="settings-label" for="pagescale">Interface scale</label>
+                                <span class="select-wrap">
+                                    <select id="pagescale" name="pagescale" class="settings-select">
+                                        <option value="80" {{if page_scale == "80"}}selected{{endif}}>80%</option>
+                                        <option value="85" {{if page_scale == "85"}}selected{{endif}}>85%</option>
+                                        <option value="90" {{if page_scale == "90"}}selected{{endif}}>90%</option>
+                                        <option value="95" {{if page_scale == "95"}}selected{{endif}}>95%</option>
+                                        <option value="100" {{if page_scale == "100"}}selected{{endif}}>100%</option>
+                                        <option value="110" {{if page_scale == "110"}}selected{{endif}}>110%</option>
+                                    </select>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="settings-colours-block">
+                            <div class="settings-colours-head">
+                                <span class="settings-label">Custom palette</span>
+                                <span class="settings-colours-hint">Applies when Colour scheme is <strong>Custom</strong>.</span>
+                            </div>
+                            <div class="settings-colours">
+                                <label class="settings-colour" for="c_bg_main">
+                                    <span class="settings-colour-name">Background</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_bg_main" name="c_bg_main" value="{{custom_bg_main}}" style="background:#{{custom_bg_main}}"><span class="settings-colour-hex" data-for="c_bg_main">{{custom_bg_main}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_bg_card">
+                                    <span class="settings-colour-name">Card</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_bg_card" name="c_bg_card" value="{{custom_bg_card}}" style="background:#{{custom_bg_card}}"><span class="settings-colour-hex" data-for="c_bg_card">{{custom_bg_card}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_border">
+                                    <span class="settings-colour-name">Border</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_border" name="c_border" value="{{custom_border}}" style="background:#{{custom_border}}"><span class="settings-colour-hex" data-for="c_border">{{custom_border}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_text_primary">
+                                    <span class="settings-colour-name">Text</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_text_primary" name="c_text_primary" value="{{custom_text_primary}}" style="background:#{{custom_text_primary}}"><span class="settings-colour-hex" data-for="c_text_primary">{{custom_text_primary}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_text_secondary">
+                                    <span class="settings-colour-name">Text secondary</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_text_secondary" name="c_text_secondary" value="{{custom_text_secondary}}" style="background:#{{custom_text_secondary}}"><span class="settings-colour-hex" data-for="c_text_secondary">{{custom_text_secondary}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_text_muted">
+                                    <span class="settings-colour-name">Text muted</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_text_muted" name="c_text_muted" value="{{custom_text_muted}}" style="background:#{{custom_text_muted}}"><span class="settings-colour-hex" data-for="c_text_muted">{{custom_text_muted}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_accent">
+                                    <span class="settings-colour-name">Accent</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_accent" name="c_accent" value="{{custom_accent}}" style="background:#{{custom_accent}}"><span class="settings-colour-hex" data-for="c_accent">{{custom_accent}}</span></span>
+                                </label>
+                                <label class="settings-colour" for="c_text_dim">
+                                    <span class="settings-colour-name">Text dim</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_text_dim" name="c_text_dim" value="{{custom_text_dim}}" style="background:#{{custom_text_dim}}"><span class="settings-colour-hex" data-for="c_text_dim">{{custom_text_dim}}</span></span>
+                                </label>
+                            </div>
+                            <div class="settings-colours-actions">
+                                <button type="submit" form="colours-form" class="btn-secondary">Save colours</button>
                             </div>
                         </div>
                     </section>
@@ -97,11 +163,13 @@
                         <div class="settings-fields">
                             <div class="settings-field">
                                 <label class="settings-label" for="locale">{{l("display_language_label")}}</label>
-                                <select id="locale" name="locale" class="settings-select">
-                                    {{for loc in locales}}
-                                    <option value="{{loc[0]}}" {{if __locale_id == loc[0]}}selected{{endif}}>{{loc[1]}}</option>
-                                    {{endfor}}
-                                </select>
+                                <span class="select-wrap">
+                                    <select id="locale" name="locale" class="settings-select">
+                                        {{for loc in locales}}
+                                        <option value="{{loc[0]}}" {{if __locale_id == loc[0]}}selected{{endif}}>{{loc[1]}}</option>
+                                        {{endfor}}
+                                    </select>
+                                </span>
                             </div>
                         </div>
                     </section>
@@ -120,14 +188,16 @@
                             {{endfor}}
                             <div class="settings-field">
                                 <label class="settings-label" for="default_engine">{{l("default_engine_label")}}</label>
-                                <select id="default_engine" name="default_engine" class="settings-select">
-                                    <option value="all" {{if default_engine == "all"}}selected{{endif}}>{{l("all_engines_option")}}</option>
-                                    {{for eng in enabled_engines}}
-                                    {{if eng[2] != ""}}
-                                    <option value="{{eng[0]}}" {{eng[3]}}>{{eng[1]}}</option>
-                                    {{endif}}
-                                    {{endfor}}
-                                </select>
+                                <span class="select-wrap">
+                                    <select id="default_engine" name="default_engine" class="settings-select">
+                                        <option value="all" {{if default_engine == "all"}}selected{{endif}}>{{l("all_engines_option")}}</option>
+                                        {{for eng in enabled_engines}}
+                                        {{if eng[2] != ""}}
+                                        <option value="{{eng[0]}}" {{eng[3]}}>{{eng[1]}}</option>
+                                        {{endif}}
+                                        {{endfor}}
+                                    </select>
+                                </span>
                             </div>
                         </div>
                     </section>
@@ -135,52 +205,6 @@
 
                     <div class="settings-actions">
                         <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
-                    </div>
-                </form>
-                <form action="/save_settings" method="GET" id="custom-form">
-                    <input type="hidden" name="q" value="{{query}}">
-                    <input type="hidden" name="theme" value="custom">
-                        <section class="settings-section" id="custom-colours">
-                            <h3 class="settings-section-title">Custom colours</h3>
-                            <p class="settings-section-desc">Applied when Colour scheme is set to <strong>Custom</strong>. Click a swatch to open your system colour picker.</p>
-                            <div class="settings-colours">
-                                <label class="settings-colour" for="c_bg_main">
-                                    <span class="settings-colour-name">Background</span>
-                                    <span class="settings-colour-control"><input type="color" id="c_bg_main" name="c_bg_main" value="{{custom_bg_main}}" style="background:#{{custom_bg_main}}"><span class="settings-colour-hex" data-for="c_bg_main">{{custom_bg_main}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_bg_card">
-                                    <span class="settings-colour-name">Card</span>
-                                    <span class="settings-colour-control"><input type="color" id="c_bg_card" name="c_bg_card" value="{{custom_bg_card}}" style="background:#{{custom_bg_card}}"><span class="settings-colour-hex" data-for="c_bg_card">{{custom_bg_card}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_border">
-                                    <span class="settings-colour-name">Border</span>
-                                    <span class="settings-colour-control"><input type="color" id="c_border" name="c_border" value="{{custom_border}}" style="background:#{{custom_border}}"><span class="settings-colour-hex" data-for="c_border">{{custom_border}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_text_primary">
-                                    <span class="settings-colour-name">Text</span>
-                                    <span class="settings-colour-control"><input type="color" id="c_text_primary" name="c_text_primary" value="{{custom_text_primary}}" style="background:#{{custom_text_primary}}"><span class="settings-colour-hex" data-for="c_text_primary">{{custom_text_primary}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_text_secondary">
-                                    <span class="settings-colour-name">Text secondary</span>
-                                    <span class="settings-colour-control"><input type="color" id="c_text_secondary" name="c_text_secondary" value="{{custom_text_secondary}}" style="background:#{{custom_text_secondary}}"><span class="settings-colour-hex" data-for="c_text_secondary">{{custom_text_secondary}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_text_muted">
-                                    <span class="settings-colour-name">Text muted</span>
-                                    <span class="settings-colour-control"><input type="color" id="c_text_muted" name="c_text_muted" value="{{custom_text_muted}}" style="background:#{{custom_text_muted}}"><span class="settings-colour-hex" data-for="c_text_muted">{{custom_text_muted}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_accent">
-                                    <span class="settings-colour-name">Accent</span>
-                                    <span class="settings-colour-control"><input type="color" id="c_accent" name="c_accent" value="{{custom_accent}}" style="background:#{{custom_accent}}"><span class="settings-colour-hex" data-for="c_accent">{{custom_accent}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_text_dim">
-                                    <span class="settings-colour-name">Text dim</span>
-                                    <span class="settings-colour-control"><input type="color" id="c_text_dim" name="c_text_dim" value="{{custom_text_dim}}" style="background:#{{custom_text_dim}}"><span class="settings-colour-hex" data-for="c_text_dim">{{custom_text_dim}}</span></span>
-                                </label>
-                            </div>
-                        </section>
-
-                    <div class="settings-actions">
-                        <button type="submit" class="btn-primary">Save colours</button>
                     </div>
                 </form>
             </main>

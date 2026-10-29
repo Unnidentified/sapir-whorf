@@ -813,6 +813,7 @@ int results_handler(UrlParams *params) {
   char *theme = get_theme("");
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "title_font", get_title_font());
+  context_set(&ctx, "page_scale", get_page_scale());
   CustomTheme custom_theme;
   get_custom_theme(&custom_theme);
   context_set_custom_theme(&ctx, &custom_theme);

@@ -123,11 +123,11 @@ img[src=""] {
 }
 
 .nav-settings-icon {
-    width: 26px;
-    height: 18px;
+    width: 21px;
+    height: 14px;
     flex-shrink: 0;
     margin-inline-start: auto;
-    align-self: flex-start;
+    align-self: center;
     display: block;
     background-color: var(--text-secondary);
     -webkit-mask-image: url('/static/settings.svg');
@@ -1175,8 +1175,7 @@ header {
     align-items: center;
     gap: 28px;
     padding-block: 20px;
-    padding-inline-start: var(--page-gutter);
-    padding-inline-end: 24px;
+    padding-inline: var(--page-gutter);
 }
 
 header .search-form {
@@ -1194,11 +1193,16 @@ header .search-box {
 }
 
 .content-layout {
-    grid-template-columns: minmax(0, 1fr) var(--rail-width);
+    /* no rail unless an infobox is actually rendered */
+    grid-template-columns: minmax(0, 1fr);
     gap: 64px;
     padding-inline: var(--page-gutter);
     padding-block: 26px 64px;
     align-items: start;
+}
+
+.content-layout.with-rail {
+    grid-template-columns: minmax(0, 1fr) var(--rail-width);
 }
 
 .content-layout .results-container {
@@ -1206,16 +1210,27 @@ header .search-box {
     max-width: 880px;
 }
 
+/* without a rail there is nothing to wrap around: use the full column */
+.content-layout:not(.with-rail) .results-container {
+    max-width: none;
+}
+
 .content-layout .infobox-sidebar {
+    grid-column: 1;
+    display: none;
+}
+
+.content-layout.with-rail .infobox-sidebar {
     grid-column: 2;
+    display: block;
 }
 
 @media (max-width: 1240px) {
-    .content-layout {
+    .content-layout.with-rail {
         grid-template-columns: minmax(0, 1fr);
         gap: 32px;
     }
-    .content-layout .results-container, .content-layout .infobox-sidebar {
+    .content-layout .results-container, .content-layout.with-rail .infobox-sidebar {
         grid-column: 1;
         max-width: none;
     }
@@ -1606,4 +1621,87 @@ input[type="color"]:focus-visible {
 
 .settings-actions .btn-primary {
     min-width: 132px;
+}
+
+/* ---------- selects: explicit chevron and padding ---------- */
+
+.select-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+}
+
+.select-wrap::after {
+    content: "";
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    margin-top: -6px;
+    border-right: 1.5px solid var(--text-muted);
+    border-bottom: 1.5px solid var(--text-muted);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+
+.settings-select {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    padding: 8px 38px 8px 12px;
+    line-height: 1.3;
+}
+
+.select-wrap:hover::after {
+    border-color: var(--text-primary);
+}
+
+/* ---------- settings: palette next to the theme selector ---------- */
+
+.colours-form {
+    display: none;
+}
+
+.settings-colours-block {
+    margin-top: 6px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.settings-colours-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.settings-colours-hint {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.settings-colours-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+.settings-colours-actions .btn-secondary {
+    padding: 8px 18px;
+    font-size: 0.85rem;
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.settings-colours-actions .btn-secondary:hover {
+    border-color: var(--text-secondary);
+}
+
+@media (max-width: 720px) {
+    .settings-colours-head {
+        flex-direction: column;
+        gap: 2px;
+    }
 }

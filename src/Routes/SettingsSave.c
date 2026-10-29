@@ -11,6 +11,7 @@ int settings_save_handler(UrlParams *params) {
   const char *locale = "";
   const char *query = "";
   const char *title_font = "";
+  const char *page_scale = "";
   const char *custom[CUSTOM_COLOUR_COUNT] = {NULL};
   const char *default_engine = "all";
   int default_engine_present = 0;
@@ -26,6 +27,8 @@ int settings_save_handler(UrlParams *params) {
         locale = params->params[i].value;
       } else if (strcmp(params->params[i].key, "titlefont") == 0) {
         title_font = params->params[i].value;
+      } else if (strcmp(params->params[i].key, "pagescale") == 0) {
+        page_scale = params->params[i].value;
       } else if (strncmp(params->params[i].key, "c_", 2) == 0) {
         static const char *SLOT_KEYS[CUSTOM_COLOUR_COUNT] = {
             "c_bg_main", "c_bg_card", "c_border", "c_text_primary",
@@ -85,6 +88,10 @@ int settings_save_handler(UrlParams *params) {
   if (strcmp(title_font, "mono") == 0 || strcmp(title_font, "orbitron") == 0 ||
       strcmp(title_font, "blackout") == 0) {
     set_cookie("titlefont", title_font, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
+               false, false);
+  }
+  if (page_scale_is_valid(page_scale)) {
+    set_cookie("pagescale", page_scale, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
                false, false);
   }
   if (strlen(locale) > 0) {

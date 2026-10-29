@@ -100,15 +100,16 @@
     'color:var(--text-secondary,#b0b0ad);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.sym-ac-item[aria-selected="true"],.sym-ac-item:hover{background:var(--border,#333633);',
     'color:var(--text-primary,#e6e3e0)}',
-    '.sym-ac-switch{position:absolute;top:50%;right:10px;transform:translateY(-50%);',
-    'width:32px;height:16px;padding:0;margin:0;cursor:pointer;background:transparent;',
-    'border:1px solid var(--text-dim,#7d7d7b);border-radius:0;font:inherit;',
-    'box-sizing:border-box;display:block;cursor:pointer}',
-    '.sym-ac-knob{position:absolute;top:50%;left:3px;transform:translateY(-50%);',
-    'width:8px;height:8px;background:var(--text-dim,#7d7d7b);',
+    '.sym-ac-switch{position:absolute;top:50%;right:12px;transform:translateY(-50%);',
+    'width:26px;height:13px;padding:0;margin:0;background:transparent;',
+    'border:1px solid var(--border,#333633);border-radius:0;font:inherit;',
+    'box-sizing:border-box;display:block;cursor:pointer;opacity:.75}',
+    '.sym-ac-knob{position:absolute;top:50%;left:2px;transform:translateY(-50%);',
+    'width:7px;height:7px;background:var(--text-muted,#8f8f8d);',
     'transition:left .15s ease,background .15s ease}',
-    '.sym-ac-switch[aria-checked="true"]{border-color:var(--accent,#c99a75)}',
-    '.sym-ac-switch[aria-checked="true"] .sym-ac-knob{left:calc(100% - 11px);background:var(--accent,#c99a75)}',
+    '.sym-ac-switch:hover{opacity:1;border-color:var(--text-secondary,#b0b0ad)}',
+    '.sym-ac-switch[aria-checked="true"]{opacity:1;border-color:var(--accent,#c99a75)}',
+    '.sym-ac-switch[aria-checked="true"] .sym-ac-knob{left:calc(100% - 9px);background:var(--accent,#c99a75)}',
     '.sym-ac-switch:focus-visible{outline:1px solid var(--accent,#c99a75);outline-offset:2px}'
   ].join('');
 
@@ -135,7 +136,7 @@
     input.parentNode.insertBefore(wrap, input);
     wrap.appendChild(input);
 
-    input.style.paddingRight = '52px';
+    input.style.paddingRight = '48px';
 
     var list = document.createElement('ul');
     list.className = 'sym-ac-list';

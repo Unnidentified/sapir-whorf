@@ -225,6 +225,40 @@ const char *get_title_font(void) {
   return value;
 }
 
+int page_scale_is_valid(const char *value) {
+  if (!value)
+    return 0;
+  return strcmp(value, "80") == 0 || strcmp(value, "85") == 0 ||
+         strcmp(value, "90") == 0 || strcmp(value, "95") == 0 ||
+         strcmp(value, "100") == 0 || strcmp(value, "110") == 0;
+}
+
+const char *get_page_scale(void) {
+  char *cookie = get_cookie("pagescale");
+  const char *value = "90";
+
+  if (cookie) {
+    if (page_scale_is_valid(cookie))
+      value = cookie;
+    /* the cookie buffer outlives this call only until freed, so copy out */
+    if (strcmp(value, "80") == 0)
+      value = "80";
+    else if (strcmp(value, "85") == 0)
+      value = "85";
+    else if (strcmp(value, "95") == 0)
+      value = "95";
+    else if (strcmp(value, "100") == 0)
+      value = "100";
+    else if (strcmp(value, "110") == 0)
+      value = "110";
+    else
+      value = "90";
+    free(cookie);
+  }
+
+  return value;
+}
+
 char *get_locale(const char *default_locale) {
   char *cookie = get_cookie("locale");
   if (cookie && beaker_get_locale_meta(cookie) != NULL) {

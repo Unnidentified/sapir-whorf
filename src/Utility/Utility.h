@@ -23,6 +23,8 @@ typedef struct {
 int hex_to_int(char c);
 char *get_theme(const char *default_theme);
 const char *get_title_font(void);
+const char *get_page_scale(void);
+int page_scale_is_valid(const char *value);
 
 /* user-defined palette, stored as "rrggbb,rrggbb,..." in a cookie */
 #define CUSTOM_COLOUR_COUNT 8

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{__locale_id}}" dir="{{__locale_direction}}" class="title-{{title_font}}">
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}" class="title-{{title_font}}" style="zoom: {{page_scale}}%">
     
     <head>
         <meta charset="UTF-8">
@@ -33,7 +33,7 @@
     
     <body class="results-view">
         {{include "_chrome.html"}}
-        <div class="content-layout">
+        <div class="content-layout{{if exists infoboxes}} with-rail{{endif}}">
             <aside class="sidebar-spacer">
             </aside>
             <main class="results-container">
