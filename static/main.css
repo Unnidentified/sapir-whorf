@@ -8,7 +8,6 @@
 
 *, *::before, *::after {
     box-sizing: border-box;
-    font-family: sans-serif;
 }
 
 html {
@@ -842,7 +841,10 @@ header .logo-link:hover {
 }
 
 /* ============================================================ SymSearch base UI (default look for every theme). Colour values live in static/themes/*.css only. ============================================================ */ /* mono — near-black, warm-amber monospace terminal look */ /* monospace everywhere, square corners everywhere */ *, *::before, *::after {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Mono", "Cascadia Code",
+        "IBM Plex Mono", "Source Code Pro", "Hack", "Inconsolata",
+        Menlo, Monaco, "DejaVu Sans Mono", Consolas, "Liberation Mono", monospace;
+    font-variant-ligatures: none;
     border-radius: 0 !important;
 }
 
@@ -864,7 +866,7 @@ body {
     color: var(--text-primary);
 }
 
-.view-home .hero-logo .prompt {
+.prompt {
     color: var(--accent);
     margin-inline-end: 4px;
 }
