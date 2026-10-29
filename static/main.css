@@ -568,10 +568,6 @@ header .logo-link:hover {
         width: 100%;
         max-width: 580px;
     }
-    .view-home .hero-logo {
-        font-size: 3rem;
-        margin-bottom: 24px;
-    }
     .view-home .search-input-wrapper {
         margin-bottom: 16px;
     }
@@ -855,10 +851,22 @@ body {
     background-color: var(--bg-main);
 }
 
-/* ---------- home ---------- */ .view-home .hero-logo {
-    font-size: clamp(2rem, 8vw, 3.6rem);
-    font-weight: 700;
-    letter-spacing: -1px;
+/* ---------- home ---------- */
+.view-home .hero-logo {
+    width: 100%;
+    text-align: right;
+    padding-inline-end: 17px;
+    margin-bottom: 10px;
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.3;
+    color: var(--text-primary);
+}
+
+.view-home .hero-logo .prompt {
+    color: var(--accent);
+    margin-inline-end: 4px;
 }
 
 .view-home .search-box {
