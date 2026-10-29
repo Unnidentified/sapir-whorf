@@ -20,82 +20,6 @@
 #include <string.h>
 #include <time.h>
 
-#define URL_HASH_TABLE_SIZE 64
-
-typedef struct UrlHashEntry {
-  char *url;
-  struct UrlHashEntry *next;
-} UrlHashEntry;
-
-typedef struct {
-  UrlHashEntry *buckets[URL_HASH_TABLE_SIZE];
-} UrlHashTable;
-
-static void url_hash_init(UrlHashTable *ht) {
-  for (int i = 0; i < URL_HASH_TABLE_SIZE; i++) {
-    ht->buckets[i] = NULL;
-  }
-}
-
-static unsigned int url_hash(const char *url) {
-  unsigned char hash[EVP_MAX_MD_SIZE];
-  unsigned int hash_len;
-  EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-  if (!ctx)
-    return 0;
-  EVP_DigestInit_ex(ctx, EVP_md5(), NULL);
-  EVP_DigestUpdate(ctx, url, strlen(url));
-  EVP_DigestFinal_ex(ctx, hash, &hash_len);
-  EVP_MD_CTX_free(ctx);
-  unsigned int h = 0;
-  for (unsigned int i = 0; i < hash_len; i++) {
-    h = h * 31 + hash[i];
-  }
-  return h % URL_HASH_TABLE_SIZE;
-}
-
-static int url_hash_contains(UrlHashTable *ht, const char *url) {
-  unsigned int idx = url_hash(url);
-  for (UrlHashEntry *e = ht->buckets[idx]; e; e = e->next) {
-    if (strcmp(e->url, url) == 0) {
-      return 1;
-    }
-  }
-  return 0;
-}
-
-static int url_hash_insert(UrlHashTable *ht, const char *url) {
-  unsigned int idx = url_hash(url);
-  for (UrlHashEntry *e = ht->buckets[idx]; e; e = e->next) {
-    if (strcmp(e->url, url) == 0) {
-      return 0;
-    }
-  }
-  UrlHashEntry *new_entry = malloc(sizeof(UrlHashEntry));
-  if (!new_entry)
-    return -1;
-  new_entry->url = strdup(url);
-  if (!new_entry->url) {
-    free(new_entry);
-    return -1;
-  }
-  new_entry->next = ht->buckets[idx];
-  ht->buckets[idx] = new_entry;
-  return 0;
-}
-
-static void url_hash_free(UrlHashTable *ht) {
-  for (int i = 0; i < URL_HASH_TABLE_SIZE; i++) {
-    UrlHashEntry *e = ht->buckets[i];
-    while (e) {
-      UrlHashEntry *next = e->next;
-      free(e->url);
-      free(e);
-      e = next;
-    }
-    ht->buckets[i] = NULL;
-  }
-}
 
 typedef struct {
   const char *query;
@@ -188,6 +112,257 @@ static int url_host_matches(const char *url, const char *host) {
     return 1;
 
   return 0;
+}
+
+/* ---------- result ranking ----------
+   Every engine contributes a position; results are merged by Reciprocal Rank
+   Fusion so a hit that several engines agree on outranks one that only a
+   single engine liked. Duplicates are matched on a normalised URL, and at
+   most MAX_PER_DOMAIN results survive per host so one site cannot fill the
+   page. */
+
+#define MAX_CANDIDATES 128
+#define MAX_PER_DOMAIN 3
+#define RRF_K 60.0
+
+typedef struct {
+  char *url;
+  char *title;
+  char *snippet;
+  char *key;
+  double score;
+  int order;
+} ResultCandidate;
+
+static int prefix_ci(const char *s, const char *prefix) {
+  while (*prefix) {
+    char a = *s++;
+    char b = *prefix++;
+    if (a >= 'A' && a <= 'Z')
+      a += 32;
+    if (b >= 'A' && b <= 'Z')
+      b += 32;
+    if (a != b)
+      return 0;
+  }
+  return 1;
+}
+
+static const char *url_body(const char *url) {
+  const char *p = url;
+  if (prefix_ci(p, "https://"))
+    p += 8;
+  else if (prefix_ci(p, "http://"))
+    p += 7;
+  if (prefix_ci(p, "www."))
+    p += 4;
+  return p;
+}
+
+static void normalize_url_key(const char *url, char *out, size_t size) {
+  out[0] = '\0';
+  if (!url || size == 0)
+    return;
+
+  const char *p = url_body(url);
+  size_t o = 0;
+  for (; *p && o + 1 < size; p++) {
+    if (*p == '#')
+      break;
+    char c = *p;
+    if (c >= 'A' && c <= 'Z')
+      c += 32;
+    out[o++] = c;
+  }
+  out[o] = '\0';
+  while (o > 0 && out[o - 1] == '/')
+    out[--o] = '\0';
+}
+
+static void extract_host(const char *url, char *out, size_t size) {
+  out[0] = '\0';
+  if (!url || size == 0)
+    return;
+
+  const char *p = url_body(url);
+  size_t o = 0;
+  for (; *p && *p != '/' && *p != '?' && o + 1 < size; p++) {
+    char c = *p;
+    if (c >= 'A' && c <= 'Z')
+      c += 32;
+    out[o++] = c;
+  }
+  out[o] = '\0';
+}
+
+static int is_month_abbrev(const char *s) {
+  static const char *MONTHS[] = {"jan", "feb", "mar", "apr", "may", "jun",
+                                 "jul", "aug", "sep", "oct", "nov", "dec"};
+  for (size_t i = 0; i < sizeof(MONTHS) / sizeof(MONTHS[0]); i++) {
+    if (prefix_ci(s, MONTHS[i]))
+      return 1;
+  }
+  return 0;
+}
+
+/* Bing and Brave prefix snippets with "May 1, 2017 · " or "3 weeks ago - " */
+static const char *skip_date_prefix(const char *s) {
+  const char *p = s;
+  while (*p == ' ')
+    p++;
+
+  if (is_month_abbrev(p)) {
+    const char *q = p;
+    while (*q && *q != ' ')
+      q++;
+    while (*q == ' ')
+      q++;
+    if (*q < '0' || *q > '9')
+      return s;
+    while (*q >= '0' && *q <= '9')
+      q++;
+    if (*q == ',')
+      q++;
+    while (*q == ' ')
+      q++;
+    int digits = 0;
+    while (*q >= '0' && *q <= '9') {
+      q++;
+      digits++;
+    }
+    if (digits < 4)
+      return s;
+    while (*q && !(*q >= '0' && *q <= '9') && !(*q >= 'a' && *q <= 'z') &&
+           !(*q >= 'A' && *q <= 'Z'))
+      q++;
+    return q;
+  }
+
+  if (*p >= '0' && *p <= '9') {
+    static const char *UNITS[] = {"day", "week", "month", "year",
+                                  "hour", "min", "minute"};
+    const char *q = p;
+    while (*q >= '0' && *q <= '9')
+      q++;
+    while (*q == ' ')
+      q++;
+    for (size_t i = 0; i < sizeof(UNITS) / sizeof(UNITS[0]); i++) {
+      if (prefix_ci(q, UNITS[i])) {
+        const char *r = q;
+        while (*r && *r != ' ')
+          r++;
+        while (*r && !(*r >= '0' && *r <= '9') && !(*r >= 'a' && *r <= 'z') &&
+               !(*r >= 'A' && *r <= 'Z'))
+          r++;
+        if (*r)
+          return r;
+        return s;
+      }
+    }
+  }
+  return s;
+}
+
+/* engines occasionally hand back raw entities ("OpenBSD&apos;s") */
+static void unescape_html(const char *in, char *out, size_t size) {
+  out[0] = '\0';
+  if (!in || size == 0)
+    return;
+
+  size_t o = 0;
+  for (const char *p = in; *p && o + 1 < size; p++) {
+    if (*p != '&') {
+      out[o++] = *p;
+      continue;
+    }
+
+    const char *semi = strchr(p, ';');
+    if (!semi || semi - p > 10) {
+      out[o++] = *p;
+      continue;
+    }
+
+    char entity[12];
+    size_t len = (size_t)(semi - p + 1);
+    memcpy(entity, p, len);
+    entity[len] = '\0';
+
+    char decoded = 0;
+    if (strcmp(entity, "&amp;") == 0) decoded = '&';
+    else if (strcmp(entity, "&lt;") == 0) decoded = '<';
+    else if (strcmp(entity, "&gt;") == 0) decoded = '>';
+    else if (strcmp(entity, "&quot;") == 0) decoded = '"';
+    else if (strcmp(entity, "&apos;") == 0) decoded = '\'';
+    else if (strcmp(entity, "&nbsp;") == 0) decoded = ' ';
+    else if (entity[1] == '#') {
+      int value = 0, ok = 1;
+      if (entity[2] == 'x' || entity[2] == 'X') {
+        for (const char *q = entity + 3; *q != ';'; q++) {
+          if (*q >= '0' && *q <= '9') value = value * 16 + (*q - '0');
+          else if ((*q | 32) >= 'a' && (*q | 32) <= 'f') value = value * 16 + (*q | 32) - 'a' + 10;
+          else { ok = 0; break; }
+        }
+      } else {
+        for (const char *q = entity + 2; *q != ';'; q++) {
+          if (*q >= '0' && *q <= '9') value = value * 10 + (*q - '0');
+          else { ok = 0; break; }
+        }
+      }
+      if (ok && value > 0 && value < 128)
+        decoded = (char)value;
+    }
+
+    if (decoded) {
+      out[o++] = decoded;
+      p = semi;
+    } else {
+      out[o++] = *p;
+    }
+  }
+  out[o] = '\0';
+}
+
+static void clean_snippet(const char *in, char *out, size_t size) {
+  out[0] = '\0';
+  if (!in || size == 0)
+    return;
+
+  const char *p = skip_date_prefix(in);
+  size_t o = 0;
+  int pending_space = 0;
+  for (; *p && o + 1 < size; p++) {
+    char c = *p;
+    if (c == '\n' || c == '\r' || c == '\t' || c == ' ') {
+      pending_space = 1;
+      continue;
+    }
+    if (pending_space && o > 0)
+      out[o++] = ' ';
+    pending_space = 0;
+    out[o++] = c;
+  }
+  out[o] = '\0';
+
+  char decoded[BUFFER_SIZE_LARGE];
+  snprintf(decoded, sizeof(decoded), "%s", out);
+  for (int pass = 0; pass < 3; pass++) {
+    char once[BUFFER_SIZE_LARGE];
+    unescape_html(decoded, once, sizeof(once));
+    if (strcmp(once, decoded) == 0)
+      break;
+    snprintf(decoded, sizeof(decoded), "%s", once);
+  }
+  snprintf(out, size, "%s", decoded);
+}
+
+static int candidate_cmp(const void *a, const void *b) {
+  const ResultCandidate *x = (const ResultCandidate *)a;
+  const ResultCandidate *y = (const ResultCandidate *)b;
+  if (x->score > y->score)
+    return -1;
+  if (x->score < y->score)
+    return 1;
+  return x->order - y->order;
 }
 
 static int is_media_result(const char *url) {
@@ -819,8 +994,10 @@ int results_handler(UrlParams *params) {
   if (total_results > 0) {
     StringMatrix results_matrix;
     string_matrix_init(&results_matrix);
-    UrlHashTable url_table;
-    url_hash_init(&url_table);
+
+    ResultCandidate cands[MAX_CANDIDATES];
+    int cand_count = 0;
+    memset(cands, 0, sizeof(cands));
 
     int max_per_engine = 0;
     for (int i = 0; i < enabled_engine_count; i++) {
@@ -828,50 +1005,135 @@ int results_handler(UrlParams *params) {
         max_per_engine = jobs[i].results_count;
     }
 
-    /* round-robin: take one result from each engine in turn, so a single
-       source cannot bury better hits from the others */
     for (int j = 0; j < max_per_engine; j++) {
       for (int i = 0; i < enabled_engine_count; i++) {
         if (j >= jobs[i].results_count)
           continue;
 
-        char *display_url = all_results[i][j].url;
+        char *raw_url = all_results[i][j].url;
+        char *raw_title = all_results[i][j].title;
+        char *raw_snippet = all_results[i][j].snippet;
 
-        if (url_hash_contains(&url_table, display_url)) {
-          free(all_results[i][j].url);
-          free(all_results[i][j].title);
-          free(all_results[i][j].snippet);
+        if (!raw_url) {
+          free(raw_url);
+          free(raw_title);
+          free(raw_snippet);
           continue;
         }
 
-        url_hash_insert(&url_table, display_url);
+        char key[BUFFER_SIZE_LARGE];
+        normalize_url_key(raw_url, key, sizeof(key));
 
-        char *pretty_url = pretty_display_url(display_url);
-        char *base_url = get_base_url(display_url);
-        const char *values[RESULT_FIELD_COUNT] = {
-            display_url,
-            pretty_url,
-            all_results[i][j].title ? all_results[i][j].title : "Untitled",
-            all_results[i][j].snippet ? all_results[i][j].snippet : "",
-            base_url,
-            is_media_result(display_url) ? "media" : "",
-        };
-        int append_result =
-            string_matrix_append(&results_matrix, values, RESULT_FIELD_COUNT);
+        char cleaned[BUFFER_SIZE_LARGE];
+        clean_snippet(raw_snippet, cleaned, sizeof(cleaned));
 
-        free(pretty_url);
-        free(base_url);
-        free(all_results[i][j].url);
-        free(all_results[i][j].title);
-        free(all_results[i][j].snippet);
-        if (append_result != 0) {
+        double score = 1.0 / (RRF_K + (double)j);
+
+        int existing = -1;
+        for (int c = 0; c < cand_count; c++) {
+          if (strcmp(cands[c].key, key) == 0) {
+            existing = c;
+            break;
+          }
+        }
+
+        if (existing >= 0) {
+          cands[existing].score += score;
+          if (strlen(cleaned) > strlen(cands[existing].snippet)) {
+            free(cands[existing].snippet);
+            cands[existing].snippet = strdup(cleaned);
+          }
+          free(raw_url);
+          free(raw_title);
+          free(raw_snippet);
           continue;
         }
+
+        if (cand_count >= MAX_CANDIDATES) {
+          free(raw_url);
+          free(raw_title);
+          free(raw_snippet);
+          continue;
+        }
+
+        ResultCandidate *cand = &cands[cand_count];
+        cand->key = strdup(key);
+        cand->url = strdup(raw_url);
+        cand->title = strdup(raw_title ? raw_title : "Untitled");
+        cand->snippet = strdup(cleaned);
+        cand->score = score;
+        cand->order = cand_count;
+
+        if (cand->key && cand->url && cand->title && cand->snippet) {
+          cand_count++;
+        } else {
+          free(cand->key);
+          free(cand->url);
+          free(cand->title);
+          free(cand->snippet);
+        }
+
+        free(raw_url);
+        free(raw_title);
+        free(raw_snippet);
       }
     }
 
     for (int i = 0; i < enabled_engine_count; i++) {
       free(all_results[i]);
+    }
+
+    qsort(cands, cand_count, sizeof(ResultCandidate), candidate_cmp);
+
+    char host_seen[64][128];
+    int host_counts[64];
+    int host_total = 0;
+
+    for (int c = 0; c < cand_count; c++) {
+      char host[128];
+      extract_host(cands[c].url, host, sizeof(host));
+
+      int slot = -1;
+      for (int h = 0; h < host_total; h++) {
+        if (strcmp(host_seen[h], host) == 0) {
+          slot = h;
+          break;
+        }
+      }
+      if (slot < 0 && host_total < 64) {
+        slot = host_total++;
+        snprintf(host_seen[slot], sizeof(host_seen[slot]), "%s", host);
+        host_counts[slot] = 0;
+      }
+
+      if (slot >= 0 && host_counts[slot] >= MAX_PER_DOMAIN) {
+        free(cands[c].key);
+        free(cands[c].url);
+        free(cands[c].title);
+        free(cands[c].snippet);
+        continue;
+      }
+      if (slot >= 0)
+        host_counts[slot]++;
+
+      char *pretty_url = pretty_display_url(cands[c].url);
+      char *base_url = get_base_url(cands[c].url);
+      const char *values[RESULT_FIELD_COUNT] = {
+          cands[c].url,
+          pretty_url,
+          cands[c].title,
+          cands[c].snippet,
+          base_url,
+          is_media_result(cands[c].url) ? "media" : "",
+      };
+      string_matrix_append(&results_matrix, values, RESULT_FIELD_COUNT);
+
+      free(pretty_url);
+      free(base_url);
+      free(cands[c].key);
+      free(cands[c].url);
+      free(cands[c].title);
+      free(cands[c].snippet);
     }
 
     context_set_array_of_arrays(&ctx, "results", results_matrix.rows,
@@ -901,7 +1163,6 @@ int results_handler(UrlParams *params) {
 
     string_matrix_free(&pager_matrix);
     string_matrix_free(&results_matrix);
-    url_hash_free(&url_table);
   } else {
     char *html = render_template("results.html", &ctx);
     if (html) {

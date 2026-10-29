@@ -151,86 +151,31 @@ InfoBox fetch_wiki_data(char *api_url) {
   return info;
 }
 
-static xmlNode *find_node_recursive(xmlNode *node, const char *target_name) {
-  for (xmlNode *cur = node; cur; cur = cur->next) {
-    if (cur->type == XML_ELEMENT_NODE &&
-        strcmp((const char *)cur->name, target_name) == 0) {
-      return cur;
-    }
-    xmlNode *found = find_node_recursive(cur->children, target_name);
-    if (found)
-      return found;
-  }
-  return NULL;
-}
-
-static char *get_first_search_result(const char *search_term) {
-  char *escaped_term = curl_easy_escape(NULL, search_term, 0);
-  const char *search_base =
-      "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=";
-  const char *search_suffix = "&format=xml&origin=*&srlimit=1";
-
-  char *search_url = malloc(strlen(search_base) + strlen(escaped_term) +
-                            strlen(search_suffix) + 1);
-  if (!search_url) {
-    curl_free(escaped_term);
-    return NULL;
-  }
-
-  strcpy(search_url, search_base);
-  strcat(search_url, escaped_term);
-  strcat(search_url, search_suffix);
-
-  curl_free(escaped_term);
-
-  HttpResponse resp = http_get(search_url, "libcurl-agent/1.0");
-  free(search_url);
-
-  char *first_title = NULL;
-  if (resp.memory && resp.size > 0) {
-    xmlDocPtr doc =
-        xmlReadMemory(resp.memory, resp.size, "noname.xml", NULL, 0);
-    if (doc) {
-      xmlNode *root = xmlDocGetRootElement(doc);
-      xmlNode *search_node = find_node_recursive(root, "search");
-      if (search_node) {
-        for (xmlNode *sr = search_node->children; sr; sr = sr->next) {
-          if (sr->type == XML_ELEMENT_NODE &&
-              strcmp((const char *)sr->name, "p") == 0) {
-            xmlChar *title = xmlGetProp(sr, (const xmlChar *)"title");
-            if (title) {
-              first_title = strdup((const char *)title);
-              xmlFree(title);
-              break;
-            }
-          }
-        }
-      }
-      xmlFreeDoc(doc);
-    }
-  }
-
-  http_response_free(&resp);
-  return first_title;
-}
-
+/* One request instead of two: the search generator returns the best matching
+   article together with its intro extract and thumbnail. The old code did a
+   title lookup and then a second fetch for the extract. */
 char *construct_wiki_url(const char *search_term) {
-  char *first_title = get_first_search_result(search_term);
-  if (!first_title)
+  if (!search_term || search_term[0] == '\0')
     return NULL;
 
-  char *escaped_title = curl_easy_escape(NULL, first_title, 0);
-  const char *base = "https://en.wikipedia.org/w/"
-                     "api.php?action=query&prop=extracts|pageimages&exintro&"
-                     "explaintext&pithumbsize=400&format=xml&origin=*&titles=";
+  char *escaped_term = curl_easy_escape(NULL, search_term, 0);
+  if (!escaped_term)
+    return NULL;
 
-  char *full_url = malloc(strlen(base) + strlen(escaped_title) + 1);
+  const char *base =
+      "https://en.wikipedia.org/w/api.php?action=query&generator=search"
+      "&gsrnamespace=0&gsrlimit=1&gsrsearch=";
+  const char *suffix = "&prop=extracts|pageimages&exintro&explaintext"
+                       "&pithumbsize=400&format=xml&origin=*&redirects=1";
+
+  char *full_url =
+      malloc(strlen(base) + strlen(escaped_term) + strlen(suffix) + 1);
   if (full_url) {
     strcpy(full_url, base);
-    strcat(full_url, escaped_title);
+    strcat(full_url, escaped_term);
+    strcat(full_url, suffix);
   }
 
-  curl_free(escaped_title);
-  free(first_title);
+  curl_free(escaped_term);
   return full_url;
 }
