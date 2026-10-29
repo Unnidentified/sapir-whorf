@@ -166,6 +166,44 @@ char *get_base_url(const char *input) {
 
   return domain;
 }
+static int url_host_matches(const char *url, const char *host) {
+  if (!url || !host)
+    return 0;
+
+  const char *start = url;
+  const char *protocol_pos = strstr(url, "://");
+  if (protocol_pos)
+    start = protocol_pos + 3;
+
+  size_t host_len = strlen(host);
+  if (strncmp(start, host, host_len) == 0 &&
+      (start[host_len] == '/' || start[host_len] == '\0' ||
+       start[host_len] == '?' || start[host_len] == ':'))
+    return 1;
+
+  if (strncmp(start, "www.", 4) == 0 &&
+      strncmp(start + 4, host, host_len) == 0 &&
+      (start[4 + host_len] == '/' || start[4 + host_len] == '\0' ||
+       start[4 + host_len] == '?' || start[4 + host_len] == ':'))
+    return 1;
+
+  return 0;
+}
+
+static int is_media_result(const char *url) {
+  static const char *MEDIA_HOSTS[] = {"youtube.com",      "m.youtube.com",
+                                      "youtu.be",         "vimeo.com",
+                                      "dailymotion.com",  "twitch.tv",
+                                      "soundcloud.com",   "spotify.com",
+                                      "music.youtube.com"};
+
+  for (size_t i = 0; i < sizeof(MEDIA_HOSTS) / sizeof(MEDIA_HOSTS[0]); i++) {
+    if (url_host_matches(url, MEDIA_HOSTS[i]))
+      return 1;
+  }
+  return 0;
+}
+
 static int is_calculator_query(const char *query) {
   if (!query)
     return 0;
@@ -233,6 +271,31 @@ static InfoBoxHandler handlers[] = {
 };
 enum { HANDLER_COUNT = sizeof(handlers) / sizeof(handlers[0]) };
 
+static int infobox_text_is_meaningful(const char *text) {
+  if (!text)
+    return 0;
+
+  const char *start = text;
+  while (*start == ' ' || *start == '\t' || *start == '\n' || *start == '\r')
+    start++;
+
+  size_t len = strlen(start);
+  while (len > 0) {
+    char c = start[len - 1];
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
+      len--;
+    else
+      break;
+  }
+
+  /* Disambiguation stubs such as "Kirby may refer to:" carry no summary, so
+   * the infobox would render as an empty card. Require a real sentence. */
+  if (len < 60)
+    return 0;
+
+  return 1;
+}
+
 static void *infobox_thread_func(void *arg) {
   InfoBoxThreadData *data = (InfoBoxThreadData *)arg;
   int handler_idx = data->success;
@@ -246,8 +309,8 @@ static void *infobox_thread_func(void *arg) {
   }
 
   data->result = h->fetch_fn((char *)data->query);
-  data->success = (data->result.title != NULL && data->result.extract != NULL &&
-                   data->result.extract[0] != '\0');
+  data->success = (data->result.title != NULL &&
+                   infobox_text_is_meaningful(data->result.extract));
   return NULL;
 }
 
@@ -743,6 +806,9 @@ int results_handler(UrlParams *params) {
     total_results += jobs[i].results_count;
   }
 
+  /* let the template render an explicit empty state instead of a blank page */
+  context_set(&ctx, "results_state", total_results > 0 ? "ok" : "empty");
+
   if (total_results > 0) {
     StringMatrix results_matrix;
     string_matrix_init(&results_matrix);
@@ -770,7 +836,7 @@ int results_handler(UrlParams *params) {
             all_results[i][j].title ? all_results[i][j].title : "Untitled",
             all_results[i][j].snippet ? all_results[i][j].snippet : "",
             base_url,
-            "",
+            is_media_result(display_url) ? "media" : "",
         };
         int append_result =
             string_matrix_append(&results_matrix, values, RESULT_FIELD_COUNT);

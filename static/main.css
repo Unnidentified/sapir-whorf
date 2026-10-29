@@ -1,3 +1,7 @@
+:root {
+    --text-dim: #7d7d7b;
+}
+
 *, *::before, *::after {
     box-sizing: border-box;
     font-family: sans-serif;
@@ -100,17 +104,26 @@ img[src=""] {
 }
 .home-settings-btn {
     position:fixed;
-    top:27px;
-    inset-inline-end:60px;
-    width:24px;
-    height:24px;
-    background-color:var(--text-primary);
+    top:24px;
+    inset-inline-end:24px;
+    width:26px;
+    height:18px;
+    display:block;
+    background-color:var(--text-secondary);
     -webkit-mask-image:url('/static/settings.svg');
     mask-image:url('/static/settings.svg');
+    -webkit-mask-size:contain;
     mask-size:contain;
+    -webkit-mask-repeat:no-repeat;
     mask-repeat:no-repeat;
-    mask-position:center;
+    -webkit-mask-position:top right;
+    mask-position:top right;
+    transition:background-color .2s;
     text-decoration:none;
+}
+
+.home-settings-btn:hover {
+    background-color:var(--text-primary);
 }
 .home-footer {
     position: fixed;
@@ -130,15 +143,21 @@ img[src=""] {
     color: var(--text-primary);
 }
 .nav-settings-icon {
-    width:24px;
-    height:24px;
+    width:26px;
+    height:18px;
     flex-shrink:0;
     margin-inline-start:auto;
-    margin-top:3px;
+    align-self:flex-start;
+    display:block;
     background-color:var(--text-secondary);
     -webkit-mask-image:url('/static/settings.svg');
     mask-image:url('/static/settings.svg');
-    mask-size:100% 100%;
+    -webkit-mask-size:contain;
+    mask-size:contain;
+    -webkit-mask-repeat:no-repeat;
+    mask-repeat:no-repeat;
+    -webkit-mask-position:top right;
+    mask-position:top right;
     transition:background-color 0.2s;
     text-decoration:none;
 }
@@ -972,5 +991,527 @@ header .logo-link:hover {
 @media (max-width: 768px) {
     [dir="rtl"] header {
         flex-direction: column;
+    }
+}
+
+/* ============================================================
+   SymSearch base UI (default look for every theme).
+   Colour values live in static/themes/*.css only.
+   ============================================================ */
+
+/* mono — near-black, warm-amber monospace terminal look */
+
+
+
+/* monospace everywhere, square corners everywhere */
+*, *::before, *::after {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco,
+                 Consolas, "Liberation Mono", "Courier New", monospace;
+    border-radius: 0 !important;
+}
+
+body {
+    background-image: none;
+    background-color: var(--bg-main);
+}
+
+/* ---------- home ---------- */
+
+.view-home .hero-logo {
+    font-size: 3.6rem;
+    font-weight: 700;
+    letter-spacing: -1px;
+}
+
+.view-home .search-box {
+    box-shadow: none;
+    padding: 14px 16px;
+    font-size: 1rem;
+}
+
+.view-home button {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid transparent;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 8px 16px;
+}
+
+.view-home .btn-primary {
+    background: transparent;
+    color: var(--text-primary);
+}
+
+.view-home .btn-primary:hover {
+    filter: none;
+    transform: none;
+    background: transparent;
+    border-color: var(--text-secondary);
+}
+
+.view-home .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 8px 16px;
+}
+
+.view-home .btn-secondary:hover {
+    background: transparent;
+    border-color: var(--text-secondary);
+}
+
+/* ---------- header / nav ---------- */
+
+header {
+    background: var(--bg-main);
+    border-bottom: 1px solid var(--border);
+    padding-block: 24px;
+    padding-inline-end: 24px;
+}
+
+h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+}
+
+h1 span {
+    color: var(--accent);
+}
+
+.nav-tabs {
+    background: var(--bg-main);
+    border-bottom: 1px solid var(--border);
+}
+
+.nav-tabs a {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.nav-tabs a.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.search-form {
+    max-width: 640px;
+}
+
+.search-box {
+    padding: 9px 13px;
+    font-size: 0.78rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+}
+
+.search-box:focus {
+    border-color: var(--accent);
+    box-shadow: none;
+}
+
+/* ---------- results ---------- */
+
+.result {
+    margin-bottom: 28px;
+}
+
+.result .url {
+    display: block;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    margin-bottom: 3px;
+}
+
+.result-title-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.result-title-row > a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 1.12rem;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+}
+
+.result-title-row > a:hover {
+    text-decoration: underline;
+}
+
+.result .desc {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    line-height: 1.75;
+    margin: 3px 0 0 0;
+}
+
+/* ---------- infobox ---------- */
+
+.infobox {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+.infobox-header {
+    padding: 20px 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.infobox-title {
+    font-size: 1.15rem;
+    font-weight: 500;
+    letter-spacing: -0.3px;
+    color: var(--text-primary);
+}
+
+.infobox-summary {
+    font-size: 0.84rem;
+    line-height: 1.75;
+    color: var(--text-muted);
+}
+
+.read-more {
+    color: var(--accent);
+    font-weight: 500;
+    font-size: 0.8rem;
+}
+
+/* ---------- pagination ---------- */
+
+.pagination-btn {
+    background: transparent;
+}
+
+.pagination-current {
+    background: transparent;
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.pagination-current:hover {
+    background: transparent;
+}
+
+/* ---------- settings ---------- */
+
+.settings-section-title {
+    font-weight: 500;
+}
+
+.settings-select,
+.settings-engine-option {
+    background: transparent;
+}
+
+.settings-actions .btn-primary {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    font-weight: 500;
+}
+
+.settings-actions .btn-primary:hover {
+    filter: none;
+    transform: none;
+    border-color: var(--text-secondary);
+}
+
+.home-footer,
+.version-link {
+    color: var(--text-dim);
+}
+
+/* ---------- feed layout (single column feed + infobox rail) ---------- */
+
+.content-layout {
+    grid-template-columns: minmax(0, 1fr) 37%;
+    gap: 5.6%;
+    padding-inline: 16.6% 5.5%;
+    padding-block: 30px;
+}
+
+.sidebar-spacer {
+    display: none;
+}
+
+.content-layout .results-container {
+    grid-column: 1;
+}
+
+@media (max-width: 1100px) {
+    .content-layout {
+        grid-template-columns: minmax(0, 1fr);
+        padding-inline: 40px;
+    }
+    .content-layout .results-container {
+        grid-column: 1;
+    }
+}
+
+/* ---------- history page ---------- */
+
+.history-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.history-title {
+    font-size: 1.15rem;
+    font-weight: 500;
+    margin: 0;
+    letter-spacing: -0.2px;
+    color: var(--text-primary);
+}
+
+.history-clear {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    border-radius: 0;
+    touch-action: manipulation;
+}
+
+.history-clear:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.history-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.history-query {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.92rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.history-query:hover {
+    text-decoration: underline;
+}
+
+.history-time {
+    flex-shrink: 0;
+    color: var(--text-dim);
+    font-size: 0.76rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.history-empty {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    margin: 8px 0 0;
+}
+
+/* ================================================================
+   page grid — aligned container, results left, rail right
+   ================================================================ */
+
+:root {
+    --page-gutter: max(24px, 12vw);
+    --rail-width: 360px;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding-block: 20px;
+    padding-inline-start: var(--page-gutter);
+    padding-inline-end: 24px;
+}
+
+header .search-form {
+    flex: 1 1 auto;
+    max-width: 690px;
+    margin: 0;
+}
+
+header .search-box {
+    width: 100%;
+}
+
+.nav-tabs {
+    padding-inline: var(--page-gutter);
+}
+
+.content-layout {
+    grid-template-columns: minmax(0, 1fr) var(--rail-width);
+    gap: 64px;
+    padding-inline: var(--page-gutter);
+    padding-block: 26px 64px;
+    align-items: start;
+}
+
+.content-layout .results-container {
+    grid-column: 1;
+    max-width: 880px;
+}
+
+.content-layout .infobox-sidebar {
+    grid-column: 2;
+}
+
+@media (max-width: 1100px) {
+    .content-layout {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 32px;
+    }
+    .content-layout .results-container,
+    .content-layout .infobox-sidebar {
+        grid-column: 1;
+        max-width: none;
+    }
+}
+
+/* ================================================================
+   buttons — Search carries the same dim border as Surprise me
+   ================================================================ */
+
+.view-home .btn-primary {
+    border: 1px solid var(--border);
+}
+
+/* ================================================================
+   empty result set
+   ================================================================ */
+
+.no-results {
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.8;
+}
+
+.no-results p {
+    margin: 0 0 6px;
+}
+
+.no-results .no-results-query {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.no-results .no-results-hint {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+/* ================================================================
+   history page — title, timestamp, delete, auto-delete
+   ================================================================ */
+
+.history-tools {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.history-autodelete {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 6px 10px;
+    border-radius: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.history-autodelete:hover,
+.history-autodelete:focus {
+    border-color: var(--text-secondary);
+    outline: none;
+}
+
+.history-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 18px;
+}
+
+.history-delete {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.74rem;
+    padding: 3px 8px;
+    border-radius: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.history-delete:hover,
+.history-delete:focus {
+    color: var(--accent);
+    border-color: var(--border);
+    outline: none;
+}
+
+.history-off-note {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    margin: 14px 0 0;
+}
+
+.history-autodelete-label {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+}
+
+/* the header gear keeps a 24px inset from the top edge */
+.nav-settings-icon {
+    margin-block-start: 4px;
+}
+
+/* images page follows the same gutter as the rest of the grid */
+.image-results-container {
+    padding: 26px var(--page-gutter) 64px;
+}
+
+.image-grid {
+    max-width: none;
+    margin: 0;
+}
+
+/* when the rail stacks under the results, keep the results first */
+@media (max-width: 1100px) {
+    .content-layout .results-container,
+    .content-layout .infobox-sidebar {
+        order: 0;
     }
 }

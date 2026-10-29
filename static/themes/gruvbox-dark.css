@@ -1,0 +1,13 @@
+/* gruvbox-dark — palette imported from a terminal colour scheme */
+
+:root {
+    --bg-main: #282828;
+    --bg-card: #363532;
+    --border: #4f4c44;
+    --text-primary: #ebdbb2;
+    --text-secondary: #b4a98b;
+    --text-muted: #938a74;
+    --accent: #fabd2f;
+    --accent-glow: #fabd2f1a;
+    --text-dim: #807966;
+}

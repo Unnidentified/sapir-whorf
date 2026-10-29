@@ -7,6 +7,7 @@
     --text-muted: #757575;
     --accent: #202124;
     --accent-glow: rgba(0,0,0,0.05);
+    --text-dim: #8a8a8a;
 }
 @media (prefers-color-scheme: dark) {
     :root {
@@ -18,5 +19,6 @@
         --text-muted: #d1d1d1;
         --accent: #e2e2e2;
         --accent-glow: rgba(255,255,255,0.1);
+        --text-dim: #8a8a8a;
     }
 }

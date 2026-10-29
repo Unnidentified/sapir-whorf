@@ -1,0 +1,13 @@
+/* srcery — palette imported from a terminal colour scheme */
+
+:root {
+    --bg-main: #1c1b19;
+    --bg-card: #2c2925;
+    --border: #49443b;
+    --text-primary: #fce8c3;
+    --text-secondary: #bdaf93;
+    --text-muted: #978c77;
+    --accent: #fed06e;
+    --accent-glow: #fed06e1a;
+    --text-dim: #817766;
+}

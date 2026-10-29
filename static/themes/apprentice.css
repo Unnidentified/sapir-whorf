@@ -1,0 +1,13 @@
+/* apprentice — palette imported from a terminal colour scheme */
+
+:root {
+    --bg-main: #262626;
+    --bg-card: #303030;
+    --border: #444444;
+    --text-primary: #bcbcbc;
+    --text-secondary: #929292;
+    --text-muted: #787878;
+    --accent: #ffffaf;
+    --accent-glow: #ffffaf1a;
+    --text-dim: #6a6a6a;
+}

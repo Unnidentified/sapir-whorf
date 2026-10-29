@@ -5,21 +5,22 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
         <title>
-            OmniSearch
+            SymSearch
         </title>
         <link rel="stylesheet" href="static/main.css">
         <link rel="stylesheet" href="static/themes/{{theme}}.css">
+        <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="search" 
         type="application/opensearchdescription+xml" 
-        title="OmniSearch" href="/opensearch.xml">
+        title="SymSearch" href="/opensearch.xml">
     </head>
     
     <body>
         <div class="view-home">
             <div class="container">
                 <h1 class="hero-logo">
-                    Omni<span>Search</span>
+                    Sym<span>Search</span>
                 </h1>
                 <form action="/search" class="home-search-form">
                     <div class="search-input-wrapper">
@@ -30,14 +31,15 @@
                         <button type="submit" class="btn-primary">
                             {{l("search_button")}}
                         </button>
-                        <button type="submit" name="btnI" value="1" class="btn-secondary">
+                        <a href="https://cloudhiker.net/explore" target="_blank" rel="noopener noreferrer" class="btn-secondary">
                             {{l("surprise_me_button")}}
-                        </button>
+                        </a>
                     </div>
                 </form>
             </div>
         </div>
         <a href="/settings" class="home-settings-btn" title="{{l("settings_tab")}}"></a>
+        <script src="/static/autocomplete.js" defer></script>
         <footer class="home-footer">
             <a href="{{git_remote}}" class="version-link" target="_blank" rel="noopener noreferrer">{{version}}</a>
         </footer>

@@ -5,20 +5,21 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
         <title>
-            OmniSearch - {{query}}
+            SymSearch - {{query}}
         </title>
         <link rel="stylesheet" href="static/main.css">
         <link rel="stylesheet" href="static/themes/{{theme}}.css">
+        <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="search" 
         type="application/opensearchdescription+xml" 
-        title="OmniSearch" href="/opensearch.xml">
+        title="SymSearch" href="/opensearch.xml">
     </head>
     
     <body class="results-view">
         <header>
             <a href="/" class="logo-link"><h1>
-                Omni<span>Search</span>
+                Sym<span>Search</span>
             </h1></a>
             <form action="/search" method="GET" class="search-form">
                 <input name="engine" type="hidden" value="{{selected_engine}}">
@@ -44,53 +45,28 @@
             <aside class="sidebar-spacer">
             </aside>
             <main class="results-container">
-                {{if exists engine_filters}}
-                <nav class="engine-filter-list">
-                    {{for filter in engine_filters}}
-                    <a href="{{filter[0]}}" class="{{filter[2]}}">
-                        {{filter[1]}}
-                    </a>
-                    {{endfor}}
-                </nav>
-                {{endif}}
-
-                {{if exists engine_warnings}}
-                <section class="engine-warning-list">
-                    {{for warning in engine_warnings}}
-                    <article class="engine-warning">
-                        <strong class="engine-warning-title">
-                            {{warning[0]}}
-                        </strong>
-                        <p class="engine-warning-copy">
-                            {{warning[1]}}
-                        </p>
-                    </article>
-                    {{endfor}}
-                </section>
-                {{endif}}
-
                 {{for result in results}}
                 <div class="result">
-                    <div class="result-header">
-                        <div class="result-favicon"
-                            style="background-image: url('/proxy?url=https://{{result[4]}}/favicon.ico'), url('/proxy?url=https://{{result[4]}}/favicon.png');">
-                        </div>
-                        <span class="url">
-                            {{result[1]}}
-                        </span>
+                    <span class="url">
+                        {{result[1]}}
                     </span>
+                    <div class="result-title-row">
+                        <a href="{{result[0]}}">
+                            {{result[2]}}
+                        </a>
                     </div>
-                    <a href="{{result[0]}}">
-                        {{result[2]}}
-                    </a>
                     <p class="desc">
                         {{result[3]}}
                     </p>
-                    <span>
-                        <a class="cached" href="https://web.archive.org/web/{{result[0]|safe}}">{{l("view_cached")}}</a>
-                    </span>
                 </div>
                 {{endfor}}
+
+                {{if results_state == "empty"}}
+                <div class="no-results">
+                    <p>No results found for <span class="no-results-query">{{query}}</span>.</p>
+                    <p class="no-results-hint">The search engines may be busy — try again in a moment.</p>
+                </div>
+                {{endif}}
 
                 {{if exists pagination_links}}
                 <nav class="pagination">
@@ -128,6 +104,7 @@
                {{endif}}
             </aside>
         </div>
+        <script src="/static/autocomplete.js" defer></script>
     </body>
 
 </html>

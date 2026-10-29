@@ -5,8 +5,9 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
         <title>
-            OmniSearch Images - {{query}}
+            SymSearch Images - {{query}}
         </title>
+        <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
         <link rel="stylesheet" href="static/main.css">
         <link rel="stylesheet" href="static/themes/{{theme}}.css">
@@ -15,10 +16,10 @@
     <body class="images-view">
         <header>
             <a href="/" class="logo-link"><h1>
-                Omni<span>Search</span>
+                Sym<span>Search</span>
             </h1></a>
             <form action="/images" method="GET" class="search-form">
-                <input name="q" autocomplete="off"="text" class="search-box" placeholder="{{l("search_placeholder")}}"
+                <input name="q" type="text" autocomplete="off" class="search-box" placeholder="{{l("search_placeholder")}}"
                 value="{{query}}">
             </form>
             <a href="/settings?q={{query}}" class="nav-settings-icon" title="{{l("settings_tab")}}"></a>
@@ -74,6 +75,7 @@
             </nav>
             {{endif}}
         </main>
+        <script src="/static/autocomplete.js" defer></script>
     </body>
 
 </html>

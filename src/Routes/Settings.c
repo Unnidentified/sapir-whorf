@@ -36,7 +36,7 @@ int settings_handler(UrlParams *params) {
     }
   }
 
-  char *theme = get_theme("system");
+  char *theme = get_theme("");
   char *locale = get_locale(NULL);
 
   LocaleInfo locales[32];

@@ -14,10 +14,12 @@ VERSION := $(if $(GIT_TAG),$(GIT_TAG),$(GIT_DATE)+$(GIT_HASH)_$(GIT_BRANCH))
 CFLAGS  := -Wall -Wextra -O2 -Isrc -DVERSION='"$(VERSION)"' -DGIT_REMOTE='"$(GIT_REMOTE)"'
 
 ifeq ($(UNAME_S),Darwin)
+BREW_PREFIX := $(shell brew --prefix 2>/dev/null || echo /opt/homebrew)
+export PKG_CONFIG_PATH := $(BREW_PREFIX)/opt/openssl@3/lib/pkgconfig:$(BREW_PREFIX)/opt/curl/lib/pkgconfig:$(PKG_CONFIG_PATH)
 DEP_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(PKG_DEPS) 2>/dev/null)
 DEP_LIBS   := $(shell $(PKG_CONFIG) --libs $(PKG_DEPS) 2>/dev/null)
-CFLAGS  += $(DEP_CFLAGS)
-LIBS    := -lbeaker $(DEP_LIBS) -lpthread -lm
+CFLAGS  += -I$(BREW_PREFIX)/include $(DEP_CFLAGS)
+LIBS    := -L$(BREW_PREFIX)/lib -lbeaker $(DEP_LIBS) -lpthread -lm
 else
 CFLAGS  += -I/usr/include/libxml2
 LIBS    := -lbeaker -lcurl -lxml2 -lpthread -lm -lssl -lcrypto

@@ -115,7 +115,7 @@ char *get_theme(const char *default_theme) {
   }
   free(cookie);
   return strdup(default_theme && strlen(default_theme) > 0 ? default_theme
-                                                           : "system");
+                                                           : "amber");
 }
 
 char *get_locale(const char *default_locale) {

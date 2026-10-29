@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}">
+    
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+        <title>
+            SymSearch - History
+        </title>
+        <link rel="stylesheet" href="static/main.css">
+        <link rel="stylesheet" href="static/themes/{{theme}}.css">
+        <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+        <link rel="search" 
+        type="application/opensearchdescription+xml" 
+        title="SymSearch" href="/opensearch.xml">
+    </head>
+    
+    <body class="results-view">
+        <header>
+            <a href="/" class="logo-link"><h1>
+                Sym<span>Search</span>
+            </h1></a>
+            <form action="/search" method="GET" class="search-form">
+                <input name="q" type="text" class="search-box" autocomplete="off" placeholder="{{l("search_placeholder")}}"
+                value="{{query}}">
+            </form>
+            <a href="/settings?q={{query}}" class="nav-settings-icon" title="{{l("settings_tab")}}"></a>
+        </header>
+        <nav class="nav-tabs">
+            <div class="nav-container">
+                <a href="/">
+                    {{l("all_tab")}}
+                </a>
+                <a href="/images?q={{query}}">
+                    {{l("images_tab")}}
+                </a>
+            </div>
+        </nav>
+        <div class="content-layout">
+            <aside class="sidebar-spacer">
+            </aside>
+            <main class="results-container">
+                <div class="history-head">
+                    <h2 class="history-title">Search history</h2>
+                    <div class="history-tools">
+                        <label class="history-autodelete-label" for="history-autodelete">Auto-delete</label>
+                        <select id="history-autodelete" class="history-autodelete">
+                            <option value="0">Never</option>
+                            <option value="1">After 1 day</option>
+                            <option value="7">After 7 days</option>
+                            <option value="30">After 30 days</option>
+                        </select>
+                        <button type="button" id="history-clear" class="history-clear">Clear history</button>
+                    </div>
+                </div>
+                <p id="history-empty" class="history-empty" hidden>
+                    No searches recorded yet.
+                </p>
+                <ol id="history-list" class="history-list"></ol>
+            </main>
+        </div>
+        <script src="/static/autocomplete.js" defer></script>
+        <script src="/static/history.js" defer></script>
+    </body>
+
+</html>

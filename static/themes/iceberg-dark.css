@@ -1,0 +1,13 @@
+/* iceberg-dark — palette imported from a terminal colour scheme */
+
+:root {
+    --bg-main: #161821;
+    --bg-card: #22242d;
+    --border: #393b44;
+    --text-primary: #c6c8d1;
+    --text-secondary: #9597a0;
+    --text-muted: #777982;
+    --accent: #e9b189;
+    --accent-glow: #e9b1891a;
+    --text-dim: #656770;
+}

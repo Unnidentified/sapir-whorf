@@ -9,6 +9,7 @@
 #include "Config.h"
 #include "Infobox/Wikipedia.h"
 #include "Proxy/Proxy.h"
+#include "Routes/History.h"
 #include "Routes/Home.h"
 #include "Routes/ImageProxy.h"
 #include "Routes/Images.h"
@@ -141,6 +142,7 @@ int main() {
   set_handler("/proxy", image_proxy_handler);
   set_handler("/info", info_handler);
   set_handler("/settings", settings_handler);
+  set_handler("/history", history_handler);
   set_handler("/save_settings", settings_save_handler);
 
   fprintf(stderr, "[INFO] Starting Omnisearch on %s:%d\n", cfg.host, cfg.port);

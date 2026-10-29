@@ -1,0 +1,14 @@
+/* amber — warm-amber palette for the SymSearch UI */
+
+:root {
+    --bg-main: #0f0f0f;
+    --bg-card: #272a27;
+    --border: #333633;
+    --text-primary: #e6e3e0;
+    --text-secondary: #b0b0ad;
+    --text-muted: #8f8f8d;
+    --accent: #c99a75;
+    --accent-glow: rgba(201,154,117,0.10);
+    /* dimmer tone used for result URLs */
+    --text-dim: #7d7d7b;
+}

@@ -1,0 +1,13 @@
+/* noctis — palette imported from a terminal colour scheme */
+
+:root {
+    --bg-main: #03191b;
+    --bg-card: #0f2527;
+    --border: #263c3f;
+    --text-primary: #b2cacd;
+    --text-secondary: #81989b;
+    --text-muted: #637a7d;
+    --accent: #e69533;
+    --accent-glow: #e695331a;
+    --text-dim: #52696b;
+}

@@ -1,0 +1,13 @@
+/* jellybeans — palette imported from a terminal colour scheme */
+
+:root {
+    --bg-main: #121212;
+    --bg-card: #202020;
+    --border: #3b3b3b;
+    --text-primary: #dedede;
+    --text-secondary: #a5a5a5;
+    --text-muted: #828282;
+    --accent: #ffdca0;
+    --accent-glow: #ffdca01a;
+    --text-dim: #6e6e6e;
+}
