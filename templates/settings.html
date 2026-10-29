@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{__locale_id}}" dir="{{__locale_direction}}">
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}" class="title-{{title_font}}">
 
     <head>
         <meta charset="UTF-8">
@@ -19,7 +19,7 @@
     <body class="settings-view">
         <header>
             <a href="/" class="logo-link"><h1>
-                <span class="prompt">&gt;</span> sapir<span>-whorf</span>
+                <span class="prompt">&gt;</span> sapir<span class="tail">-whorf</span>
             </h1></a>
             {{if query != ""}}
             <form action="/search" method="GET" class="search-form">
@@ -61,6 +61,18 @@
                                 {{for t in themes}}
                                 <option value="{{t[0]}}" {{if theme == t[0]}}selected{{endif}}>{{t[1]}}</option>
                                 {{endfor}}
+                            </select>
+                        </div>
+                    </section>
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">Title font</h3>
+                        <p class="settings-section-desc">Typeface used for the &gt; sapir-whorf wordmark.</p>
+                        <div class="settings-field">
+                            <label class="settings-label" for="titlefont">Title font</label>
+                            <select id="titlefont" name="titlefont" class="settings-select">
+                                <option value="mono" {{if title_font == "mono"}}selected{{endif}}>Monospace</option>
+                                <option value="orbitron" {{if title_font == "orbitron"}}selected{{endif}}>Orbitron Light</option>
+                                <option value="blackout" {{if title_font == "blackout"}}selected{{endif}}>Blackout</option>
                             </select>
                         </div>
                     </section>

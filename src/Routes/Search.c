@@ -513,6 +513,7 @@ int results_handler(UrlParams *params) {
 
   char *theme = get_theme("");
   context_set(&ctx, "theme", theme);
+  context_set(&ctx, "title_font", get_title_font());
   free(theme);
 
   char *locale = get_locale(NULL);

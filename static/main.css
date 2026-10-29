@@ -841,11 +841,23 @@ header .logo-link:hover {
 }
 
 /* ============================================================ SymSearch base UI (default look for every theme). Colour values live in static/themes/*.css only. ============================================================ */ /* mono — near-black, warm-amber monospace terminal look */ /* monospace everywhere, square corners everywhere */ *, *::before, *::after {
-    font-family: "JetBrains Mono", "Fira Code", "Cascadia Mono", "Cascadia Code",
+    border-radius: 0 !important;
+}
+
+/* body copy inherits the font; form controls need it spelled out because
+   they do not inherit by default. Setting it on * instead would break the
+   wordmark: every nested span would get the body face, not the title face. */
+body {
+    font-family: "League Mono UltraLight", "LeagueMono-UltraLight", "League Mono",
+        "JetBrains Mono", "Fira Code", "Cascadia Mono", "Cascadia Code",
         "IBM Plex Mono", "Source Code Pro", "Hack", "Inconsolata",
         Menlo, Monaco, "DejaVu Sans Mono", Consolas, "Liberation Mono", monospace;
     font-variant-ligatures: none;
-    border-radius: 0 !important;
+}
+
+input, button, select, textarea {
+    font-family: inherit;
+    font-variant-ligatures: inherit;
 }
 
 body {
@@ -1308,10 +1320,12 @@ header .search-box {
     margin: 0;
 }
 
-/* when the rail stacks under the results, keep the results first */ @media (max-width: 1240px) {
+/* when the rail stacks under the results, keep the results first */
+@media (max-width: 1240px) {
     .content-layout .results-container,
     .content-layout .infobox-sidebar {
         order: 0;
+    }
 }
 
 /* ---------- keyboard focus ---------- */
@@ -1329,4 +1343,44 @@ input:focus-visible,
     outline: 2px solid var(--accent);
     outline-offset: 1px;
     box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ---------- wordmark typeface (Settings -> Title font) ---------- */
+
+h1 {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Mono", "Cascadia Code",
+        "IBM Plex Mono", "Source Code Pro", "Hack", "Inconsolata",
+        Menlo, Monaco, "DejaVu Sans Mono", Consolas, "Liberation Mono", monospace;
+}
+
+/* the second half is deliberately not the palette accent */
+.tail {
+    color: var(--text-muted);
+}
+
+html.title-orbitron h1,
+html.title-orbitron .view-home .hero-logo {
+    font-family: Orbitron, "Orbitron Light", sans-serif;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    font-size: 1.15rem;
+}
+
+/* the chevron stays a plain terminal glyph whatever the title face is */
+h1 .prompt {
+    font-family: "JetBrains Mono", "Fira Code", Menlo, Monaco, Consolas, monospace;
+    font-weight: 400;
+}
+
+html.title-blackout h1,
+html.title-blackout .view-home .hero-logo {
+    font-family: "Blackout Two AM", Blackout, "Two AM", sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    font-size: 1.2rem;
+}
+
+html.title-orbitron .view-home .hero-logo,
+html.title-blackout .view-home .hero-logo {
+    text-transform: lowercase;
 }

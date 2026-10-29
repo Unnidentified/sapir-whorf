@@ -15,6 +15,7 @@ int home_handler(UrlParams *params) {
 
   TemplateContext ctx = new_context();
   context_set(&ctx, "theme", theme);
+  context_set(&ctx, "title_font", get_title_font());
   context_set(&ctx, "version", VERSION);
   context_set(&ctx, "git_remote", GIT_REMOTE);
   beaker_set_locale(&ctx, locale);

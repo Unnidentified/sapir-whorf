@@ -108,6 +108,7 @@ int settings_handler(UrlParams *params) {
   beaker_set_locale(&ctx, locale);
   context_set(&ctx, "query", query);
   context_set(&ctx, "theme", theme);
+  context_set(&ctx, "title_font", get_title_font());
   context_set(&ctx, "locale", locale);
   context_set(&ctx, "default_engine", default_engine);
   context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count,

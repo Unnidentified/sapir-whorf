@@ -18,6 +18,7 @@ int history_handler(UrlParams *params) {
 
   TemplateContext ctx = new_context();
   context_set(&ctx, "theme", theme);
+  context_set(&ctx, "title_font", get_title_font());
   context_set(&ctx, "query", query);
   context_set(&ctx, "chrome_action", "/search");
   context_set(&ctx, "chrome_active", "");

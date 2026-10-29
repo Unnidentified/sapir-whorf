@@ -10,6 +10,7 @@ int settings_save_handler(UrlParams *params) {
   const char *theme = "";
   const char *locale = "";
   const char *query = "";
+  const char *title_font = "";
   const char *default_engine = "all";
   int default_engine_present = 0;
   int engines_present = 0;
@@ -22,6 +23,8 @@ int settings_save_handler(UrlParams *params) {
         theme = params->params[i].value;
       } else if (strcmp(params->params[i].key, "locale") == 0) {
         locale = params->params[i].value;
+      } else if (strcmp(params->params[i].key, "titlefont") == 0) {
+        title_font = params->params[i].value;
       } else if (strcmp(params->params[i].key, "q") == 0) {
         query = params->params[i].value;
       } else if (strcmp(params->params[i].key, "default_engine") == 0) {
@@ -46,6 +49,11 @@ int settings_save_handler(UrlParams *params) {
 
   if (strlen(theme) > 0) {
     set_cookie("theme", theme, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
+  }
+  if (strcmp(title_font, "mono") == 0 || strcmp(title_font, "orbitron") == 0 ||
+      strcmp(title_font, "blackout") == 0) {
+    set_cookie("titlefont", title_font, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
+               false, false);
   }
   if (strlen(locale) > 0) {
     set_cookie("locale", locale, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);

@@ -118,6 +118,21 @@ char *get_theme(const char *default_theme) {
                                                            : "amber");
 }
 
+const char *get_title_font(void) {
+  char *cookie = get_cookie("titlefont");
+  const char *value = "mono";
+
+  if (cookie) {
+    if (strcmp(cookie, "orbitron") == 0)
+      value = "orbitron";
+    else if (strcmp(cookie, "blackout") == 0)
+      value = "blackout";
+    free(cookie);
+  }
+
+  return value;
+}
+
 char *get_locale(const char *default_locale) {
   char *cookie = get_cookie("locale");
   if (cookie && beaker_get_locale_meta(cookie) != NULL) {

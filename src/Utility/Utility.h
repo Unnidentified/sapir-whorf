@@ -22,6 +22,7 @@ typedef struct {
 
 int hex_to_int(char c);
 char *get_theme(const char *default_theme);
+const char *get_title_font(void);
 void init_themes(const char *static_path);
 void get_available_themes(char ***out_themes, int *out_count);
 void set_default_locale(const char *locale);
