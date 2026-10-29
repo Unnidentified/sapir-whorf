@@ -856,7 +856,7 @@ body {
 }
 
 /* ---------- home ---------- */ .view-home .hero-logo {
-    font-size: 3.6rem;
+    font-size: clamp(2rem, 8vw, 3.6rem);
     font-weight: 700;
     letter-spacing: -1px;
 }

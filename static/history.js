@@ -1,4 +1,4 @@
-/* SymSearch — renders the /history page from locally stored search history. */
+/* Sapir-Whorf — renders the /history page from locally stored search history. */
 (function () {
   'use strict';
 

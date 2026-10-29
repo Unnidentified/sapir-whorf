@@ -1,4 +1,4 @@
-/* SymSearch — lightweight client-side autocomplete + search history.
+/* Sapir-Whorf — lightweight client-side autocomplete + search history.
  * No backend changes: suggestions come from locally stored search history.
  * Injects its own styles and a history on/off switch next to each search box. */
 (function () {
