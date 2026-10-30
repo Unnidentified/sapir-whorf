@@ -290,6 +290,9 @@ tests/test_canonical: tests/test_canonical.c src/Ranking/Ranker.c \
 canonical: tests/test_canonical
 	@./tests/test_canonical
 
+config-check:
+	@./tests/test_c15_config.sh
+
 # A3: offline relevance benchmark. Reranks a recorded replay file with the
 # production ranker - no network, no server, deterministic.
 tests/offline_rank: tests/offline_rank.c src/Ranking/Ranker.c \
@@ -322,6 +325,6 @@ eval:
 eval-strict:
 	@python3 tools/eval.py $(BASE) --strict
 
-check: check-themes registry-lint fixtures canonical smoke
+check: check-themes registry-lint fixtures canonical config-check smoke
 
-.PHONY: all run clean rebuild info check check-themes registry-lint fixtures canonical eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info check check-themes registry-lint fixtures canonical config-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

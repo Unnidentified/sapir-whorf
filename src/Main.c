@@ -109,7 +109,7 @@ int handle_opensearch(UrlParams *params) {
   return 0;
 }
 
-int main() {
+int main(int argc, char **argv) {
   sigset_t mask;
   sigemptyset(&mask);
   sigaddset(&mask, SIGPIPE);
@@ -123,8 +123,40 @@ int main() {
   Config cfg;
   config_set_defaults(&cfg);
 
-  if (load_config("config.ini", &cfg) != 0) {
-    fprintf(stderr, "[WARN] Could not load config file, using defaults\n");
+  /* --config PATH overrides the file, --check-config validates and exits */
+  const char *config_path = getenv("OMNISEARCH_CONFIG");
+  int check_only = 0;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
+      config_path = argv[++i];
+    } else if (strcmp(argv[i], "--check-config") == 0) {
+      check_only = 1;
+    }
+  }
+  if (!config_path || !config_path[0])
+    config_path = "config.ini";
+
+  int config_rc = load_config(config_path, &cfg);
+  if (config_rc != 0 && config_rc != 2) {
+    fprintf(stderr, "[WARN] Could not load %s, using defaults\n", config_path);
+  }
+
+  if (check_only) {
+    printf("config: %s\n", config_path);
+    printf("  host=%s port=%d locale=%s\n", cfg.host, cfg.port,
+           cfg.default_locale);
+    printf("  cache=%s ttl_search=%d ttl_infobox=%d ttl_image=%d\n",
+           cfg.cache_dir, cfg.cache_ttl_search, cfg.cache_ttl_infobox,
+           cfg.cache_ttl_image);
+    printf("  breaker_threshold=%d cooldown=%ds\n", cfg.breaker_threshold,
+           cfg.breaker_cooldown);
+    printf("  rate_limit: search=%d/%ds trusted_proxies=\"%s\"\n",
+           cfg.rate_limit_search_requests, cfg.rate_limit_search_interval,
+           cfg.trusted_proxies);
+    printf("  engines=\"%s\"\n", cfg.engines);
+    printf("config: %s\n",
+           config_rc == 0 ? "OK" : "loaded with warnings (see above)");
+    return config_rc == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
   set_default_locale(cfg.default_locale);

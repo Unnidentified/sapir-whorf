@@ -128,8 +128,12 @@ static int parse_boolean(const char *value, int *result) {
   return -1;
 }
 
-static void set_option(Config *config, const char *section, const char *key,
-                       const char *value) {
+/* Returns 0 when applied, -1 when the key is unknown, -2 when the value is
+   unusable. The old version returned nothing, so "breaker_threshold = 5"
+   written as "threshold = 5" silently did nothing whatever - the config lied
+   about itself and the operator had no way to know. */
+static int set_option(Config *config, const char *section, const char *key,
+                      const char *value, int line_no) {
   size_t option_count = sizeof(CONFIG_OPTIONS) / sizeof(CONFIG_OPTIONS[0]);
 
   for (size_t i = 0; i < option_count; i++) {
@@ -142,13 +146,41 @@ static void set_option(Config *config, const char *section, const char *key,
     void *destination = (char *)config + option->offset;
     if (option->type == CONFIG_STRING) {
       snprintf(destination, option->size, "%s", value);
-    } else if (option->type == CONFIG_INTEGER) {
-      parse_integer(value, destination);
-    } else {
-      parse_boolean(value, destination);
+      return 0;
     }
-    return;
+    if (option->type == CONFIG_INTEGER) {
+      if (parse_integer(value, destination) != 0) {
+        fprintf(stderr,
+                "[WARN] config.ini:%d [%s] %s = \"%s\" is not an integer; "
+                "keeping the default\n",
+                line_no, section, key, value);
+        return -2;
+      }
+      return 0;
+    }
+    if (parse_boolean(value, destination) != 0) {
+      fprintf(stderr,
+              "[WARN] config.ini:%d [%s] %s = \"%s\" is not a boolean; "
+              "keeping the default\n",
+              line_no, section, key, value);
+      return -2;
+    }
+    return 0;
   }
+
+  /* [ranking] is a known-dead section: say so once rather than pretending */
+  if (strcmp(section, "ranking") == 0) {
+    fprintf(stderr,
+            "[WARN] config.ini:%d section [ranking] is not read by anything; "
+            "ranking weights are compile-time constants in "
+            "src/Ranking/Ranker.c\n",
+            line_no);
+    return -1;
+  }
+
+  fprintf(stderr, "[WARN] config.ini:%d unknown key [%s] %s = \"%s\"\n",
+          line_no, section, key, value);
+  return -1;
 }
 
 int load_config(const char *filename, Config *config) {
@@ -163,8 +195,11 @@ int load_config(const char *filename, Config *config) {
 
   char line[1024];
   char section[64] = "";
+  int line_no = 0;
+  int unknown_or_bad = 0;
 
   while (fgets(line, sizeof(line), file)) {
+    line_no++;
     line[strcspn(line, "\r\n")] = '\0';
     char *content = trim(line);
 
@@ -189,10 +224,20 @@ int load_config(const char *filename, Config *config) {
     *delimiter = '\0';
     char *key = trim(content);
     char *value = unquote(trim(delimiter + 1));
-    set_option(config, section, key, value);
+    int rc = set_option(config, section, key, value, line_no);
+    if (rc < 0)
+      unknown_or_bad++;
   }
 
+  if (unknown_or_bad > 0)
+    fprintf(stderr,
+            "[WARN] config.ini: %d key(s) were rejected above; those settings "
+            "are NOT in effect\n",
+            unknown_or_bad);
+
   int result = ferror(file) ? -1 : 0;
+  if (unknown_or_bad > 0 && result == 0)
+    result = 2; /* loaded, but some settings are not in effect */
   fclose(file);
   return result;
 }
