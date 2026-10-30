@@ -65,4 +65,7 @@ int string_matrix_build_pagination(int page,
                                    char *(*href_builder)(int page, void *data),
                                    void *data, StringMatrix *out_matrix);
 
+int is_known_theme(const char *theme);
+int is_known_locale(const char *locale);
+
 #endif

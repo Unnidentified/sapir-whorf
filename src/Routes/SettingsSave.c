@@ -3,6 +3,7 @@
 #include "../Utility/Utility.h"
 #include <stdlib.h>
 #include <string.h>
+#include <curl/curl.h>
 
 #define MAX_ENGINE_IDS ENGINE_COUNT
 
@@ -61,7 +62,9 @@ int settings_save_handler(UrlParams *params) {
     }
   }
 
-  if (strlen(theme) > 0) {
+  /* validate against the real lists before writing: these values were stored
+     verbatim, so a crafted link could set an arbitrary theme/locale cookie. */
+  if (is_known_theme(theme)) {
     set_cookie("theme", theme, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
   }
   int have_custom = 1;
@@ -94,7 +97,7 @@ int settings_save_handler(UrlParams *params) {
     set_cookie("pagescale", page_scale, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
                false, false);
   }
-  if (strlen(locale) > 0) {
+  if (is_known_locale(locale)) {
     set_cookie("locale", locale, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
   }
 
@@ -135,8 +138,36 @@ int settings_save_handler(UrlParams *params) {
                "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
   }
 
-  char redirect_url[512];
-  snprintf(redirect_url, sizeof(redirect_url), "/settings?q=%s", query);
+  /* The decoded query went straight into Location. CR/LF in a header value is
+     response splitting, and unescaped characters break the redirect. Encode
+     everything, and drop any control character first. */
+  char safe_query[256];
+  size_t qlen = strlen(query);
+  if (qlen >= sizeof(safe_query))
+    qlen = sizeof(safe_query) - 1;
+  size_t qo = 0;
+  for (size_t i = 0; i < qlen; i++) {
+    unsigned char ch = (unsigned char)query[i];
+    if (ch < 0x20 || ch == 0x7F)
+      continue; /* strip CR, LF, NUL and friends */
+    safe_query[qo++] = (char)ch;
+  }
+  safe_query[qo] = '\0';
+
+  char encoded_query[768];
+  encoded_query[0] = '\0';
+  CURL *curl = curl_easy_init();
+  if (curl) {
+    char *esc = curl_easy_escape(curl, safe_query, 0);
+    if (esc) {
+      snprintf(encoded_query, sizeof(encoded_query), "%s", esc);
+      curl_free(esc);
+    }
+    curl_easy_cleanup(curl);
+  }
+
+  char redirect_url[1024];
+  snprintf(redirect_url, sizeof(redirect_url), "/settings?q=%s", encoded_query);
   send_redirect(redirect_url);
 
   return 0;

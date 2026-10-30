@@ -518,3 +518,27 @@ int string_matrix_build_pagination(int page,
   }
   return 0;
 }
+
+/* Allowlist checks used when a cookie is *written*. Reading already validated
+   the theme; writing did not, so this closed the gap in both directions. */
+int is_known_theme(const char *theme) {
+  if (!theme || !theme[0])
+    return 0;
+  for (int i = 0; i < themes_count; i++) {
+    if (strcmp(theme, themes_list[i]) == 0)
+      return 1;
+  }
+  return 0;
+}
+
+int is_known_locale(const char *locale) {
+  if (!locale || !locale[0])
+    return 0;
+  LocaleInfo locales[32];
+  int n = beaker_get_all_locales(locales, 32);
+  for (int i = 0; i < n; i++) {
+    if (strcmp(locale, locales[i].meta.id) == 0)
+      return 1;
+  }
+  return 0;
+}
