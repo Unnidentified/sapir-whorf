@@ -15,6 +15,7 @@ typedef enum {
 typedef struct {
   char raw[512];            /* exactly what the user typed              */
   char clean[512];          /* operators removed, whitespace collapsed  */
+  char engine_core[512];    /* clean minus opinion fillers, for the SERP */
   char terms[8][32];
   int term_count;
   char phrases[2][96];
@@ -30,6 +31,10 @@ typedef struct {
 } SearchQuery;
 
 void query_analyze(const char *raw, const char *locale, SearchQuery *out);
+
+/* "best", "cheap", "top" ... carry intent, not topic. Engines that treat them
+   as brands ("Best" hotels) return junk, so the SERP query drops them. */
+int query_is_opinion_modifier(const char *word);
 const char *query_intent_name(QueryIntent intent);
 
 /* Build the text handed to one engine. Engines that understand site: and

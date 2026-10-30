@@ -78,6 +78,8 @@ void configure_curl_handle(CURL *curl, const char *full_url,
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT,
                    timeout_secs > 0 ? timeout_secs : CURL_TIMEOUT_SECS);
+  /* a dead endpoint (silent TLS handshake) must not hold the batch */
+  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 700L);
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
   curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
 

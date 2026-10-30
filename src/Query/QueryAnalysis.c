@@ -196,6 +196,21 @@ static void detect_language(SearchQuery *query, const char *locale) {
            fallback_lang[0] ? fallback_lang : "en");
 }
 
+static const char *OPINION_MODIFIERS[] = {
+    "best", "top", "cheap", "cheapest", "affordable", "budget",
+    "good", "great", "recommended", "recommendation", "decent",
+    "reliable", "trusted", "ultimate", "perfect"};
+
+int query_is_opinion_modifier(const char *word) {
+  if (!word || !word[0])
+    return 0;
+  for (size_t i = 0; i < sizeof(OPINION_MODIFIERS) / sizeof(OPINION_MODIFIERS[0]);
+       i++)
+    if (strcasecmp(word, OPINION_MODIFIERS[i]) == 0)
+      return 1;
+  return 0;
+}
+
 void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
   memset(out, 0, sizeof(*out));
   if (!raw)
@@ -266,6 +281,34 @@ void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
   collapse_spaces(clean);
   snprintf(out->clean, sizeof(out->clean), "%s", clean);
 
+  /* Build the SERP query: drop opinion fillers when at least two topic words
+     remain, so "best podcast app" is searched as "podcast app". */
+  snprintf(out->engine_core, sizeof(out->engine_core), "%s", clean);
+  if (!out->has_operators && out->phrase_count == 0) {
+    char words[16][64];
+    int word_count = 0;
+    char work[512];
+    snprintf(work, sizeof(work), "%s", clean);
+    char *sp = NULL;
+    char *tok = strtok_r(work, " ", &sp);
+    while (tok && word_count < 16) {
+      snprintf(words[word_count++], sizeof(words[0]), "%s", tok);
+      tok = strtok_r(NULL, " ", &sp);
+    }
+    int kept = 0;
+    char rebuilt[512] = "";
+    for (int i = 0; i < word_count; i++) {
+      if (query_is_opinion_modifier(words[i]))
+        continue;
+      size_t used = strlen(rebuilt);
+      snprintf(rebuilt + used, sizeof(rebuilt) - used, "%s%s",
+               used ? " " : "", words[i]);
+      kept++;
+    }
+    if (kept >= 2 && kept < word_count)
+      snprintf(out->engine_core, sizeof(out->engine_core), "%s", rebuilt);
+  }
+
   char lower[512];
   lower_copy(lower, sizeof(lower), clean);
   char *saveptr = NULL;
@@ -312,7 +355,8 @@ void query_engine_text(const SearchQuery *query, int supports_site,
   if (!query)
     return;
 
-  snprintf(out, size, "%s", query->clean);
+  snprintf(out, size, "%s",
+           query->engine_core[0] ? query->engine_core : query->clean);
 
   if (supports_site && query->site[0]) {
     size_t used = strlen(out);

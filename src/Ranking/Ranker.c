@@ -16,6 +16,8 @@
 #define W_URL_QUALITY 0.04
 #define W_FRESHNESS 0.03
 #define W_SPAM 0.15
+#define W_REDDIT 0.22
+#define W_COVERAGE 0.65
 
 #define BM25_K1 1.2
 #define BM25_B 0.75
@@ -367,6 +369,30 @@ static double spam_penalty(const RankDoc *doc, const SearchQuery *query) {
   return penalty;
 }
 
+/* Reddit threads are often the best human answer, but only when the thread is
+   actually about the query. Require the query terms to appear in the title or
+   the thread URL. */
+static double reddit_relevance(const RankDoc *doc, const SearchQuery *query) {
+  if (!doc->domain[0] || strcmp(doc->domain, "reddit.com") != 0)
+    return 0.0;
+  if (query->term_count <= 0)
+    return 0.0;
+
+  int hits = 0;
+  for (int i = 0; i < query->term_count; i++) {
+    if (contains_ci(doc->title, query->terms[i]) ||
+        contains_ci(doc->url, query->terms[i]))
+      hits++;
+  }
+
+  double coverage = (double)hits / (double)query->term_count;
+  if (query->term_count == 1)
+    return coverage >= 1.0 ? 1.0 : 0.0;
+  if (query->term_count == 2)
+    return coverage >= 0.5 ? 1.0 : 0.0;
+  return coverage >= 0.66 ? 1.0 : 0.0;
+}
+
 static double url_quality(const RankDoc *doc) {
   double score = 0.0;
   if (strncasecmp(doc->url, "https://", 8) == 0)
@@ -466,10 +492,30 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
     double authority = rank_authority(doc->domain);
     double spam = spam_penalty(doc, query);
 
+    /* IDF-weighted coverage: a page that only matches the common word of the
+       query ("best hotels" for "best mechanical keyboard") must not win on
+       engine consensus or domain authority alone. */
+    double idf_sum = 0.0;
+    double idf_hit = 0.0;
+    for (int t = 0; t < query->term_count; t++) {
+      /* opinion fillers are not topical: they must not dilute coverage */
+      if (query_is_opinion_modifier(query->terms[t]))
+        continue;
+      double idf = log(1.0 + ((double)count - df[t] + 0.5) / (df[t] + 0.5));
+      idf_sum += idf;
+      if (count_token(title_tokens, title_n, query->terms[t]) > 0 ||
+          count_token(snippet_tokens, snippet_n, query->terms[t]) > 0 ||
+          count_token(url_tokens, url_n, query->terms[t]) > 0)
+        idf_hit += idf;
+    }
+    double coverage = idf_sum > 0.0 ? idf_hit / idf_sum : 1.0;
+
     doc->score = W_RRF * (doc->rrf / max_rrf) + W_BM25 * bm25 +
                  W_AUTHORITY * authority + W_PHRASE * phrase +
                  W_CONSENSUS * consensus + W_URL_QUALITY * url_quality(doc) +
-                 W_FRESHNESS * 0.5 - W_SPAM * spam;
+                 W_FRESHNESS * 0.5 - W_SPAM * spam +
+                 W_REDDIT * reddit_relevance(doc, query) -
+                 W_COVERAGE * (1.0 - coverage);
   }
 }
 

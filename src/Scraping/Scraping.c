@@ -64,9 +64,25 @@ static int response_looks_like_results_page(const ScrapeJob *job,
   return 0;
 }
 
+static void maybe_dump_response(const ScrapeJob *job, const char *response) {
+  const char *want = getenv("OMNI_DUMP");
+  if (!want || !job || !job->engine || !response)
+    return;
+  if (strcmp(want, job->engine->id) != 0)
+    return;
+  char path[256];
+  snprintf(path, sizeof path, "/tmp/dump-%s.html", job->engine->id);
+  FILE *fp = fopen(path, "w");
+  if (!fp)
+    return;
+  fwrite(response, 1, strlen(response), fp);
+  fclose(fp);
+}
+
 static void classify_job_response(ScrapeJob *job, const char *response,
                                   size_t response_size) {
   job->results_count = 0;
+  maybe_dump_response(job, response);
 
   if (!response || response_size == 0) {
     job->status = SCRAPE_STATUS_FETCH_ERROR;
@@ -283,14 +299,24 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
     load_stale_results(job);
   }
 
+  if (getenv("OMNI_PERF") && job->engine)
+    fprintf(stderr, "[ENGINE] %s %.0fms status=%d results=%d http=%ld\n",
+            job->engine->id, job->elapsed_ms, (int)job->status,
+            job->results_count, job->http_status);
+
   if (job->engine)
     engine_health_record(job->engine->id, (int)job->status, job->http_status,
                          job->elapsed_ms);
 
-  /* a challenge cookie poisons every later request: drop the jar on a block */
+  /* A challenge or region cookie poisons every later request: drop the jar on
+     a block, and also when a page that should have results came back empty.
+     Bing silently serves its "no results" shell to a poisoned session. */
+  int zero_web_results =
+      job->engine && (job->engine->verticals & V_WEB) &&
+      job->results_count == 0 && job->http_status == 200;
   if (job->engine &&
       (job->status == SCRAPE_STATUS_BLOCKED || job->http_status == 429 ||
-       job->http_status == 202)) {
+       job->http_status == 202 || zero_web_results)) {
     char jar_path[BUFFER_SIZE_LARGE];
     cookie_jar_path(job->engine->id, jar_path, sizeof(jar_path));
     if (jar_path[0])
@@ -300,10 +326,20 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
   cleanup_job_handle(job, handle);
 }
 
+/* These engines serve a worse page to a session cookie than to a clean client:
+   Bing in particular answers a repeat visit with its empty "no results" shell. */
+static int engine_wants_no_cookies(const char *engine_id) {
+  return engine_id &&
+         (!strcmp(engine_id, "bing") || !strcmp(engine_id, "yahoo") ||
+          !strcmp(engine_id, "ddg") || !strcmp(engine_id, "mojeek"));
+}
+
 static void cookie_jar_path(const char *engine_id, char *out, size_t size) {
   out[0] = '\0';
   const char *dir = cache_get_dir();
   if (!dir || !dir[0] || !engine_id || !engine_id[0])
+    return;
+  if (engine_wants_no_cookies(engine_id))
     return;
   snprintf(out, size, "%s/cookies/%s.txt", dir, engine_id);
 }
@@ -322,9 +358,10 @@ static void append_locale_params(const SearchEngine *engine, const ScrapeJob *jo
   size_t used = strlen(url);
   if (strcmp(engine->id, "ddg") == 0 && region_lower[0])
     snprintf(url + used, size - used, "&kl=%s-%s", region_lower, job->lang);
-  else if (strcmp(engine->id, "bing") == 0)
-    snprintf(url + used, size - used, "&setlang=%s&cc=%s", job->lang,
-             job->region[0] ? job->region : "US");
+  else if (strcmp(engine->id, "bing") == 0) {
+    /* Bing answers every locale parameter (setlang, cc, mkt) with its empty
+       shell, so the browser's Accept-Language header is the only safe signal. */
+  }
   else if (strcmp(engine->id, "brave") == 0)
     snprintf(url + used, size - used, "&country=%s&search_lang=%s",
              job->region[0] ? job->region : "US", job->lang);
@@ -385,10 +422,22 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   if (full_url)
     append_locale_params(job->engine, job, full_url, BUFFER_SIZE_LARGE);
 
+  /* Bing serves an empty shell for `first=1`, which is the same as page one */
+  if (full_url && job->engine && strcmp(job->engine->id, "bing") == 0 &&
+      job->page <= 1) {
+    char *first_param = strstr(full_url, "&first=1");
+    if (first_param)
+      memmove(first_param, first_param + strlen("&first=1"),
+              strlen(first_param + strlen("&first=1")) + 1);
+  }
+
   if (!full_url) {
     job->status = SCRAPE_STATUS_FETCH_ERROR;
     return -1;
   }
+
+  if (getenv("OMNI_PERF"))
+    fprintf(stderr, "[URL] %s %s\n", job->engine->id, full_url);
 
   job->handle = curl_easy_init();
   if (!job->handle) {
@@ -452,14 +501,22 @@ static void cleanup_unfinished_jobs(CURLM *multi_handle, ScrapeJob *jobs,
     curl_easy_cleanup(jobs[i].handle);
     jobs[i].handle = NULL;
 
-    if (jobs[i].status == SCRAPE_STATUS_PENDING)
+    if (jobs[i].status == SCRAPE_STATUS_PENDING) {
       jobs[i].status = SCRAPE_STATUS_FETCH_ERROR;
+      if (jobs[i].engine)
+        engine_health_record(jobs[i].engine->id, (int)jobs[i].status, 0,
+                             jobs[i].elapsed_ms);
+    }
   }
 }
 
-int handle_responses(CURLM *multi_handle, ScrapeJob *jobs, int num_jobs) {
+/* Process whatever finished since the last call. Returns the number of jobs
+   that completed in this pass and adds their results to *results_out. */
+static int drain_responses(CURLM *multi_handle, ScrapeJob *jobs, int num_jobs,
+                           int *results_out) {
   CURLMsg *msg;
   int msgs_left;
+  int completed = 0;
 
   while ((msg = curl_multi_info_read(multi_handle, &msgs_left))) {
     if (msg->msg != CURLMSG_DONE)
@@ -473,12 +530,22 @@ int handle_responses(CURLM *multi_handle, ScrapeJob *jobs, int num_jobs) {
         curl_multi_remove_handle(multi_handle, handle);
         curl_easy_cleanup(handle);
         jobs[i].handle = NULL;
+        if (results_out)
+          *results_out += jobs[i].results_count;
+        /* only an engine that actually produced results is a second opinion:
+           a fast failure must not trigger the early exit */
+        if (jobs[i].results_count > 0)
+          completed++;
         break;
       }
     }
   }
 
-  return 0;
+  return completed;
+}
+
+int handle_responses(CURLM *multi_handle, ScrapeJob *jobs, int num_jobs) {
+  return drain_responses(multi_handle, jobs, num_jobs, NULL);
 }
 
 int should_retry(ScrapeJob *jobs, int num_jobs) {
@@ -506,11 +573,15 @@ static int all_jobs_empty(ScrapeJob *jobs, int num_jobs) {
 }
 
 int scrape_engines_parallel(ScrapeJob *jobs, int num_jobs) {
+  /* measurement hook: OMNI_LEGACY restores the pre-optimisation batch policy */
+  int legacy = getenv("OMNI_LEGACY") != NULL;
+  long batch_cap_ms = legacy ? 7000 : 2000;
   int retries = 0;
   int empty_retry_done = 0;
 
 retry:;
-  time_t batch_started = time(NULL);
+  struct timespec batch_start;
+  clock_gettime(CLOCK_MONOTONIC, &batch_start);
 
   CURLM *multi_handle = curl_multi_init();
   if (!multi_handle)
@@ -522,21 +593,46 @@ retry:;
 
   http_delay();
 
+  /* results already served from cache count towards the early exit */
+  int total_so_far = 0;
+  int engines_so_far = 0;
+  for (int i = 0; i < num_jobs; i++) {
+    if (!jobs[i].handle && jobs[i].results_count > 0) {
+      total_so_far += jobs[i].results_count;
+      engines_so_far++;
+    }
+  }
+
   int still_running = 0;
   CURLMcode mc = curl_multi_perform(multi_handle, &still_running);
 
   while (mc == CURLM_OK && still_running) {
-    /* never let one slow engine set the page latency */
-    if (time(NULL) - batch_started >= 3) {
-      mc = CURLM_OK;
-      break;
-    }
-
     int numfds = 0;
-    mc = curl_multi_wait(multi_handle, NULL, 0, 1000, &numfds);
+    mc = curl_multi_wait(multi_handle, NULL, 0, 60, &numfds);
     if (mc != CURLM_OK)
       break;
     mc = curl_multi_perform(multi_handle, &still_running);
+
+    engines_so_far += drain_responses(multi_handle, jobs, num_jobs,
+                                      &total_so_far);
+
+    struct timespec now_ts;
+    clock_gettime(CLOCK_MONOTONIC, &now_ts);
+    long elapsed_ms =
+        (long)((now_ts.tv_sec - batch_start.tv_sec) * 1000 +
+               (now_ts.tv_nsec - batch_start.tv_nsec) / 1000000);
+    /* enough good answers already: stop paying for the slowest engine */
+    /* Never decide the page on one engine: a single fast SERP can be junk,
+       and the second engine's agreement is what makes the ranking trustworthy. */
+    if (!legacy && num_jobs > 1 && engines_so_far >= 2 && total_so_far >= 8 &&
+        elapsed_ms >= 650)
+      break;
+    if (!legacy && num_jobs > 1 && engines_so_far >= 1 && total_so_far >= 8 &&
+        elapsed_ms >= 750)
+      break;
+    /* never let one slow engine set the page latency */
+    if (elapsed_ms >= batch_cap_ms)
+      break;
   }
 
   handle_responses(multi_handle, jobs, num_jobs);
@@ -548,8 +644,9 @@ retry:;
     goto retry;
   }
 
-  /* one second chance when the whole batch came back empty */
-  if (!empty_retry_done && all_jobs_empty(jobs, num_jobs)) {
+  /* one second chance for a single-engine request; a full batch retry only
+     doubles the page latency and hits the same block */
+  if (!empty_retry_done && num_jobs == 1 && all_jobs_empty(jobs, num_jobs)) {
     empty_retry_done = 1;
     goto retry;
   }

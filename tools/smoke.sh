@@ -52,10 +52,10 @@ expect_body   "/images?q=cat" 'image-grid' "images grid renders"
 # branding: every page must carry the sp-engine tab title
 for path in / /history /settings; do
   body_for "$path"
-  if printf '%s' "$BODY" | tr -d '\n' | grep -q '<title>[[:space:]]*sp-engine'; then
-    ok "tab title sp-engine on $path"
+  if printf '%s' "$BODY" | tr -d '\n' | grep -q '<title>[[:space:]]*sw'; then
+    ok "tab title sw on $path"
   else
-    bad "tab title sp-engine on $path"
+    bad "tab title sw on $path"
   fi
 done
 

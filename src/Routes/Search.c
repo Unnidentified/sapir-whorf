@@ -136,6 +136,7 @@ static int url_host_matches(const char *url, const char *host) {
 
 #define MAX_CANDIDATES 128
 #define MAX_PER_DOMAIN 3
+#define MIN_WEB_ENGINES 3
 #define RRF_K 60.0
 
 typedef RankDoc ResultCandidate;
@@ -738,6 +739,8 @@ static char *build_search_request_cache_key(const char *query,
 
 int results_handler(UrlParams *params) {
   extern Config global_config;
+  struct timespec perf_start, perf_engines, perf_infobox, perf_done;
+  clock_gettime(CLOCK_MONOTONIC, &perf_start);
   TemplateContext ctx = new_context();
   char *raw_query = "";
   char selected_engine_id[32];
@@ -837,6 +840,11 @@ int results_handler(UrlParams *params) {
     eligible[eligible_count++] = &ENGINE_REGISTRY[i];
   }
 
+  const SearchEngine *eligible_all[ENGINE_COUNT];
+  int eligible_all_count = eligible_count;
+  for (int i = 0; i < eligible_count; i++)
+    eligible_all[i] = eligible[i];
+
   /* skip engines whose breaker is open, but never leave the page without one */
   if (eligible_count > 0) {
     int healthy[ENGINE_COUNT];
@@ -852,6 +860,33 @@ int results_handler(UrlParams *params) {
         if (healthy[i])
           eligible[kept++] = eligible[i];
       eligible_count = kept;
+    }
+
+    /* Keep a floor of three web engines. A breaker that took out every general
+       engine used to leave the page ranked on academic APIs alone. */
+    int web_count = 0;
+    for (int i = 0; i < eligible_count; i++)
+      if (eligible[i]->verticals & V_WEB)
+        web_count++;
+    for (int want = MIN_WEB_ENGINES; web_count < want; ) {
+      const SearchEngine *best = NULL;
+      for (int i = 0; i < eligible_all_count; i++) {
+        const SearchEngine *e = eligible_all[i];
+        if (!(e->verticals & V_WEB))
+          continue;
+        int already = 0;
+        for (int j = 0; j < eligible_count; j++)
+          if (eligible[j] == e)
+            already = 1;
+        if (already)
+          continue;
+        if (!best || e->weight > best->weight)
+          best = e;
+      }
+      if (!best || eligible_count >= ENGINE_COUNT)
+        break;
+      eligible[eligible_count++] = best;
+      web_count++;
     }
   }
   int enabled_engine_count = eligible_count;
@@ -899,12 +934,18 @@ int results_handler(UrlParams *params) {
       break;
     }
 
+    /* A site: query is a web query restricted to one host: vertical APIs
+       cannot honour it, and neither can engines that drop the operator. */
+    int site_locked = analysis.site[0] != '\0';
+
     for (int pass = 0; pass < 2 && routed_count < max_engines; pass++) {
       for (int i = 0; i < eligible_count && routed_count < max_engines; i++) {
         int verticals = eligible[i]->verticals;
         if (pass == 0 && (verticals & want) == 0)
           continue;
         if (pass == 1 && (verticals & V_WEB) == 0)
+          continue;
+        if (site_locked && (!(verticals & V_WEB) || !eligible[i]->supports_site))
           continue;
         int duplicate = 0;
         for (int k = 0; k < routed_count; k++) {
@@ -934,6 +975,13 @@ int results_handler(UrlParams *params) {
       for (int i = 0; i < routed_count; i++)
         eligible[i] = routed[i];
       eligible_count = routed_count;
+    }
+
+    if (getenv("OMNI_PERF")) {
+      fprintf(stderr, "[ROUTE] intent=%s engines=", query_intent_name(analysis.intent));
+      for (int i = 0; i < eligible_count; i++)
+        fprintf(stderr, "%s%s", i ? "," : "", eligible[i]->id);
+      fprintf(stderr, "\n");
     }
   }
 
@@ -1045,12 +1093,14 @@ int results_handler(UrlParams *params) {
   if (engine_idx > 0) {
     scrape_engines_parallel(jobs, engine_idx);
   }
+  clock_gettime(CLOCK_MONOTONIC, &perf_engines);
 
   if (page == 1) {
     for (int i = 0; i < HANDLER_COUNT; i++) {
       pthread_join(infobox_threads[i], NULL);
     }
   }
+  clock_gettime(CLOCK_MONOTONIC, &perf_infobox);
 
 
   if (btnI) {
@@ -1366,6 +1416,18 @@ int results_handler(UrlParams *params) {
       context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix.rows,
                                   pager_matrix.count,
                                   pager_matrix.field_counts);
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &perf_done);
+    if (getenv("OMNI_PERF")) {
+      double to_eng = (perf_engines.tv_sec - perf_start.tv_sec) * 1e3 +
+                      (perf_engines.tv_nsec - perf_start.tv_nsec) / 1e6;
+      double to_box = (perf_infobox.tv_sec - perf_engines.tv_sec) * 1e3 +
+                      (perf_infobox.tv_nsec - perf_engines.tv_nsec) / 1e6;
+      double to_render = (perf_done.tv_sec - perf_infobox.tv_sec) * 1e3 +
+                         (perf_done.tv_nsec - perf_infobox.tv_nsec) / 1e6;
+      fprintf(stderr, "[PERF] engines=%.0fms infobox=%.0fms fusion=%.0fms\n",
+              to_eng, to_box, to_render);
     }
 
     context_set(&ctx, "results_state",
