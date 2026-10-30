@@ -49,6 +49,7 @@ static const ConfigOption CONFIG_OPTIONS[] = {
     STRING_OPTION("engines", "google_cse_cx", google_cse_cx),
     STRING_OPTION("engines", "searxng_url", searxng_url),
     STRING_OPTION("engines", "searxng_engines", searxng_engines),
+    STRING_OPTION("rate_limit", "trusted_proxies", trusted_proxies),
     INTEGER_OPTION("rate_limit", "search_requests", rate_limit_search_requests),
     INTEGER_OPTION("rate_limit", "search_interval", rate_limit_search_interval),
     INTEGER_OPTION("rate_limit", "images_requests", rate_limit_images_requests),

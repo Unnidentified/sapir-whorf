@@ -14,6 +14,9 @@ typedef struct {
 } RateLimitResult;
 
 void rate_limit_get_client_key(char *client_key, size_t client_key_size);
+
+/* addresses whose X-Forwarded-For may be believed; empty = trust nobody */
+void rate_limit_set_trusted_proxies(const char *list);
 RateLimitResult rate_limit_check(const char *scope,
                                  const RateLimitConfig *config);
 

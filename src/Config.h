@@ -54,6 +54,7 @@ typedef struct {
   char google_cse_cx[128];
   char searxng_url[256];
   char searxng_engines[128];
+  char trusted_proxies[512];
   int rate_limit_search_requests;
   int rate_limit_search_interval;
   int rate_limit_images_requests;

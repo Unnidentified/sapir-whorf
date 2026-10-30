@@ -104,16 +104,69 @@ static void get_client_key_from_socket(char *client_key,
   }
 }
 
+/* X-Forwarded-For is only meaningful when the request actually came from a
+   proxy we trust. Trusting it unconditionally let any client pick its own
+   limiter bucket - and, because the client key is part of the request-cache
+   and seen-URL cache keys, it also multiplied cache files without bound. */
+static char trusted_proxies[512];
+static pthread_mutex_t trusted_proxies_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void rate_limit_set_trusted_proxies(const char *list) {
+  pthread_mutex_lock(&trusted_proxies_mutex);
+  if (!list)
+    trusted_proxies[0] = '\0';
+  else
+    snprintf(trusted_proxies, sizeof(trusted_proxies), "%s", list);
+  pthread_mutex_unlock(&trusted_proxies_mutex);
+}
+
+/* comma-separated exact addresses, "loopback" and "lan" shorthands */
+static int peer_is_trusted(const char *peer) {
+  char list[512];
+  pthread_mutex_lock(&trusted_proxies_mutex);
+  snprintf(list, sizeof(list), "%s", trusted_proxies);
+  pthread_mutex_unlock(&trusted_proxies_mutex);
+
+  if (!list[0])
+    return 0;
+
+  if (strcmp(peer, "127.0.0.1") == 0 || strcmp(peer, "::1") == 0) {
+    if (strstr(list, "loopback"))
+      return 1;
+  }
+  if (strncmp(peer, "10.", 3) == 0 || strncmp(peer, "192.168.", 8) == 0) {
+    if (strstr(list, "lan"))
+      return 1;
+  }
+
+  const char *p = list;
+  while (*p) {
+    while (*p == ' ' || *p == ',')
+      p++;
+    const char *end = p;
+    while (*end && *end != ',' && *end != ' ')
+      end++;
+    size_t len = (size_t)(end - p);
+    if (len > 0 && len == strlen(peer) && strncmp(p, peer, len) == 0)
+      return 1;
+    p = end;
+  }
+  return 0;
+}
+
 void rate_limit_get_client_key(char *client_key, size_t client_key_size) {
   if (!client_key || client_key_size == 0)
     return;
 
-  client_key[0] = '\0';
-  get_client_key(client_key, client_key_size);
+  char peer[64] = {0};
+  get_client_key_from_socket(peer, sizeof(peer));
 
-  if (client_key[0] == '\0') {
-    get_client_key_from_socket(client_key, client_key_size);
-  }
+  client_key[0] = '\0';
+  if (peer_is_trusted(peer))
+    get_client_key(client_key, client_key_size);
+
+  if (client_key[0] == '\0' && peer[0] != '\0')
+    snprintf(client_key, client_key_size, "%s", peer);
 
   if (client_key[0] == '\0') {
     snprintf(client_key, client_key_size, "nun");

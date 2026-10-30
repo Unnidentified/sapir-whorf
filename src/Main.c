@@ -19,6 +19,7 @@
 #include "Routes/Images.h"
 #include "Routes/Info.h"
 #include "Routes/Search.h"
+#include "Limiter/RateLimit.h"
 #include "Routes/Settings.h"
 #include "Routes/SettingsSave.h"
 #include "Ranking/Ranker.h"
@@ -205,6 +206,9 @@ int main() {
     fprintf(stderr, "[INFO] Using %d proxies from %s\n", proxy_count,
             cfg.proxy_list_file);
   }
+
+  /* C6: only a proxy we name may set X-Forwarded-For */
+  rate_limit_set_trusted_proxies(cfg.trusted_proxies);
 
   set_handler("/", home_handler);
   set_handler("/opensearch.xml", handle_opensearch);
