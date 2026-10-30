@@ -27,9 +27,21 @@ static int append_json(char *buf, size_t size, size_t *used, const char *format,
   return 0;
 }
 
+/* /info lists engine internals. It is useful on loopback and revealing on a
+   LAN, so the detail is only served to the local host (unless the operator has
+   bound to another address deliberately, in which case they get health state
+   without the git remote). */
+static int caller_is_loopback(void) {
+  const char *addr = beaker_get_remote_addr();
+  if (!addr)
+    return 0;
+  return strncmp(addr, "127.", 4) == 0 || strcmp(addr, "::1") == 0;
+}
+
 int info_handler(UrlParams *params) {
   (void)params;
   extern Config global_config;
+  int local = caller_is_loopback();
 
   char json[INITIAL_BUFFER_SIZE];
   size_t used = 0;
@@ -37,7 +49,7 @@ int info_handler(UrlParams *params) {
   if (append_json(json, sizeof(json), &used, "{\"version\":\"%s\",", VERSION) !=
           0 ||
       append_json(json, sizeof(json), &used, "\"git_remote\":\"%s\",",
-                  GIT_REMOTE) != 0 ||
+                  local ? GIT_REMOTE : "") != 0 ||
       append_json(json, sizeof(json), &used, "\"locale\":\"%s\",",
                   global_config.default_locale) != 0 ||
       append_json(json, sizeof(json), &used, "\"engines\":[") != 0) {

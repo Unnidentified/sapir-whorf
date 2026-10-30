@@ -74,6 +74,10 @@ void config_set_defaults(Config *config) {
       .cache_ttl_image = DEFAULT_CACHE_TTL_IMAGE,
       .breaker_threshold = DEFAULT_BREAKER_THRESHOLD,
       .breaker_cooldown = DEFAULT_BREAKER_COOLDOWN,
+      .rate_limit_search_requests = DEFAULT_RATE_LIMIT_SEARCH_REQUESTS,
+      .rate_limit_search_interval = DEFAULT_RATE_LIMIT_SEARCH_INTERVAL,
+      .rate_limit_images_requests = DEFAULT_RATE_LIMIT_IMAGES_REQUESTS,
+      .rate_limit_images_interval = DEFAULT_RATE_LIMIT_IMAGES_INTERVAL,
   };
 }
 

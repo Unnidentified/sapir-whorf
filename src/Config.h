@@ -1,13 +1,24 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define DEFAULT_HOST "0.0.0.0"
+/* Bind to loopback by default. The one scarce resource this app spends is the
+   host's egress reputation: one noisy LAN client gets every engine blocked and
+   then breaker-banned for hours. LAN exposure is now an explicit choice. */
+#define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 5000
 #define DEFAULT_CACHE_DIR "/tmp/omnisearch_cache"
 #define DEFAULT_CACHE_TTL_SEARCH 3600
 #define DEFAULT_CACHE_TTL_INFOBOX 86400
 #define DEFAULT_CACHE_TTL_IMAGE 604800
 #define DEFAULT_MAX_PROXY_RETRIES 3
+/* A modest inbound limit by default. One runaway client (a reload loop, a
+   scraper on the LAN) can otherwise get every upstream engine to block this
+   host, and the breakers then persist that for hours. */
+#define DEFAULT_RATE_LIMIT_SEARCH_REQUESTS 120
+#define DEFAULT_RATE_LIMIT_SEARCH_INTERVAL 60
+#define DEFAULT_RATE_LIMIT_IMAGES_REQUESTS 60
+#define DEFAULT_RATE_LIMIT_IMAGES_INTERVAL 60
+
 #define DEFAULT_BREAKER_THRESHOLD 5
 #define DEFAULT_BREAKER_COOLDOWN 900
 #define DEFAULT_YACY_INSTANCE "http://127.0.0.1:8090"
