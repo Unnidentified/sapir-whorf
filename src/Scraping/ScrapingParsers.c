@@ -515,7 +515,7 @@ SearchEngine ENGINE_REGISTRY[] = {
      .parser = parse_brave,
      .enabled = 1,
      .timeout_secs = 5,
-     .supports_site = 0, .verticals = V_WEB, .weight = 1.0},
+     .supports_site = 1, .verticals = V_WEB, .weight = 1.15},
 
     {.id = "openalex",
      .name = "OpenAlex",

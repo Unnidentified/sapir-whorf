@@ -2,6 +2,11 @@
 
 A modern lightweight metasearch engine with a clean design written in C.
 
+## Architecture handoff
+For how the engine is put together — request pipeline, engine registry, ranking
+signals, caching, breaker behaviour, and a list of known sharp edges — see
+[docs/SETUP.md](docs/SETUP.md).
+
 ## Disclaimer
 I request that none of this code, in part or in full, be hosted on GitHub, SourceForge, or any other proprietary platform. This request is made out of respect for both me, the developer and for you, the user.
 
