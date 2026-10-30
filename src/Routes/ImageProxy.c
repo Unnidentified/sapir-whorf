@@ -78,7 +78,7 @@ static int dns_cache_lookup(const char *hostname, char *out_ip) {
   for (DnsCacheEntry *e = dns_cache; e; e = e->next) {
     if (strcmp(e->hostname, hostname) == 0) {
       if ((now - e->resolved_at) < DNS_CACHE_TTL) {
-        strcpy(out_ip, e->ip_str);
+        snprintf(out_ip, INET6_ADDRSTRLEN, "%s", e->ip_str);
         pthread_mutex_unlock(&dns_cache_mutex);
         return 0;
       }
@@ -102,7 +102,7 @@ static void dns_cache_insert(const char *hostname, const char *ip_str) {
       continue;
     }
     if (strcmp(entry->hostname, hostname) == 0) {
-      strcpy(entry->ip_str, ip_str);
+      snprintf(entry->ip_str, sizeof(entry->ip_str), "%s", ip_str);
       entry->resolved_at = now;
       pthread_mutex_unlock(&dns_cache_mutex);
       return;
@@ -114,7 +114,7 @@ static void dns_cache_insert(const char *hostname, const char *ip_str) {
   if (new_entry) {
     strncpy(new_entry->hostname, hostname, sizeof(new_entry->hostname) - 1);
     new_entry->hostname[sizeof(new_entry->hostname) - 1] = '\0';
-    strcpy(new_entry->ip_str, ip_str);
+    snprintf(new_entry->ip_str, sizeof(new_entry->ip_str), "%s", ip_str);
     new_entry->resolved_at = now;
     new_entry->next = dns_cache;
     dns_cache = new_entry;
@@ -349,7 +349,7 @@ static char *url_encode_key(const char *url) {
   EVP_MD_CTX_free(ctx);
 
   for (int i = 0; i < 16; i++) {
-    sprintf(hash + (i * 2), "%02x", md5hash[i]);
+    snprintf(hash + (i * 2), 3, "%02x", md5hash[i]);
   }
   hash[32] = '\0';
 
@@ -396,7 +396,7 @@ static void proxy_hmac_hex(const char *url, char *out, size_t out_size) {
   if (out_size < n * 2 + 1)
     return;
   for (size_t i = 0; i < n; i++)
-    sprintf(out + (i * 2), "%02x", mac[i]);
+    snprintf(out + (i * 2), 3, "%02x", mac[i]);
   out[n * 2] = '\0';
 }
 

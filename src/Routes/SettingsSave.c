@@ -79,9 +79,11 @@ int settings_save_handler(UrlParams *params) {
       const char *hex = custom[c][0] == '#' ? custom[c] + 1 : custom[c];
       if (strlen(hex) != 6)
         continue;
-      if (c > 0)
-        strcat(palette, "-");
-      strcat(palette, hex);
+      size_t used = strlen(palette);
+      if (c > 0 && used + 1 < sizeof(palette))
+        palette[used++] = '-', palette[used] = '\0';
+      if (used + strlen(hex) < sizeof(palette))
+        memcpy(palette + used, hex, strlen(hex) + 1);
     }
     if (strlen(palette) == 8 * 6 + 7)
       set_cookie("customtheme", palette, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
@@ -105,9 +107,12 @@ int settings_save_handler(UrlParams *params) {
     char cookie_value[512];
     cookie_value[0] = '\0';
     for (int i = 0; i < selected_count; i++) {
-      if (i > 0)
-        strcat(cookie_value, ",");
-      strcat(cookie_value, selected_ids[i]);
+      size_t used = strlen(cookie_value);
+      if (i > 0 && used + 1 < sizeof(cookie_value))
+        cookie_value[used++] = ',', cookie_value[used] = '\0';
+      if (used + strlen(selected_ids[i]) < sizeof(cookie_value))
+        memcpy(cookie_value + used, selected_ids[i],
+               strlen(selected_ids[i]) + 1);
     }
     set_cookie("engines", cookie_value, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
                false, false);

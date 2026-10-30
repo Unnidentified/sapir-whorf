@@ -1455,7 +1455,7 @@ int results_handler(UrlParams *params) {
         if (existing >= 0) {
           cands[existing].score += score;
           cands[existing].rrf += score;
-          cands[existing].engine_mask |= (1 << i);
+          cands[existing].engine_mask |= (1u << i);
           if (i < 32) {
             cands[existing].engine_groups[i] =
                 jobs[i].engine ? jobs[i].engine->index_group : NULL;
@@ -1485,7 +1485,7 @@ int results_handler(UrlParams *params) {
         cand->snippet = strdup(cleaned);
         cand->score = score;
         cand->rrf = score;
-        cand->engine_mask = (1 << i);
+        cand->engine_mask = (1u << i);
         if (i < 32) {
           cand->engine_groups[i] =
               jobs[i].engine ? jobs[i].engine->index_group : NULL;
@@ -1634,7 +1634,7 @@ int results_handler(UrlParams *params) {
         returned[i] = jobs[i].results_count;
       for (int c = 0; c < cand_count; c++) {
         for (int bit = 0; bit < 32 && bit < enabled_engine_count; bit++) {
-          if (cands[c].engine_mask & (1 << bit))
+          if (cands[c].engine_mask & (1u << bit))
             useful[bit]++;
         }
       }

@@ -5,7 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char logic_log[4096];
+/* Per-thread: this file-level buffer was shared by every request thread, so
+   two concurrent calculator queries interleaved their working. */
+static __thread char logic_log[4096];
 
 typedef struct {
   const char *buffer;
