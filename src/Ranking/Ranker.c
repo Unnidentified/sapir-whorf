@@ -89,8 +89,11 @@ void rank_domain_of(const char *url, char *out, size_t size) {
 }
 
 static int url_has_tracking_param(const char *url) {
-  static const char *TRACKERS[] = {"utm_", "gclid=", "fbclid=", "ref_src=",
-                                   "mc_cid=", "igshid=", "spm="};
+  /* "utm_" missed bare "utm=1"; match prefixes both with and without the
+     separator's underscore-or-equals spelling */
+  static const char *TRACKERS[] = {"utm_", "utm=", "gclid=",  "fbclid=",
+                                   "ref_src=", "ref=", "mc_cid=", "mc_eid=",
+                                   "igshid=", "spm=", "si=", "_ga="};
   for (size_t i = 0; i < sizeof(TRACKERS) / sizeof(TRACKERS[0]); i++) {
     if (strstr(url, TRACKERS[i]))
       return 1;
@@ -113,12 +116,25 @@ void rank_canonical_url(const char *url, char *out, size_t size) {
   }
   if (strncasecmp(p, "www.", 4) == 0)
     p += 4;
-  if (strncasecmp(p, "m.", 2) == 0 || strncasecmp(p, "amp.", 4) == 0)
+  /* reddit serves one thread from many hosts (F3); collapse them here */
+  if (strncasecmp(p, "old.reddit.com", 14) == 0)
+    p += 4;
+  else if (strncasecmp(p, "np.reddit.com", 13) == 0)
+    p += 3;
+  else if (strncasecmp(p, "new.reddit.com", 14) == 0)
+    p += 4;
+  else if (strncasecmp(p, "i.reddit.com", 12) == 0)
+    p += 2;
+  else if (strncasecmp(p, "m.", 2) == 0 || strncasecmp(p, "amp.", 4) == 0)
     p += (p[0] == 'm' ? 2 : 4);
 
+  /* Lowercase the HOST only. Paths are case-sensitive: youtu.be/<id>,
+     Wikipedia titles after the first character and paste ids all collide when
+     the path is folded, and dedupe then silently drops one of them. */
   char buffer[1024];
   size_t o = 0;
   const char *query_start = NULL;
+  int in_host = 1;
   for (; *p && o + 1 < sizeof(buffer); p++) {
     if (*p == '#')
       break;
@@ -126,9 +142,24 @@ void rank_canonical_url(const char *url, char *out, size_t size) {
       query_start = p + 1;
       break;
     }
-    buffer[o++] = (char)tolower((unsigned char)*p);
+    if (*p == '/')
+      in_host = 0;
+    buffer[o++] = in_host ? (char)tolower((unsigned char)*p) : *p;
   }
   buffer[o] = '\0';
+
+  /* /r/<sub>/comments/<id>/<slug>/<comment-id> -> /r/<sub>/comments/<id>
+     (F3: the same thread otherwise appears several times, once per comment
+     permalink or slug spelling) */
+  if (strncmp(buffer, "reddit.com/r/", 13) == 0) {
+    const char *comments = strstr(buffer, "/comments/");
+    if (comments) {
+      const char *id = comments + strlen("/comments/");
+      const char *id_end = strchr(id, '/');
+      if (id_end)
+        buffer[(size_t)(id_end - buffer)] = '\0';
+    }
+  }
 
   /* drop /index.html and trailing slashes */
   size_t len = strlen(buffer);
@@ -145,8 +176,13 @@ void rank_canonical_url(const char *url, char *out, size_t size) {
   /* keep non-tracking query parameters, sorted, so order cannot fake a dupe */
   char params[512] = "";
   if (query_start) {
+    /* the query runs to the fragment, if any: "#frag" was being folded into
+       the parameter list and survived as part of the key */
     char copy[512];
     snprintf(copy, sizeof(copy), "%s", query_start);
+    char *frag = strchr(copy, '#');
+    if (frag)
+      *frag = '\0';
     char *saveptr = NULL;
     char *token = strtok_r(copy, "&", &saveptr);
     char *parts[16];
