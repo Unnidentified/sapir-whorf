@@ -308,18 +308,24 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
               curl_easy_strerror(msg->data.result), job->http_status);
   }
 
+  /* Health must judge the live fetch, never the substitution below it: a stale
+     body standing in for a blocked engine used to report success, so the
+     breaker could never open for any engine that had ever worked. */
+  int live_status = (int)job->status;
+  int live_count = job->results_count;
+
   if (job->results_count == 0 &&
       job->status != SCRAPE_STATUS_EMPTY) {
     load_stale_results(job);
   }
 
   if (getenv("OMNI_PERF") && job->engine)
-    fprintf(stderr, "[ENGINE] %s %.0fms status=%d results=%d http=%ld\n",
-            job->engine->id, job->elapsed_ms, (int)job->status,
-            job->results_count, job->http_status);
+    fprintf(stderr, "[ENGINE] %s %.0fms status=%d results=%d http=%ld%s\n",
+            job->engine->id, job->elapsed_ms, live_status, job->results_count,
+            job->http_status, job->stale ? " stale=1" : "");
 
   if (job->engine)
-    engine_health_record(job->engine->id, (int)job->status, job->http_status,
+    engine_health_record(job->engine->id, live_status, job->http_status,
                          job->elapsed_ms, job->retry_after);
 
   /* A challenge or region cookie poisons every later request: drop the jar on
@@ -327,7 +333,7 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
      Bing silently serves its "no results" shell to a poisoned session. */
   int zero_web_results =
       job->engine && (job->engine->verticals & V_WEB) &&
-      job->results_count == 0 && job->http_status == 200;
+      live_count == 0 && job->http_status == 200;
   if (job->engine &&
       (job->status == SCRAPE_STATUS_BLOCKED || job->http_status == 429 ||
        job->http_status == 202 || job->http_status >= 500 ||
