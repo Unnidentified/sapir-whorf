@@ -3,21 +3,101 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <string.h>
 
-static const char *STOPWORDS[] = {
-    "the", "and", "for", "with", "how", "what", "when", "where", "who",
-    "why", "that", "this", "from", "into", "your", "you", "are", "was",
-    "were", "has", "have", "had", "not", "but", "all", "can", "will",
-    "its", "his", "her", "they", "them", "then", "than", "about", "over",
-    "does", "did", "use", "using", "best", "latest"};
+/* A5: the word tables are data. They used to be English arrays compiled into
+   this file, so supporting a language meant patching C. A language is now a
+   file: static/lang/<lang>.tsv, one "<kind><TAB><word>" per line. */
+typedef enum { WK_STOP, WK_FILLER, WK_DISC, WK_CODE, WK_ACADEMIC, WK_NONE } WordKind;
 
-static int is_stopword(const char *word) {
-  for (size_t i = 0; i < sizeof(STOPWORDS) / sizeof(STOPWORDS[0]); i++) {
-    if (strcmp(word, STOPWORDS[i]) == 0)
+#define MAX_LANG_WORDS 512
+static char lang_words[MAX_LANG_WORDS][32];
+static unsigned char lang_kinds[MAX_LANG_WORDS];
+static int lang_word_count = 0;
+static char lang_loaded_for[8] = "";
+static pthread_mutex_t lang_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void load_language(const char *lang) {
+  const char *want = (lang && lang[0]) ? lang : "en";
+  /* the file id is like "en_gb" -> try en_gb, then the two-letter prefix */
+  char path[256];
+  FILE *fp = NULL;
+
+  pthread_mutex_lock(&lang_mutex);
+  if (strcmp(lang_loaded_for, want) == 0) {
+    pthread_mutex_unlock(&lang_mutex);
+    return;
+  }
+
+  snprintf(path, sizeof(path), "static/lang/%s.tsv", want);
+  fp = fopen(path, "r");
+  if (!fp && strlen(want) > 2) {
+    char short_lang[8];
+    snprintf(short_lang, sizeof(short_lang), "%.2s", want);
+    snprintf(path, sizeof(path), "static/lang/%s.tsv", short_lang);
+    fp = fopen(path, "r");
+  }
+  if (!fp) {
+    snprintf(path, sizeof(path), "static/lang/en.tsv");
+    fp = fopen(path, "r");
+  }
+
+  lang_word_count = 0;
+  if (fp) {
+    char line[128];
+    while (fgets(line, sizeof(line), fp) && lang_word_count < MAX_LANG_WORDS) {
+      char *nl = strpbrk(line, "\r\n");
+      if (nl)
+        *nl = '\0';
+      if (line[0] == '#' || line[0] == '\0')
+        continue;
+      char *tab = strchr(line, '\t');
+      if (!tab)
+        continue;
+      *tab = '\0';
+      const char *kind = line;
+      const char *word = tab + 1;
+      if (!word[0])
+        continue;
+
+      WordKind k = WK_NONE;
+      if (strcmp(kind, "stop") == 0)
+        k = WK_STOP;
+      else if (strcmp(kind, "filler") == 0)
+        k = WK_FILLER;
+      else if (strcmp(kind, "disc") == 0)
+        k = WK_DISC;
+      else if (strcmp(kind, "code") == 0)
+        k = WK_CODE;
+      else if (strcmp(kind, "academic") == 0)
+        k = WK_ACADEMIC;
+      if (k == WK_NONE)
+        continue;
+
+      snprintf(lang_words[lang_word_count], sizeof(lang_words[0]), "%s", word);
+      lang_kinds[lang_word_count] = (unsigned char)k;
+      lang_word_count++;
+    }
+    fclose(fp);
+  }
+  snprintf(lang_loaded_for, sizeof(lang_loaded_for), "%s", want);
+  pthread_mutex_unlock(&lang_mutex);
+}
+
+static int has_word_kind(const char *word, WordKind kind) {
+  if (!word || !word[0])
+    return 0;
+  for (int i = 0; i < lang_word_count; i++) {
+    if (lang_kinds[i] == (unsigned char)kind &&
+        strcasecmp(word, lang_words[i]) == 0)
       return 1;
   }
   return 0;
+}
+
+static int is_stopword(const char *word) {
+  return has_word_kind(word, WK_STOP);
 }
 
 static void lower_copy(char *dst, size_t size, const char *src) {
@@ -102,20 +182,11 @@ static int discussion_score(const SearchQuery *query) {
   /* These are plain words, not IntentTerm structs: table_score expects the
      latter, so match them directly instead of reinterpreting a char* array as
      structs (which read garbage pointers and crashed on strcmp). */
-  static const char *DISCUSSION_TERMS[] = {
-      "best",     "worst",     "recommend",  "worth",   "vs",
-      "versus",   "review",    "reviews",    "experience", "anyone",
-      "opinions", "alternative", "alternatives", "cheap",  "budget",
-      "should",   "compare",   "comparison", "feedback", "thoughts"};
   int score = 0;
   for (int i = 0; i < query->term_count; i++) {
-    for (size_t t = 0;
-         t < sizeof(DISCUSSION_TERMS) / sizeof(DISCUSSION_TERMS[0]); t++) {
-      if (strcmp(query->terms[i], DISCUSSION_TERMS[t]) == 0) {
-        score++;
-        break;
-      }
-    }
+    if (has_word_kind(query->terms[i], WK_DISC) ||
+        has_word_kind(query->terms[i], WK_FILLER))
+      score++;
   }
   if (strstr(query->clean, " worth it") || strstr(query->clean, "anyone tried"))
     score += 2;
@@ -232,19 +303,8 @@ static void detect_language(SearchQuery *query, const char *locale) {
            fallback_lang[0] ? fallback_lang : "en");
 }
 
-static const char *OPINION_MODIFIERS[] = {
-    "best", "top", "cheap", "cheapest", "affordable", "budget",
-    "good", "great", "recommended", "recommendation", "decent",
-    "reliable", "trusted", "ultimate", "perfect"};
-
 int query_is_opinion_modifier(const char *word) {
-  if (!word || !word[0])
-    return 0;
-  for (size_t i = 0; i < sizeof(OPINION_MODIFIERS) / sizeof(OPINION_MODIFIERS[0]);
-       i++)
-    if (strcasecmp(word, OPINION_MODIFIERS[i]) == 0)
-      return 1;
-  return 0;
+  return has_word_kind(word, WK_FILLER);
 }
 
 void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
@@ -252,6 +312,15 @@ void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
   if (!raw)
     raw = "";
   snprintf(out->raw, sizeof(out->raw), "%s", raw);
+
+  /* A5: the word tables must exist before anything consults them - the filler
+     strip runs before detect_language() gets to set out->lang, so do it here
+     from the locale and refresh later if detection disagrees. */
+  {
+    char initial[8];
+    snprintf(initial, sizeof(initial), "%.2s", locale && locale[0] ? locale : "en");
+    load_language(initial);
+  }
 
   char clean[512];
   clean[0] = '\0';
@@ -364,6 +433,8 @@ void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
                      strncasecmp(out->clean, "where ", 6) == 0;
 
   detect_language(out, locale);
+  /* re-load if the detected language differs from the locale guess */
+  load_language(out->lang);
   out->intent = detect_intent(out);
 
   /* F3: the lane only runs for discussion-shaped queries */

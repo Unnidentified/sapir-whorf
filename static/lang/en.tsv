@@ -1,0 +1,125 @@
+# Language tables (A5). One word per line, tab-separated: <kind><TAB><word>.
+#
+# These used to be English arrays compiled into QueryAnalysis.c, which meant a
+# language was a code patch. Adding static/lang/<lang>.tsv is now enough.
+#
+#   stop     - dropped from the query terms (never sent as topical words)
+#   filler   - opinion/intent words: stripped from the SERP query because some
+#              engines treat them as brands, but they still trigger the
+#              discussion lane
+#   disc     - marks a discussion-shaped query ("is this worth it", "X vs Y")
+#   code     - intent keywords
+#   academic - intent keywords
+
+stop	the
+stop	and
+stop	for
+stop	with
+stop	how
+stop	what
+stop	when
+stop	where
+stop	who
+stop	why
+stop	that
+stop	this
+stop	from
+stop	into
+stop	your
+stop	you
+stop	are
+stop	was
+stop	were
+stop	has
+stop	have
+stop	had
+stop	not
+stop	but
+stop	all
+stop	can
+stop	will
+stop	its
+stop	his
+stop	her
+stop	they
+stop	them
+stop	then
+stop	than
+stop	about
+stop	over
+stop	does
+stop	did
+stop	use
+stop	using
+stop	latest
+
+filler	best
+filler	top
+filler	cheap
+filler	cheapest
+filler	affordable
+filler	budget
+filler	good
+filler	great
+filler	recommended
+filler	recommendation
+filler	decent
+filler	reliable
+filler	trusted
+filler	ultimate
+filler	perfect
+
+disc	worst
+disc	recommend
+disc	worth
+disc	versus
+disc	review
+disc	reviews
+disc	experience
+disc	anyone
+disc	opinions
+disc	alternative
+disc	alternatives
+disc	should
+disc	compare
+disc	comparison
+disc	feedback
+disc	thoughts
+
+code	api
+code	function
+code	class
+code	error
+code	exception
+code	compile
+code	compiler
+code	syntax
+code	python
+code	javascript
+code	rust
+code	golang
+code	java
+code	sql
+code	regex
+code	git
+code	docker
+code	kubernetes
+code	linux
+code	bash
+code	shell
+code	npm
+code	pip
+code	cmake
+
+academic	paper
+academic	study
+academic	research
+academic	journal
+academic	citation
+academic	doi
+academic	arxiv
+academic	thesis
+academic	meta-analysis
+academic	trial
+academic	dataset
+academic	peer-reviewed
