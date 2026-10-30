@@ -630,7 +630,41 @@ SearchEngine ENGINE_REGISTRY[] = {
      .parser = parse_yacy,
      .enabled = 0,
      .is_xml = 1,
-     .supports_site = 0, .verticals = V_WEB, .weight = 0.6}};
+     .supports_site = 0, .verticals = V_WEB, .weight = 0.6},
+    {.id = "google",
+     .name = "Google",
+     .base_url = "",
+     .host_header = "www.googleapis.com",
+     .referer = NULL,
+     .page_param = "start",
+     .page_multiplier = 10,
+     .page_base = 1,
+     .parser = NULL,
+     .body_parser = api_parse_google_cse,
+     .build_url = api_url_google_cse,
+     .enabled = 0,
+     .is_xml = 0,
+     .timeout_secs = 6,
+     .supports_site = 1,
+     .verticals = V_WEB,
+     .weight = 1.3},
+    {.id = "searxng",
+     .name = "SearXNG",
+     .base_url = "",
+     .host_header = NULL,
+     .referer = NULL,
+     .page_param = "pageno",
+     .page_multiplier = 1,
+     .page_base = 1,
+     .parser = NULL,
+     .body_parser = api_parse_searxng,
+     .build_url = api_url_searxng,
+     .enabled = 0,
+     .is_xml = 0,
+     .timeout_secs = 6,
+     .supports_site = 1,
+     .verticals = V_WEB,
+     .weight = 1.25}};
 
 const int ENGINE_COUNT = sizeof(ENGINE_REGISTRY) / sizeof(SearchEngine);
 
@@ -648,6 +682,15 @@ static int engine_id_compare(const char *engine_id, const char *config_id) {
     config_id++;
   }
   return *engine_id == *config_id;
+}
+
+void engine_set_enabled(const char *engine_id, int enabled) {
+  for (int i = 0; i < ENGINE_COUNT; i++) {
+    if (engine_id_compare(ENGINE_REGISTRY[i].id, engine_id)) {
+      ENGINE_REGISTRY[i].enabled = enabled ? 1 : 0;
+      return;
+    }
+  }
 }
 
 void apply_engines_config(const char *engines_str) {

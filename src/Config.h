@@ -50,6 +50,10 @@ typedef struct {
   int cache_ttl_image;
   char engines[512];
   char yacy_instance[512];
+  char google_cse_key[256];
+  char google_cse_cx[128];
+  char searxng_url[256];
+  char searxng_engines[128];
   int rate_limit_search_requests;
   int rate_limit_search_interval;
   int rate_limit_images_requests;

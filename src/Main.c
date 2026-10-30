@@ -7,6 +7,7 @@
 
 #include "Cache/Cache.h"
 #include "Config.h"
+#include "Scraping/ApiEngines.h"
 #include "Infobox/Wikipedia.h"
 #include "Proxy/Proxy.h"
 #include "Routes/History.h"
@@ -91,6 +92,21 @@ int main() {
   }
 
   apply_engines_config(cfg.engines);
+
+  /* Google and SearXNG stay off until they are actually configured: a
+     credential-less API engine would only add a failed source per query */
+  engine_set_enabled("google", 0);
+  engine_set_enabled("searxng", 0);
+  if (cfg.google_cse_key[0] != '\0' && cfg.google_cse_cx[0] != '\0') {
+    api_google_cse_configure(cfg.google_cse_key, cfg.google_cse_cx);
+    engine_set_enabled("google", 1);
+    fprintf(stderr, "[INFO] Google Programmable Search enabled\n");
+  }
+  if (cfg.searxng_url[0] != '\0') {
+    api_searxng_configure(cfg.searxng_url, cfg.searxng_engines);
+    engine_set_enabled("searxng", 1);
+    fprintf(stderr, "[INFO] SearXNG bridge enabled at %s\n", cfg.searxng_url);
+  }
   configure_yacy_engine(cfg.yacy_instance);
 
   if (cfg.yacy_instance[0] != '\0') {

@@ -13,6 +13,7 @@ typedef struct {
   char id[32];
   BreakerState state;
   int consecutive_failures;
+  int trips;              /* times the breaker has opened without a success */
   time_t open_until;
   unsigned long total_requests;
   unsigned long total_ok;
@@ -29,7 +30,7 @@ int engine_health_allow(const char *id);
 
 /* status: SCRAPE_STATUS_* from Scraping.h (kept as int to avoid a cycle) */
 void engine_health_record(const char *id, int status, long http_status,
-                          double latency_ms);
+                          double latency_ms, int retry_after_secs);
 
 EngineHealthEntry *engine_health_get(const char *id);
 const char *engine_health_state_name(BreakerState state);

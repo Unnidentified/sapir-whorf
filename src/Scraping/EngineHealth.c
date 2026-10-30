@@ -52,6 +52,7 @@ void engine_health_set_limits(int threshold, int cooldown) {
 }
 
 void engine_health_init(const char *cache_dir) {
+  srand((unsigned)time(NULL));
   pthread_mutex_lock(&health_mutex);
   entry_count = 0;
   memset(entries, 0, sizeof(entries));
@@ -67,9 +68,10 @@ void engine_health_init(const char *cache_dir) {
       long open_until = 0;
       unsigned long req = 0, ok = 0, blocked = 0, errors = 0;
       double latency = 0;
-      if (sscanf(line, "%31s %d %d %ld %lu %lu %lu %lu %lf", id, &state,
+      int trips = 0;
+      if (sscanf(line, "%31s %d %d %ld %lu %lu %lu %lu %lf %d", id, &state,
                  &consecutive, &open_until, &req, &ok, &blocked, &errors,
-                 &latency) < 4)
+                 &latency, &trips) < 4)
         continue;
       EngineHealthEntry *entry = find_or_create(id);
       if (!entry)
@@ -82,6 +84,7 @@ void engine_health_init(const char *cache_dir) {
       entry->total_blocked = blocked;
       entry->total_errors = errors;
       entry->total_latency_ms = latency;
+      entry->trips = trips;
     }
     fclose(file);
   }
@@ -129,8 +132,27 @@ int engine_health_allow(const char *id) {
   return allow;
 }
 
+/* Repeated trips mean the source is still unhappy: wait longer each time,
+   with jitter so parallel engines do not retry in lockstep. */
+static int backoff_seconds(int trips, int retry_after) {
+  int cooldown = cooldown_seconds > 0 ? cooldown_seconds : 900;
+  int shift = trips > 1 ? trips - 1 : 0;
+  if (shift > 4)
+    shift = 4;
+  long wait = (long)cooldown << shift;
+  if (wait > 6 * 3600)
+    wait = 6 * 3600;
+  if (retry_after > wait)
+    wait = retry_after;
+  if (wait > 60) {
+    int spread = (int)(wait / 5);
+    wait += (rand() % (2 * spread + 1)) - spread;
+  }
+  return (int)wait;
+}
+
 void engine_health_record(const char *id, int status, long http_status,
-                          double latency_ms) {
+                          double latency_ms, int retry_after_secs) {
   pthread_mutex_lock(&health_mutex);
   EngineHealthEntry *entry = find_or_create(id);
   if (entry) {
@@ -144,11 +166,14 @@ void engine_health_record(const char *id, int status, long http_status,
       if (entry->state == HEALTH_HALF_OPEN ||
           entry->consecutive_failures >= failure_threshold) {
         entry->state = HEALTH_OPEN;
-        entry->open_until = time(NULL) + cooldown_seconds;
+        entry->trips++;
+        entry->open_until =
+            time(NULL) + backoff_seconds(entry->trips, retry_after_secs);
       }
     } else if (status == SCRAPE_STATUS_OK) {
       entry->total_ok++;
       entry->consecutive_failures = 0;
+      entry->trips = 0;
       entry->state = HEALTH_CLOSED;
       entry->open_until = 0;
     }
@@ -170,12 +195,12 @@ void engine_health_persist(void) {
   FILE *file = fopen(health_file, "w");
   if (file) {
     for (int i = 0; i < entry_count; i++) {
-      fprintf(file, "%s\t%d\t%d\t%ld\t%lu\t%lu\t%lu\t%lu\t%.1f\n",
+      fprintf(file, "%s\t%d\t%d\t%ld\t%lu\t%lu\t%lu\t%lu\t%.1f\t%d\n",
               entries[i].id, entries[i].state,
               entries[i].consecutive_failures, (long)entries[i].open_until,
               entries[i].total_requests, entries[i].total_ok,
               entries[i].total_blocked, entries[i].total_errors,
-              entries[i].total_latency_ms);
+              entries[i].total_latency_ms, entries[i].trips);
     }
     fclose(file);
   }

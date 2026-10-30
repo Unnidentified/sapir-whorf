@@ -64,6 +64,17 @@ static int response_looks_like_results_page(const ScrapeJob *job,
   return 0;
 }
 
+static size_t capture_header(char *buffer, size_t size, size_t nitems,
+                            void *userdata) {
+  ScrapeJob *job = userdata;
+  size_t length = size * nitems;
+  if (job && length > 12 &&
+      strncasecmp(buffer, "retry-after:", 12) == 0) {
+    job->retry_after = (int)strtol(buffer + 12, NULL, 10);
+  }
+  return length;
+}
+
 static void maybe_dump_response(const ScrapeJob *job, const char *response) {
   const char *want = getenv("OMNI_DUMP");
   if (!want || !job || !job->engine || !response)
@@ -309,7 +320,7 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
 
   if (job->engine)
     engine_health_record(job->engine->id, (int)job->status, job->http_status,
-                         job->elapsed_ms);
+                         job->elapsed_ms, job->retry_after);
 
   /* A challenge or region cookie poisons every later request: drop the jar on
      a block, and also when a page that should have results came back empty.
@@ -387,6 +398,7 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
 
   cleanup_job_results(job);
   job->http_status = 0;
+  job->retry_after = 0;
   job->status = SCRAPE_STATUS_PENDING;
   job->stale = 0;
   job->elapsed_ms = 0;
@@ -483,6 +495,8 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
     }
   }
   curl_easy_setopt(job->handle, CURLOPT_PRIVATE, headers);
+  curl_easy_setopt(job->handle, CURLOPT_HEADERFUNCTION, capture_header);
+  curl_easy_setopt(job->handle, CURLOPT_HEADERDATA, (void *)job);
 
   free(full_url);
   CURLMcode add_result = curl_multi_add_handle(multi_handle, job->handle);

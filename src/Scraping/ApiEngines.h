@@ -25,4 +25,18 @@ char *api_url_hn(const char *encoded_query, int page, const char *lang);
 char *api_url_wikipedia(const char *encoded_query, int page, const char *lang);
 char *api_url_arxiv(const char *encoded_query, int page, const char *lang);
 
+/* Google Programmable Search (official JSON API, needs a key and cx) */
+void api_google_cse_configure(const char *key, const char *cx);
+int api_google_cse_available(void);
+int api_parse_google_cse(const char *body, size_t len, const char *lang,
+                         SearchResult **out, int max);
+char *api_url_google_cse(const char *encoded_query, int page, const char *lang);
+
+/* SearXNG instance acting as a bridge to Google and other engines */
+void api_searxng_configure(const char *base_url, const char *engines);
+int api_searxng_available(void);
+int api_parse_searxng(const char *body, size_t len, const char *lang,
+                      SearchResult **out, int max);
+char *api_url_searxng(const char *encoded_query, int page, const char *lang);
+
 #endif

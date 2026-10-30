@@ -85,6 +85,7 @@ typedef struct {
   MemoryBuffer response;
   int results_count;
   long http_status;
+  int retry_after;
   int stale;                 /* served from the last-known-good cache */
   double elapsed_ms;
   struct timespec started;
@@ -94,6 +95,7 @@ typedef struct {
 extern SearchEngine ENGINE_REGISTRY[];
 extern const int ENGINE_COUNT;
 void apply_engines_config(const char *engines_str);
+void engine_set_enabled(const char *engine_id, int enabled);
 void configure_yacy_engine(const char *instance);
 
 size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
