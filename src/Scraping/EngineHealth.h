@@ -24,6 +24,7 @@ typedef struct {
      at all. An engine can be perfectly healthy (200, ten results, no warning)
      and still be returning junk that the coverage floor throws away - that is
      what Bing did for "best podcast app". */
+  unsigned long total_cancelled;  /* cut off by our own batch deadline */
   unsigned long quality_samples;
   double quality_ewma;      /* 0..1, share of its results that survived      */
 } EngineHealthEntry;
@@ -49,5 +50,9 @@ void engine_health_set_batch_outage(int is_outage);
 /* A2: feed back how many of this engine's results survived ranking. `useful`
    is the count that passed the floor and were backed by another index. */
 void engine_health_record_quality(const char *id, int returned, int useful);
+
+/* C12: an engine that is cancelled every time is either consistently slow or
+   consistently a bad fit for the query mix. Recording it makes that visible. */
+void engine_health_record_cancelled(const char *id);
 
 #endif

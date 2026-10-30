@@ -249,6 +249,16 @@ void engine_health_record_quality(const char *id, int returned, int useful) {
   pthread_mutex_unlock(&health_mutex);
 }
 
+void engine_health_record_cancelled(const char *id) {
+  if (!id)
+    return;
+  pthread_mutex_lock(&health_mutex);
+  EngineHealthEntry *entry = find_or_create(id);
+  if (entry)
+    entry->total_cancelled++;
+  pthread_mutex_unlock(&health_mutex);
+}
+
 void engine_health_persist(void) {
   if (!health_file[0])
     return;

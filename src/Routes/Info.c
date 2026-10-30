@@ -56,7 +56,7 @@ int info_handler(UrlParams *params) {
                     "\"health\":\"%s\",\"requests\":%lu,\"ok\":%lu,"
                     "\"blocked\":%lu,\"errors\":%lu,"
                     "\"quality\":%.2f,\"quality_samples\":%lu,"
-                    "\"never_succeeded\":%s}",
+                    "\"never_succeeded\":%s,\"cancelled\":%lu}",
                     first ? "" : ",", ENGINE_REGISTRY[i].id,
                     ENGINE_REGISTRY[i].name,
                     health ? engine_health_state_name(health->state) : "unknown",
@@ -69,7 +69,8 @@ int info_handler(UrlParams *params) {
                     (health && health->total_requests > 0 &&
                      health->total_ok == 0)
                         ? "true"
-                        : "false") != 0) {
+                        : "false",
+                    health ? health->total_cancelled : 0UL) != 0) {
       send_response("Failed to build instance info");
       return -1;
     }

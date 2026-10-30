@@ -1418,7 +1418,12 @@ int results_handler(UrlParams *params) {
         char cleaned[BUFFER_SIZE_LARGE];
         clean_snippet(raw_snippet, cleaned, sizeof(cleaned));
 
-        double score = 1.0 / (RRF_K + (double)j);
+        /* C12: engine weight was only ever used for routing and the "trusted"
+           heuristic; fusion ignored it. Weighting the RRF vote means a source
+           the project rates higher (Yahoo, Brave) actually counts more than a
+           weaker one, which is what the weight was always for. */
+        double engine_weight = jobs[i].engine ? jobs[i].engine->weight : 1.0;
+        double score = engine_weight / (RRF_K + (double)j);
 
         int existing = -1;
         for (int c = 0; c < cand_count; c++) {
@@ -1432,9 +1437,11 @@ int results_handler(UrlParams *params) {
           cands[existing].score += score;
           cands[existing].rrf += score;
           cands[existing].engine_mask |= (1 << i);
-          if (i < 32)
+          if (i < 32) {
             cands[existing].engine_groups[i] =
                 jobs[i].engine ? jobs[i].engine->index_group : NULL;
+            cands[existing].engine_weights[i] = engine_weight;
+          }
           if (strlen(cleaned) > strlen(cands[existing].snippet)) {
             free(cands[existing].snippet);
             cands[existing].snippet = strdup(cleaned);
@@ -1460,9 +1467,11 @@ int results_handler(UrlParams *params) {
         cand->score = score;
         cand->rrf = score;
         cand->engine_mask = (1 << i);
-        if (i < 32)
+        if (i < 32) {
           cand->engine_groups[i] =
               jobs[i].engine ? jobs[i].engine->index_group : NULL;
+          cand->engine_weights[i] = engine_weight;
+        }
         cand->order = cand_count;
         rank_domain_of(cand->url, cand->domain, sizeof(cand->domain));
 

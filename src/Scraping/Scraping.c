@@ -563,8 +563,11 @@ static void cleanup_unfinished_jobs(CURLM *multi_handle, ScrapeJob *jobs,
     curl_easy_cleanup(jobs[i].handle);
     jobs[i].handle = NULL;
 
-    if (jobs[i].status == SCRAPE_STATUS_PENDING)
+    if (jobs[i].status == SCRAPE_STATUS_PENDING) {
       jobs[i].status = SCRAPE_STATUS_CANCELLED;
+      if (jobs[i].engine)
+        engine_health_record_cancelled(jobs[i].engine->id);
+    }
   }
 }
 
@@ -786,6 +789,21 @@ retry:;
     int projected = projected_yield(jobs, num_jobs, 3);
     int full_page = 10;
 
+    /* C12: the old "weight >= 1.1 means trusted" test counted Wikipedia,
+       StackExchange and OpenAlex as anchors, so one fast API could end a
+       general query before any web engine answered. A web result is required
+       for a general query unless the user picked a single engine. */
+    int have_web_result = 0;
+    for (int i = 0; i < num_jobs; i++) {
+      if (jobs[i].results_count > 0 && jobs[i].engine &&
+          (jobs[i].engine->verticals & V_WEB))
+        have_web_result = 1;
+    }
+    /* a single-engine request (engine= or a one-engine allowlist) is the
+       user's explicit choice, so it does not need a web result */
+    int single_engine_request = (num_jobs <= 1);
+    int needs_web = !single_engine_request;
+
     /* Independent sources, not engine count: Bing and Yahoo share an index, so
        their agreement must not satisfy the "two engines answered" test (F2). */
     const char *answered_groups[16] = {0};
@@ -806,13 +824,15 @@ retry:;
         answered_groups[group_count++] = g;
     }
 
-    if (!legacy && num_jobs > 1 && trusted && group_count >= 2 &&
+    int web_ok = have_web_result || !needs_web;
+
+    if (!legacy && num_jobs > 1 && web_ok && trusted && group_count >= 2 &&
         projected >= full_page && elapsed_ms >= 500)
       break;
-    if (!legacy && num_jobs > 1 && trusted && engines_so_far >= 1 &&
+    if (!legacy && num_jobs > 1 && web_ok && trusted && engines_so_far >= 1 &&
         projected >= 6 && elapsed_ms >= 550)
       break;
-    if (!legacy && num_jobs > 1 && group_count >= 2 &&
+    if (!legacy && num_jobs > 1 && web_ok && group_count >= 2 &&
         projected >= full_page && elapsed_ms >= 1200)
       break;
 

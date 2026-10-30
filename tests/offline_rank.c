@@ -11,6 +11,7 @@
  */
 #include "../src/Ranking/Ranker.h"
 #include "../src/Query/QueryAnalysis.h"
+#include "../src/Scraping/Scraping.h"
 #include "../src/Utility/Utility.h"
 #include <jansson.h>
 #include <math.h>
@@ -25,8 +26,25 @@ typedef struct {
   char *engine;
   int page;
   RankDoc docs[MAX_DOCS];
+  int doc_engine[MAX_DOCS]; /* which engine ordinal produced each doc */
   int count;
+  int engine_count;
+  char *engines[32];
 } QueryRecord;
+
+extern SearchEngine ENGINE_REGISTRY[];
+extern const int ENGINE_COUNT;
+
+static int engine_ordinal(QueryRecord *r, const char *id) {
+  for (int i = 0; i < r->engine_count; i++)
+    if (strcmp(r->engines[i], id) == 0)
+      return i;
+  if (r->engine_count < 32) {
+    r->engines[r->engine_count] = strdup(id);
+    return r->engine_count++;
+  }
+  return 0;
+}
 
 /* minimal containment test so this harness does not drag in the whole app */
 /* Is `expected` the registrable host of `url`, or a parent of it?
@@ -145,6 +163,8 @@ static int load(const char *path, QueryRecord **out, int *out_count) {
       recs[slot].page =
           (int)json_integer_value(json_object_get(root, "page"));
       recs[slot].count = 0;
+      recs[slot].engine_count = 0;
+      memset(recs[slot].engines, 0, sizeof(recs[slot].engines));
     }
 
     json_t *rows = json_object_get(root, "results");
@@ -156,7 +176,10 @@ static int load(const char *path, QueryRecord **out, int *out_count) {
         const char *url = json_string_value(json_object_get(r, "url"));
         if (!url)
           continue;
-        RankDoc *d = &recs[slot].docs[recs[slot].count++];
+        int ord = engine_ordinal(&recs[slot], e);
+        RankDoc *d = &recs[slot].docs[recs[slot].count];
+        recs[slot].doc_engine[recs[slot].count] = ord;
+        recs[slot].count++;
         memset(d, 0, sizeof(*d));
         d->url = strdup(url);
         d->title = strdup(json_string_value(json_object_get(r, "title")) ?: "");
@@ -212,6 +235,25 @@ int main(int argc, char **argv) {
 
     /* mark which engine produced each doc so consensus works */
     int count = recs[r].count;
+
+    /* Reconstruct the engine mask so consensus and engine weight actually
+       participate; without it the harness measured a pipeline that never runs
+       in production. */
+    for (int i = 0; i < count; i++) {
+      int ord = recs[r].doc_engine[i];
+      recs[r].docs[i].engine_mask |= (1 << ord);
+      if (ord < 32) {
+        const char *gid = recs[r].engines[ord];
+        for (int e = 0; e < ENGINE_COUNT; e++) {
+          if (strcmp(ENGINE_REGISTRY[e].id, gid) == 0) {
+            recs[r].docs[i].engine_groups[ord] = ENGINE_REGISTRY[e].index_group;
+            recs[r].docs[i].engine_weights[ord] = ENGINE_REGISTRY[e].weight;
+            break;
+          }
+        }
+      }
+    }
+
     int deduped = rank_dedupe(recs[r].docs, count);
     rank_score(recs[r].docs, deduped, &analysis);
 
