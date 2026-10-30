@@ -1,0 +1,26 @@
+# query	expected-host	grade (2=the answer, 1=useful)
+# Seeded from the expected-hint column in queries.tsv. Extend by hand:
+# judging 100 queries on a 0/1/2 scale is what makes nDCG meaningful.
+wikipedia	wikipedia.org	2
+github	github.com	2
+hacker news	news.ycombinator.com	2
+marilyn monroe	wikipedia.org	2
+who wrote dune	wikipedia.org	2
+nikola tesla born	wikipedia.org	2
+tallest mountain in japan	wikipedia.org	2
+python asyncio gather exception handling	stackoverflow.com	2
+rust borrow checker error e0502	rust-lang.org	2
+cmake target_include_directories SYSTEM	cmake.org	2
+sqlite wal mode checkpoint	sqlite.org	2
+postgres index bloat check	postgresql.org	2
+javascript array flatmap	developer.mozilla.org	2
+attention is all you need	arxiv.org	2
+crispr off target effects	doi.org	2
+climate tipping points 2024	nature.com	2
+site:doc.rust-lang.org e0502	doc.rust-lang.org	2
+site:stackoverflow.com asyncio gather	stackoverflow.com	2
+python	learn	2
+linux	kernel.org	2
+openbsd	openbsd.org	2
+postgresql documentation	postgresql.org	2
+sqlite	c	2

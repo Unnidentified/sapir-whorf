@@ -1342,7 +1342,9 @@ int results_handler(UrlParams *params) {
     }
 
     /* collapse syndicated copies, then score with the ranker */
+    int funnel_raw = cand_count;
     cand_count = rank_dedupe(cands, cand_count);
+    int funnel_deduped = cand_count;
     rank_score(cands, cand_count, &analysis);
 
     /* Relevance floor: if a result shares almost none of the query's
@@ -1362,6 +1364,7 @@ int results_handler(UrlParams *params) {
       }
       cand_count = kept;
     }
+    int funnel_floored = cand_count;
 
     /* drop anything already shown on an earlier page of this query */
     /* cache keys are hashed; a raw "seen|<client>|<query>" string is rejected */
@@ -1494,6 +1497,57 @@ int results_handler(UrlParams *params) {
 
     context_set(&ctx, "results_state",
                 results_matrix.count > 0 ? "ok" : "empty");
+
+    /* F1 funnel: where did the results go? Without this a thin page is
+       indistinguishable from a slow one or a blocked one. */
+    {
+      int cancelled = 0, blocked = 0, failed = 0, empty_eng = 0, ok_eng = 0;
+      for (int i = 0; i < enabled_engine_count; i++) {
+        switch (jobs[i].status) {
+        case SCRAPE_STATUS_CANCELLED: cancelled++; break;
+        case SCRAPE_STATUS_BLOCKED: blocked++; break;
+        case SCRAPE_STATUS_FETCH_ERROR: failed++; break;
+        case SCRAPE_STATUS_EMPTY: empty_eng++; break;
+        case SCRAPE_STATUS_OK: ok_eng++; break;
+        default: break;
+        }
+      }
+
+      if (getenv("OMNI_PERF")) {
+        fprintf(stderr,
+                "[FUNNEL] raw=%d deduped=%d floored=%d capped=%d rendered=%d "
+                "engines=%d ok=%d empty=%d blocked=%d failed=%d cancelled=%d "
+                "stale=%d\n",
+                funnel_raw, funnel_deduped, funnel_floored, total_results,
+                results_matrix.count, enabled_engine_count, ok_eng, empty_eng,
+                blocked, failed, cancelled, stale_count);
+        for (int i = 0; i < enabled_engine_count; i++) {
+          fprintf(stderr, "[FUNNEL-E] %-14s status=%d results=%d http=%ld %.0fms%s\n",
+                  jobs[i].engine->id, (int)jobs[i].status,
+                  jobs[i].results_count, jobs[i].http_status, jobs[i].elapsed_ms,
+                  jobs[i].stale ? " stale" : "");
+        }
+      }
+
+      /* loopback-only debug view: never expose engine internals to the LAN */
+      const char *dbg = NULL;
+      for (int i = 0; i < params->count; i++) {
+        if (strcmp(params->params[i].key, "debug") == 0)
+          dbg = params->params[i].value;
+      }
+      if (dbg && strcmp(dbg, "1") == 0 &&
+          strncmp(client_key, "127.", 4) == 0) {
+        char line[512];
+        snprintf(line, sizeof(line),
+                 "raw=%d deduped=%d floored=%d capped=%d rendered=%d "
+                 "engines=%d ok=%d empty=%d blocked=%d failed=%d cancelled=%d "
+                 "stale=%d",
+                 funnel_raw, funnel_deduped, funnel_floored, total_results,
+                 results_matrix.count, enabled_engine_count, ok_eng, empty_eng,
+                 blocked, failed, cancelled, stale_count);
+        context_set(&ctx, "debug_funnel", line);
+      }
+    }
 
     if (results_matrix.count == 0 && total_results > 0) {
       fprintf(stderr,

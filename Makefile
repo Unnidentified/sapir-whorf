@@ -277,6 +277,29 @@ registry-lint: tests/registry_lint
 fixtures: tests/parser_fixtures
 	@./tests/parser_fixtures
 
+# A3: offline relevance benchmark. Reranks a recorded replay file with the
+# production ranker - no network, no server, deterministic.
+tests/offline_rank: tests/offline_rank.c src/Ranking/Ranker.c \
+                    src/Query/QueryAnalysis.c src/Utility/Utility.c \
+                    src/Utility/Unescape.c src/Utility/XmlHelper.c \
+                    src/Utility/Display.c src/Cache/Cache.c \
+                    src/Scraping/BlockDetection.c src/Scraping/ScrapingParsers.c \
+                    src/Scraping/ApiEngines.c src/Config.c
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -I/usr/include/libxml2 -o $@ $^ \
+		$(LINT_LIBS)
+
+REPLAY ?= tests/replay/baseline.jsonl
+
+JUDGMENTS ?= tools/judgments.tsv
+
+eval-offline: tests/offline_rank
+	@./tests/offline_rank $(REPLAY) $(JUDGMENTS)
+
+record-replay:
+	@echo "Record with OMNI_REPLAY_RECORD=<file> ./bin/omnisearch, run the"
+	@echo "queries in tools/queries.tsv against it, then copy the file to"
+	@echo "tests/replay/."
+
 smoke:
 	@./tools/smoke.sh $(BASE)
 
@@ -288,4 +311,4 @@ eval-strict:
 
 check: check-themes registry-lint fixtures smoke
 
-.PHONY: all run clean rebuild info check check-themes registry-lint fixtures smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info check check-themes registry-lint fixtures eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

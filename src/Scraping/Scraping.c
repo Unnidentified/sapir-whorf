@@ -1,5 +1,6 @@
 #include "Scraping.h"
 #include "BlockDetection.h"
+#include "Replay.h"
 #include "EngineHealth.h"
 #include "../Cache/Cache.h"
 #include "../Proxy/Proxy.h"
@@ -323,6 +324,9 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
             job->engine->id, job->elapsed_ms, live_status, job->results_count,
             job->http_status, job->stale ? " stale=1" : "");
 
+  if (replay_enabled_record() && job->out_results && job->out_results[0])
+    replay_record_job(job, job->out_results[0], job->results_count);
+
   if (job->engine)
     engine_health_record(job->engine->id, live_status, job->http_status,
                          job->elapsed_ms, job->retry_after);
@@ -607,6 +611,20 @@ retry:;
   CURLM *multi_handle = curl_multi_init();
   if (!multi_handle)
     return -1;
+
+  /* Offline replay: if a recording is active, jobs answered from it never open
+     a socket. This is how the ranking benchmark runs with zero network. */
+  if (replay_enabled_read()) {
+    int replayed = 0;
+    for (int i = 0; i < num_jobs; i++) {
+      if (replay_fill_job(&jobs[i]))
+        replayed++;
+    }
+    if (replayed == num_jobs) {
+      curl_multi_cleanup(multi_handle);
+      return replayed;
+    }
+  }
 
   for (int i = 0; i < num_jobs; i++) {
     setup_job(&jobs[i], multi_handle);
