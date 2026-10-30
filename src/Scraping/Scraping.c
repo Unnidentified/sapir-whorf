@@ -1,4 +1,5 @@
 #include "Scraping.h"
+#include "BlockDetection.h"
 #include "EngineHealth.h"
 #include "../Cache/Cache.h"
 #include "../Proxy/Proxy.h"
@@ -19,17 +20,6 @@ static int response_contains(const char *response, const char *needle) {
 }
 
 /* anti-bot interstitials served instead of a results page */
-static int response_is_blocked_page(const char *response) {
-  if (!response)
-    return 0;
-
-  return response_contains(response, "<title>Captcha</title>") ||
-         response_contains(response, "Startpage Captcha") ||
-         response_contains(response, "Ecosia Firewall") ||
-         response_contains(response, ">Robot<") ||
-         response_contains(response, "Just a moment...");
-}
-
 static int response_looks_like_results_page(const ScrapeJob *job,
                                             const char *response) {
   if (!job || !job->engine || !response)
@@ -100,11 +90,6 @@ static void classify_job_response(ScrapeJob *job, const char *response,
     return;
   }
 
-  if (response_is_blocked_page(response)) {
-    job->status = SCRAPE_STATUS_BLOCKED;
-    return;
-  }
-
   if (job->engine->body_parser) {
     job->results_count = job->engine->body_parser(
         response, response_size, job->lang, job->out_results, job->max_results);
@@ -114,6 +99,10 @@ static void classify_job_response(ScrapeJob *job, const char *response,
     }
     if (job->http_status >= 400) {
       job->status = SCRAPE_STATUS_FETCH_ERROR;
+      return;
+    }
+    if (response_is_blocked_for_engine(response, job->results_count)) {
+      job->status = SCRAPE_STATUS_BLOCKED;
       return;
     }
     job->status = SCRAPE_STATUS_EMPTY;
@@ -147,6 +136,14 @@ static void classify_job_response(ScrapeJob *job, const char *response,
 
   if (job->http_status >= 400) {
     job->status = SCRAPE_STATUS_FETCH_ERROR;
+    return;
+  }
+
+  /* Only now, with zero results in hand, is "blocked" a useful judgement: a
+     page that parsed results can never be a challenge page, whatever words its
+     snippets contain. */
+  if (response_is_blocked_for_engine(response, job->results_count)) {
+    job->status = SCRAPE_STATUS_BLOCKED;
     return;
   }
 

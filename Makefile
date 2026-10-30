@@ -256,6 +256,27 @@ uninstall:
 check-themes:
 	@python3 tools/check_themes.py
 
+# A1: registry lint + parser fixtures. Neither touches the network.
+LINT_SRCS = src/Scraping/ScrapingParsers.c src/Scraping/BlockDetection.c \
+            src/Scraping/ApiEngines.c src/Utility/Utility.c \
+            src/Utility/XmlHelper.c src/Utility/Unescape.c
+# beaker has no .pc file; it lives in the brew prefix like the app build expects
+LINT_LIBS = -L$(BREW_PREFIX)/lib -lbeaker $(DEP_LIBS) -lpthread -lm -lssl -lcrypto
+
+tests/registry_lint: tests/registry_lint.c $(LINT_SRCS)
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto \
+		|| { echo "registry lint build failed"; exit 1; }
+
+tests/parser_fixtures: tests/parser_fixtures.c $(LINT_SRCS)
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto \
+		|| { echo "fixture test build failed"; exit 1; }
+
+registry-lint: tests/registry_lint
+	@./tests/registry_lint
+
+fixtures: tests/parser_fixtures
+	@./tests/parser_fixtures
+
 smoke:
 	@./tools/smoke.sh $(BASE)
 
@@ -265,6 +286,6 @@ eval:
 eval-strict:
 	@python3 tools/eval.py $(BASE) --strict
 
-check: check-themes smoke
+check: check-themes registry-lint fixtures smoke
 
-.PHONY: all run clean rebuild info check check-themes smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info check check-themes registry-lint fixtures smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
