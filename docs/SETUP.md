@@ -75,6 +75,7 @@ Defaults in `src/Config.h`.
 | engines | google_cse_key / google_cse_cx | empty | enables Google if both set |
 | engines | searxng_url / searxng_engines | empty / google | enables SearXNG bridge |
 | rate_limit | search_requests / search_interval | 0 / 0 | inbound limit per client; 0 disables |
+| rate_limit | trusted_proxies | empty | addresses whose X-Forwarded-For may be believed (`loopback`, `lan`, or a list); empty trusts nobody |
 | rate_limit | images_requests / images_interval | 0 / 0 | same for images |
 | health | breaker_threshold / cooldown_seconds | 5 / 900 | circuit breaker |
 
@@ -104,6 +105,10 @@ priority and for the batch's "trusted source" test.
 | hn | code+news | 0.80 | yes | Algolia JSON |
 | wikipedia | entity | 1.20 | yes | MediaWiki API; also feeds the infobox |
 | yacy | web | 0.60 | no | needs a peer |
+
+`index_group` groups engines that answer from the same index (Bing, Yahoo and
+DuckDuckGo are `bing`). Consensus and the batch's early exit count groups, not
+engines, so one index's failure cannot look like three engines agreeing.
 
 Rules applied to the registry at request time:
 

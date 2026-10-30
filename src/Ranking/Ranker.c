@@ -25,9 +25,30 @@
 
 /* ---------- registrable domain ---------- */
 
-static const char *TWO_LEVEL_SUFFIXES[] = {
-    "co.uk", "ac.uk", "com.au", "co.jp", "com.br", "co.in", "com.mx",
-    "co.nz", "co.za",  "com.tr", "com.cn", "com.tw", "co.kr", "com.sg"};
+/* C11: the suffix list is data, not code. A 14-entry hand list knew co.uk but
+   not org.uk, gov.uk, com.pl, and nothing about hosted platforms, so every
+   *.github.io site counted as one domain and one thread could fill a page. */
+#define MAX_SUFFIXES 256
+static char suffixes[MAX_SUFFIXES][64];
+static int suffix_count = 0;
+static pthread_once_t suffix_once = PTHREAD_ONCE_INIT;
+
+static void load_suffixes(void) {
+  FILE *fp = fopen("static/public_suffixes.txt", "r");
+  if (!fp)
+    return;
+  char line[128];
+  while (fgets(line, sizeof(line), fp) && suffix_count < MAX_SUFFIXES) {
+    char *nl = strpbrk(line, "\r\n");
+    if (nl)
+      *nl = '\0';
+    if (line[0] == '#' || line[0] == '\0')
+      continue;
+    snprintf(suffixes[suffix_count], sizeof(suffixes[0]), "%s", line);
+    suffix_count++;
+  }
+  fclose(fp);
+}
 
 void rank_domain_of(const char *url, char *out, size_t size) {
   out[0] = '\0';
@@ -55,36 +76,46 @@ void rank_domain_of(const char *url, char *out, size_t size) {
       memmove(out, out + plen, strlen(out + plen) + 1);
   }
 
-  /* find the label boundary, then the public suffix boundary */
   char *first_dot = strchr(out, '.');
   if (!first_dot)
     return;
 
-  const char *last_two = NULL;
-  char *scan = first_dot;
-  while ((scan = strchr(scan, '.')) != NULL) {
-    scan++;
-    if (strchr(scan, '.'))
-      last_two = scan;
-  }
-  if (last_two) {
-    memmove(out, last_two, strlen(last_two) + 1);
+  /* If the host ends with a known multi-label suffix, the registrable domain
+     is that suffix plus exactly one more label: bbc.co.uk, not co.uk;
+     alice.github.io, not github.io. The old code computed `prev` from the
+     suffix start and then required prev > out, which silently did nothing for
+     a two-label host - the very case every `.co.uk` site hits. */
+  pthread_once(&suffix_once, load_suffixes);
+  for (int i = 0; i < suffix_count; i++) {
+    size_t slen = strlen(suffixes[i]);
+    size_t olen = strlen(out);
+    if (olen <= slen + 1)
+      continue;
+    if (out[olen - slen - 1] != '.' )
+      continue;
+    if (strcmp(out + olen - slen, suffixes[i]) != 0)
+      continue;
+
+    /* walk back over exactly one more label */
+    size_t cut = olen - slen - 1; /* index of the dot before the suffix */
+    while (cut > 0 && out[cut - 1] != '.')
+      cut--;
+    if (cut > 0 && cut < olen)
+      memmove(out, out + cut, strlen(out + cut) + 1);
+    return;
   }
 
-  for (size_t i = 0; i < sizeof(TWO_LEVEL_SUFFIXES) / sizeof(TWO_LEVEL_SUFFIXES[0]);
-       i++) {
-    size_t slen = strlen(TWO_LEVEL_SUFFIXES[i]);
-    size_t olen = strlen(out);
-    if (olen > slen && out[olen - slen - 1] == '.' &&
-        strcmp(out + olen - slen, TWO_LEVEL_SUFFIXES[i]) == 0) {
-      /* keep one extra label for e.g. example.co.uk */
-      char *prev = out + olen - slen - 1;
-      while (prev > out && prev[-1] != '.')
-        prev--;
-      if (prev > out)
-        memmove(out, prev, strlen(prev) + 1);
-      break;
+  /* no special suffix: the registrable domain is the last two labels */
+  {
+    const char *last_two = NULL;
+    char *scan = strchr(out, '.');
+    while ((scan = strchr(scan, '.')) != NULL) {
+      scan++;
+      if (strchr(scan, '.'))
+        last_two = scan;
     }
+    if (last_two)
+      memmove(out, last_two, strlen(last_two) + 1);
   }
 }
 

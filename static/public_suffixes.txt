@@ -1,0 +1,103 @@
+# Public suffixes where the registrable domain needs one MORE label than the
+# default "last two labels" rule.
+#
+# Used by rank_domain_of(): the per-domain cap and the authority lookup both
+# key on the registrable domain, so without this every *.github.io site counts
+# as a single domain and one comment thread can fill a page.
+#
+# Two kinds of entry, handled identically because both need suffix+1 label:
+#   1. multi-label ccTLD suffixes      (co.uk, com.au, org.uk ...)
+#   2. hosted platforms                (github.io, blogspot.com ...)
+#
+# This is a deliberately trimmed list, not the full Public Suffix List: it
+# carries the suffixes that actually appear in search results. Add entries as
+# they show up; nothing else needs to change.
+
+# --- United Kingdom
+co.uk
+org.uk
+me.uk
+ac.uk
+gov.uk
+net.uk
+ltd.uk
+plc.uk
+sch.uk
+
+# --- Commonwealth / Anglophone
+com.au
+net.au
+org.au
+edu.au
+gov.au
+co.nz
+net.nz
+org.nz
+co.za
+org.za
+com.my
+com.sg
+com.hk
+com.tw
+com.ph
+com.pk
+com.bd
+
+# --- Europe
+co.jp
+ne.jp
+or.jp
+ac.jp
+co.kr
+or.kr
+com.br
+com.ar
+com.mx
+com.co
+com.pe
+com.ve
+co.cl
+com.pl
+com.ua
+com.ru
+com.tr
+com.gr
+com.pt
+com.es
+co.it
+co.il
+co.in
+net.in
+org.in
+gov.in
+com.cn
+net.cn
+org.cn
+gov.cn
+com.hk
+
+# --- hosted platforms: each user/site is its own domain
+github.io
+gitlab.io
+netlify.app
+vercel.app
+pages.dev
+workers.dev
+herokuapp.com
+appspot.com
+blogspot.com
+wordpress.com
+tumblr.com
+substack.com
+medium.com
+notion.site
+web.app
+firebaseapp.com
+azurewebsites.net
+cloudfront.net
+s3.amazonaws.com
+glitch.me
+repl.co
+readthedocs.io
+surge.sh
+neocities.org

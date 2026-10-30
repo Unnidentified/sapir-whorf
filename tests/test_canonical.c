@@ -52,6 +52,44 @@ int main(void) {
   expect_differ("https://reddit.com/r/rust/comments/abc123/x/",
                 "https://reddit.com/r/rust/comments/zzz999/x/");
 
+  /* C11: registrable domain, from static/public_suffixes.txt */
+  printf("\nregistrable domains\n");
+  struct { const char *url, *want; } domains[] = {
+      {"https://example.co.uk/x", "example.co.uk"},
+      {"https://news.bbc.co.uk/x", "bbc.co.uk"},
+      {"https://example.org.uk/x", "example.org.uk"},
+      {"https://user1.github.io/a", "user1.github.io"},
+      {"https://user2.github.io/b", "user2.github.io"},
+      {"https://site.pages.dev/x", "site.pages.dev"},
+      {"https://foo.blogspot.com/x", "foo.blogspot.com"},
+      {"https://en.wikipedia.org/wiki/X", "wikipedia.org"},
+      {"https://a.b.example.com/x", "example.com"},
+  };
+  for (size_t i = 0; i < sizeof(domains) / sizeof(domains[0]); i++) {
+    char got[256];
+    rank_domain_of(domains[i].url, got, sizeof(got));
+    if (strcmp(got, domains[i].want) != 0) {
+      printf("  FAIL %-42s -> %-24s want %s\n", domains[i].url, got,
+             domains[i].want);
+      failures++;
+    } else {
+      printf("  ok   %-42s -> %s\n", domains[i].url, got);
+    }
+  }
+
+  /* two different github.io sites must not collapse into one domain */
+  {
+    char a[256], b[256];
+    rank_domain_of("https://alice.github.io/x", a, sizeof(a));
+    rank_domain_of("https://bob.github.io/y", b, sizeof(b));
+    if (strcmp(a, b) == 0) {
+      printf("  FAIL alice.github.io and bob.github.io share a domain (%s)\n", a);
+      failures++;
+    } else {
+      printf("  ok   alice.github.io != bob.github.io\n");
+    }
+  }
+
   printf("%s\n", failures == 0 ? "canonical urls: PASS" : "canonical urls: FAIL");
   return failures == 0 ? 0 : 1;
 }
