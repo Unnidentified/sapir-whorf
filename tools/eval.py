@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Quality and latency measurement for a running sp-engine instance.
 
-    ./tools/eval.py [base-url] [--strict] [--json]
+    ./tools/eval.py [base-url] [--strict] [--json] [--pace SECONDS]
+
+--pace sleeps between queries so a benchmark run does not hammer the upstream
+engines. Start the server with OMNI_NOBREAKER=1 when benchmarking: the run
+otherwise trips the persisted breakers and leaves the instance believing every
+source is broken for hours.
 
 Reads tools/queries.tsv (category, query, optional expected host) and reports:
 zero-result rate, unique-site diversity, title coverage, duplicate rate,

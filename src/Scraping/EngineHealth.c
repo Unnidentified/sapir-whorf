@@ -16,6 +16,16 @@ static int cooldown_seconds = 900;
 static char health_file[768];
 static int records_since_persist = 0;
 
+/* C8: set by the scraper when the whole batch failed the same way, i.e. when
+   the evidence points at our network rather than at any one engine. */
+static int batch_transport_outage = 0;
+
+void engine_health_set_batch_outage(int is_outage) {
+  pthread_mutex_lock(&health_mutex);
+  batch_transport_outage = is_outage ? 1 : 0;
+  pthread_mutex_unlock(&health_mutex);
+}
+
 static int is_failure_status(int status, long http_status) {
   if (status == SCRAPE_STATUS_FETCH_ERROR ||
       status == SCRAPE_STATUS_PARSE_MISMATCH ||
@@ -164,7 +174,23 @@ static int backoff_seconds(int trips, int retry_after) {
 
 void engine_health_record(const char *id, int status, long http_status,
                           double latency_ms, int retry_after_secs) {
+  /* evaluation runs and local outages must not poison persisted breakers */
+  if (getenv("OMNI_NOBREAKER"))
+    return;
+
   pthread_mutex_lock(&health_mutex);
+
+  /* a transport failure while the whole batch is failing transport-wise says
+     nothing about this engine: skip it entirely */
+  if (is_failure_status(status, http_status) && batch_transport_outage) {
+    EngineHealthEntry *e = find_or_create(id);
+    if (e) {
+      e->total_requests++;
+      e->total_latency_ms += latency_ms;
+    }
+    pthread_mutex_unlock(&health_mutex);
+    return;
+  }
   EngineHealthEntry *entry = find_or_create(id);
   if (entry) {
     entry->total_requests++;

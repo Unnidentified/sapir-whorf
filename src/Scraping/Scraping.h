@@ -64,6 +64,17 @@ typedef struct {
   size_t capacity;
 } MemoryBuffer;
 
+/* C8: why a fetch failed matters. A DNS blip or a connect timeout is our
+   network, not the engine refusing us, and must not count against its breaker -
+   otherwise one Wi-Fi hiccup opens every breaker and the exponential backoff
+   persists that verdict for hours. */
+typedef enum {
+  FETCH_FAIL_NONE = 0,
+  FETCH_FAIL_TRANSPORT,  /* DNS, connect, TLS, timeout: probably our side    */
+  FETCH_FAIL_REFUSED,    /* HTTP 429/202/403/5xx or a challenge page         */
+  FETCH_FAIL_PARSE       /* we got bytes and could not read them             */
+} FetchFailureKind;
+
 typedef enum {
   SCRAPE_STATUS_PENDING,
   SCRAPE_STATUS_OK,
@@ -91,6 +102,7 @@ typedef struct {
   int results_count;
   long http_status;
   int retry_after;
+  FetchFailureKind failure_kind;
   int stale;                 /* served from the last-known-good cache */
   double elapsed_ms;
   struct timespec started;

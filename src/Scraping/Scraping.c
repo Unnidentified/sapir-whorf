@@ -1,6 +1,8 @@
 #include "Scraping.h"
 #include "BlockDetection.h"
 #include "Replay.h"
+
+__thread int batch_transport_outage_hint = 0;
 #include "../Ranking/Ranker.h"
 
 /* set by the results handler when the request asked to wait for all sources */
@@ -307,6 +309,22 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
   else {
     job->results_count = 0;
     job->status = SCRAPE_STATUS_FETCH_ERROR;
+    /* classify: a transport failure is our network, not the engine's fault */
+    switch (msg->data.result) {
+    case CURLE_COULDNT_RESOLVE_HOST:
+    case CURLE_COULDNT_CONNECT:
+    case CURLE_OPERATION_TIMEDOUT:
+    case CURLE_SSL_CONNECT_ERROR:
+    case CURLE_GOT_NOTHING:
+    case CURLE_SEND_ERROR:
+    case CURLE_RECV_ERROR:
+    case CURLE_PARTIAL_FILE:
+      job->failure_kind = FETCH_FAIL_TRANSPORT;
+      break;
+    default:
+      job->failure_kind = FETCH_FAIL_REFUSED;
+      break;
+    }
     if (getenv("OMNI_PERF") && job->engine)
       fprintf(stderr, "[FETCHERR] %s: %s (http=%ld)\n", job->engine->id,
               curl_easy_strerror(msg->data.result), job->http_status);
@@ -331,9 +349,20 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
   if (replay_enabled_record() && job->out_results && job->out_results[0])
     replay_record_job(job, job->out_results[0], job->results_count);
 
-  if (job->engine)
+  if (job->engine) {
+    /* C8: one transport failure among many successes is the engine; many at
+       once is our network. The batch-level flag is set by the caller before
+       the responses are drained, so this is a cheap local decision. */
+    extern __thread int batch_transport_outage_hint;
+    int outage = (job->failure_kind == FETCH_FAIL_TRANSPORT) &&
+                 batch_transport_outage_hint;
+    if (outage)
+      engine_health_set_batch_outage(1);
     engine_health_record(job->engine->id, live_status, job->http_status,
                          job->elapsed_ms, job->retry_after);
+    if (outage)
+      engine_health_set_batch_outage(0);
+  }
 
   /* A challenge or region cookie poisons every later request: drop the jar on
      a block, and also when a page that should have results came back empty.
@@ -717,6 +746,23 @@ retry:;
 
     engines_so_far += drain_responses(multi_handle, jobs, num_jobs,
                                       &total_so_far);
+
+    /* C8: if at least two engines have now failed and every failure so far is
+       transport-level, the common cause is this host's network, so later
+       failures in this batch must not be charged to the engines' breakers. */
+    {
+      int failed = 0, transport = 0, done = 0;
+      for (int i = 0; i < num_jobs; i++) {
+        if (jobs[i].status == SCRAPE_STATUS_FETCH_ERROR) {
+          failed++;
+          if (jobs[i].failure_kind == FETCH_FAIL_TRANSPORT)
+            transport++;
+        }
+        if (jobs[i].status != SCRAPE_STATUS_PENDING)
+          done++;
+      }
+      batch_transport_outage_hint = (failed >= 2 && failed == transport);
+    }
 
     struct timespec now_ts;
     clock_gettime(CLOCK_MONOTONIC, &now_ts);

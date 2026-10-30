@@ -42,6 +42,10 @@ EngineHealthEntry *engine_health_get(const char *id);
 const char *engine_health_state_name(BreakerState state);
 void engine_health_persist(void);
 
+/* C8: when most of a batch failed for transport reasons, the cause is our
+   network. Engines still count requests but no failure is charged to them. */
+void engine_health_set_batch_outage(int is_outage);
+
 /* A2: feed back how many of this engine's results survived ranking. `useful`
    is the count that passed the floor and were backed by another index. */
 void engine_health_record_quality(const char *id, int returned, int useful);
