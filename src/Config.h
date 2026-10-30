@@ -66,6 +66,11 @@ typedef struct {
   char searxng_url[256];
   char searxng_engines[128];
   char trusted_proxies[512];
+  /* "all"    - every infobox handler, including Wikipedia, dictionary and
+                currency lookups (these leave the machine)
+     "local"  - calculator, units and colour only; nothing leaves the box
+     "off"    - no infobox at all */
+  char infobox_mode[16];
   int rate_limit_search_requests;
   int rate_limit_search_interval;
   int rate_limit_images_requests;

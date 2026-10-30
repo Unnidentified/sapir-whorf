@@ -50,6 +50,7 @@ static const ConfigOption CONFIG_OPTIONS[] = {
     STRING_OPTION("engines", "searxng_url", searxng_url),
     STRING_OPTION("engines", "searxng_engines", searxng_engines),
     STRING_OPTION("rate_limit", "trusted_proxies", trusted_proxies),
+    STRING_OPTION("server", "infobox", infobox_mode),
     INTEGER_OPTION("rate_limit", "search_requests", rate_limit_search_requests),
     INTEGER_OPTION("rate_limit", "search_interval", rate_limit_search_interval),
     INTEGER_OPTION("rate_limit", "images_requests", rate_limit_images_requests),
@@ -78,6 +79,7 @@ void config_set_defaults(Config *config) {
       .rate_limit_search_interval = DEFAULT_RATE_LIMIT_SEARCH_INTERVAL,
       .rate_limit_images_requests = DEFAULT_RATE_LIMIT_IMAGES_REQUESTS,
       .rate_limit_images_interval = DEFAULT_RATE_LIMIT_IMAGES_INTERVAL,
+      .infobox_mode = "all",
   };
 }
 

@@ -551,6 +551,25 @@ static void *infobox_thread_func(void *arg) {
     return NULL;
   }
 
+  /* A6: these handlers contact other services (Wikipedia, Cambridge
+     Dictionary, exchange-rate APIs) on every matching query. "local" keeps the
+     calculator, units and colour lookups and sends nothing off the machine. */
+  {
+    extern Config global_config;
+    const char *mode = global_config.infobox_mode;
+    if (mode && strcmp(mode, "off") == 0) {
+      data->success = 0;
+      return NULL;
+    }
+    int remote = (h->fetch_fn == fetch_wiki_wrapper) ||
+                 (h->fetch_fn == fetch_dict_wrapper) ||
+                 (h->fetch_fn == fetch_currency_wrapper);
+    if (remote && mode && strcmp(mode, "local") == 0) {
+      data->success = 0;
+      return NULL;
+    }
+  }
+
   if (h->fetch_fn == fetch_wiki_wrapper)
     data->result = fetch_wiki_wrapper_lang((char *)data->query, data->lang);
   else

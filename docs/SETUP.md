@@ -79,8 +79,27 @@ Defaults in `src/Config.h`.
 | rate_limit | images_requests / images_interval | 0 / 0 | same for images |
 | health | breaker_threshold / cooldown_seconds | 5 / 900 | circuit breaker |
 
-Note: `[ranking]` exists in `config.ini` but **nothing parses it** — ranking
-weights are compile-time constants in `src/Ranking/Ranker.c`.
+Note: `[ranking]` used to exist in `config.ini` but **nothing parsed it** —
+ranking weights are compile-time constants in `src/Ranking/Ranker.c`. It has
+been removed; unknown keys now report `config.ini:LINE` and `--check-config`
+exits non-zero.
+
+### Where a query actually goes
+
+This is worth stating plainly, because it is more than "the six engines":
+
+| Destination | When | Can be turned off |
+|---|---|---|
+| up to 6 search engines | every search | yes (`engines=` allowlist) |
+| Yahoo, `site:reddit.com` | discussion-shaped queries | yes (`infobox`/lane) |
+| Wikipedia API | every query (the infobox `always_true` handler) | yes |
+| Cambridge Dictionary | looks like a dictionary query | yes |
+| exchange-rate / crypto APIs | looks like a currency query | yes |
+| thumbnail hosts (via `/proxy`) | every image search | yes |
+
+`[server] infobox = all | local | off` controls the middle three: `local` keeps
+the calculator, unit and colour boxes (which compute locally) and sends nothing
+off the machine; `off` disables infoboxes entirely.
 
 ---
 
