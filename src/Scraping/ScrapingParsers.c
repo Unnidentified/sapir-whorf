@@ -329,6 +329,15 @@ static int parse_bing(const char *engine_name, xmlDocPtr doc,
 
   xmlXPathObjectPtr obj =
       xml_xpath_eval(ctx, "//li[contains(@class,'b_algo')]");
+  /* Bing rotates the result list class between experiments; fall back to any
+     result list item that carries a heading link. */
+  if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
+    /* free the object only: free_xpath_objects also destroys the context we
+       still need for the second query */
+    if (obj)
+      xmlXPathFreeObject(obj);
+    obj = xml_xpath_eval(ctx, "//*[@id='b_results']//li[.//h2/a]");
+  }
   if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
     free_xpath_objects(ctx, obj);
     return 0;
@@ -358,6 +367,12 @@ static int parse_bing(const char *engine_name, xmlDocPtr doc,
 
     xmlXPathObjectPtr snip_obj = xml_xpath_eval(
         ctx, ".//div[contains(@class,'b_caption')]//p[1]");
+    if (!snip_obj || !snip_obj->nodesetval ||
+        snip_obj->nodesetval->nodeNr == 0) {
+      if (snip_obj)
+        xmlXPathFreeObject(snip_obj);
+      snip_obj = xml_xpath_eval(ctx, ".//p[1]");
+    }
     char *snippet = (snip_obj && snip_obj->nodesetval &&
                      snip_obj->nodesetval->nodeNr > 0)
                         ? xml_node_content(snip_obj->nodesetval->nodeTab[0])

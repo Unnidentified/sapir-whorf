@@ -554,6 +554,10 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
       /* opinion fillers are not topical: they must not dilute coverage */
       if (query_is_opinion_modifier(query->terms[t]))
         continue;
+      /* a term no candidate contains cannot be matched by anything: counting
+         it as missing would let one typo blank an otherwise good page */
+      if (df[t] == 0)
+        continue;
       double idf = log(1.0 + ((double)count - df[t] + 0.5) / (df[t] + 0.5));
       idf_sum += idf;
       if (coverage_has_term(title_tokens, title_n, query->terms[t]) ||
@@ -561,7 +565,8 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
           coverage_has_term(url_tokens, url_n, query->terms[t]))
         idf_hit += idf;
     }
-    double coverage = idf_sum > 0.0 ? idf_hit / idf_sum : 1.0;
+    /* nothing matched at all: every term was unknown to the result set */
+    double coverage = idf_sum > 0.0 ? idf_hit / idf_sum : 0.0;
 
     doc->coverage = coverage;
     doc->score = W_RRF * (doc->rrf / max_rrf) + W_BM25 * bm25 +
