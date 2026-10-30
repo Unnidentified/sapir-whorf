@@ -95,6 +95,37 @@ static int table_score(char tokens[][32], int count, const IntentTerm *table,
   return score;
 }
 
+/* Opinion words the SERP query strips are exactly the ones that mark a
+   discussion: "best X", "X vs Y", "is it worth it", "recommend". The filler
+   strip throws that signal away; this keeps it. */
+static int discussion_score(const SearchQuery *query) {
+  /* These are plain words, not IntentTerm structs: table_score expects the
+     latter, so match them directly instead of reinterpreting a char* array as
+     structs (which read garbage pointers and crashed on strcmp). */
+  static const char *DISCUSSION_TERMS[] = {
+      "best",     "worst",     "recommend",  "worth",   "vs",
+      "versus",   "review",    "reviews",    "experience", "anyone",
+      "opinions", "alternative", "alternatives", "cheap",  "budget",
+      "should",   "compare",   "comparison", "feedback", "thoughts"};
+  int score = 0;
+  for (int i = 0; i < query->term_count; i++) {
+    for (size_t t = 0;
+         t < sizeof(DISCUSSION_TERMS) / sizeof(DISCUSSION_TERMS[0]); t++) {
+      if (strcmp(query->terms[i], DISCUSSION_TERMS[t]) == 0) {
+        score++;
+        break;
+      }
+    }
+  }
+  if (strstr(query->clean, " worth it") || strstr(query->clean, "anyone tried"))
+    score += 2;
+  /* "vs"/"or"/"x vs y" never reach `terms`: they are two characters and the
+     tokeniser drops those, so match the cleaned text directly */
+  if (strstr(query->clean, " vs ") || strstr(query->clean, " versus "))
+    score += 2;
+  return score;
+}
+
 static QueryIntent detect_intent(const SearchQuery *query) {
   int code = table_score(query->terms, query->term_count, CODE_TERMS,
                          sizeof(CODE_TERMS) / sizeof(CODE_TERMS[0]));
@@ -121,6 +152,11 @@ static QueryIntent detect_intent(const SearchQuery *query) {
     return QI_ACADEMIC;
   if (media >= 3 && media >= entity)
     return QI_MEDIA;
+
+  /* discussion is checked before entity/general: a "best X" query is asking
+     for opinions even when X is an entity */
+  if (discussion_score(query) >= 1 && code < 2 && academic < 3)
+    return QI_DISCUSSION;
   if (entity >= 2)
     return QI_ENTITY;
   return QI_GENERAL;
@@ -329,6 +365,25 @@ void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
 
   detect_language(out, locale);
   out->intent = detect_intent(out);
+
+  /* F3: the lane only runs for discussion-shaped queries */
+  out->wants_discussion =
+      (out->intent == QI_DISCUSSION) || discussion_score(out) >= 1;
+
+  /* "r/rust" or a bare "reddit" narrows the lane to that subreddit */
+  out->discussion_site[0] = '\0';
+  {
+    const char *r = strstr(out->clean, "r/");
+    if (r && (r == out->clean || r[-1] == ' ')) {
+      size_t n = 0;
+      const char *q = r;
+      while (*q && *q != ' ' && n < sizeof(out->discussion_site) - 1)
+        out->discussion_site[n++] = *q++;
+      out->discussion_site[n] = '\0';
+    } else if (strstr(out->clean, "reddit")) {
+      snprintf(out->discussion_site, sizeof(out->discussion_site), "reddit.com");
+    }
+  }
 }
 
 const char *query_intent_name(QueryIntent intent) {
@@ -343,6 +398,8 @@ const char *query_intent_name(QueryIntent intent) {
     return "news";
   case QI_MEDIA:
     return "media";
+  case QI_DISCUSSION:
+    return "discussion";
   case QI_GENERAL:
     break;
   }

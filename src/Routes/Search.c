@@ -1129,6 +1129,73 @@ int results_handler(UrlParams *params) {
     }
   }
 
+  /* F3 Reddit lane: for discussion-shaped queries, also ask the one engine
+     that actually surfaces Reddit threads (Yahoo, per the spike: 12 plain /
+     89 site: hits vs 0 for Bing, Brave and DDG) for site:reddit.com results.
+     It joins the same parallel batch, so it costs no extra latency, and it is
+     a separate job so its results merge and rank like any other source. */
+  int reddit_lane_job = -1;
+  if (analysis.wants_discussion && page == 1 && engine_idx < ENGINE_COUNT &&
+      user_engine_count == 0) {
+    /* Measured, not assumed (tools/queries-reddit.tsv): of the scraped
+       engines only DuckDuckGo Lite actually honours site:reddit.com - it
+       returns ~10 Reddit threads, while Yahoo returns a zero-byte body for the
+       same operator and Bing and Brave return none. The lane therefore asks
+       DDG, and falls back to any other site:-capable web engine only if DDG is
+       unavailable. */
+    static const char *LANE_ORDER[] = {"ddg", "yahoo", "bing", "brave"};
+    const SearchEngine *lane = NULL;
+    for (size_t p = 0; p < sizeof(LANE_ORDER) / sizeof(LANE_ORDER[0]) && !lane;
+         p++) {
+      for (int i = 0; i < ENGINE_COUNT; i++) {
+        if (!ENGINE_REGISTRY[i].enabled ||
+            !(ENGINE_REGISTRY[i].verticals & V_WEB) ||
+            !ENGINE_REGISTRY[i].supports_site)
+          continue;
+        if (strcmp(ENGINE_REGISTRY[i].id, LANE_ORDER[p]) == 0) {
+          lane = &ENGINE_REGISTRY[i];
+          break;
+        }
+      }
+    }
+    if (lane && engine_health_allow(lane->id)) {
+      char lane_query[512];
+      if (analysis.discussion_site[0])
+        snprintf(lane_query, sizeof(lane_query), "site:%s %s",
+                 analysis.discussion_site, analysis.engine_core);
+      else
+        snprintf(lane_query, sizeof(lane_query), "site:reddit.com %s",
+                 analysis.engine_core);
+
+      all_results[engine_idx] = NULL;
+      jobs[engine_idx].engine = lane;
+      jobs[engine_idx].query = jobs[engine_idx].query_text;
+      snprintf(jobs[engine_idx].query_text,
+               sizeof(jobs[engine_idx].query_text), "%s", lane_query);
+      snprintf(jobs[engine_idx].lang, sizeof(jobs[engine_idx].lang), "%s",
+               lang);
+      snprintf(jobs[engine_idx].region, sizeof(jobs[engine_idx].region), "%s",
+               region);
+      snprintf(jobs[engine_idx].accept_language,
+               sizeof(jobs[engine_idx].accept_language), "%s",
+               accept_language);
+      jobs[engine_idx].out_results = &all_results[engine_idx];
+      jobs[engine_idx].max_results = MAX_RESULTS_PER_ENGINE;
+      jobs[engine_idx].results_count = 0;
+      jobs[engine_idx].page = page;
+      jobs[engine_idx].handle = NULL;
+      jobs[engine_idx].response.memory = NULL;
+      jobs[engine_idx].response.size = 0;
+      jobs[engine_idx].response.capacity = 0;
+      jobs[engine_idx].http_status = 0;
+      jobs[engine_idx].status = SCRAPE_STATUS_PENDING;
+      reddit_lane_job = engine_idx;
+      engine_idx++;
+      if (getenv("OMNI_PERF"))
+        fprintf(stderr, "[F3] reddit lane via %s: %s\n", lane->id, lane_query);
+    }
+  }
+
   if (page == 1) {
     for (int i = 0; i < HANDLER_COUNT; i++) {
       pthread_create(&infobox_threads[i], NULL, infobox_thread_func,
@@ -1559,6 +1626,9 @@ int results_handler(UrlParams *params) {
     /* F1 top-up: if the page would still be thin, allow more results per host
        rather than shipping five results when fifteen were available. */
     int domain_cap = MAX_PER_DOMAIN;
+    /* F3: reddit.com carries several distinct threads per query by design, so
+       the generic 3-per-domain cap would throw the lane away */
+    int reddit_cap = analysis.wants_discussion ? 4 : MAX_PER_DOMAIN;
     {
       int cancelled_here = 0;
       for (int i = 0; i < enabled_engine_count; i++)
@@ -1590,7 +1660,9 @@ int results_handler(UrlParams *params) {
         host_counts[slot] = 0;
       }
 
-      if (slot >= 0 && host_counts[slot] >= domain_cap) {
+      int this_cap = (strstr(host, "reddit.com") != NULL) ? reddit_cap
+                                                          : domain_cap;
+      if (slot >= 0 && host_counts[slot] >= this_cap) {
         rank_doc_free(&cands[c]);
         continue;
       }

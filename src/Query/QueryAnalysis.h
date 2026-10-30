@@ -9,7 +9,8 @@ typedef enum {
   QI_ACADEMIC,
   QI_ENTITY,
   QI_NEWS,
-  QI_MEDIA
+  QI_MEDIA,
+  QI_DISCUSSION   /* recommendations, "X vs Y", "is it worth it": Reddit-shaped */
 } QueryIntent;
 
 typedef struct {
@@ -28,6 +29,10 @@ typedef struct {
   char lang[8];
   int is_question;
   int has_operators;
+  /* F3: this is a discussion-shaped query, so the Reddit lane should run */
+  int wants_discussion;
+  /* r/<sub> or a bare "reddit" restricts the lane to site:reddit.com */
+  char discussion_site[128];
 } SearchQuery;
 
 void query_analyze(const char *raw, const char *locale, SearchQuery *out);
