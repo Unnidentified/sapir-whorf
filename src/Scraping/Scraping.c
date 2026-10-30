@@ -737,13 +737,33 @@ retry:;
     int projected = projected_yield(jobs, num_jobs, 3);
     int full_page = 10;
 
-    if (!legacy && num_jobs > 1 && trusted && engines_so_far >= 2 &&
+    /* Independent sources, not engine count: Bing and Yahoo share an index, so
+       their agreement must not satisfy the "two engines answered" test (F2). */
+    const char *answered_groups[16] = {0};
+    int group_count = 0;
+    for (int i = 0; i < num_jobs; i++) {
+      if (jobs[i].results_count <= 0 || !jobs[i].engine)
+        continue;
+      const char *g = jobs[i].engine->index_group
+                          ? jobs[i].engine->index_group
+                          : jobs[i].engine->id;
+      int seen = 0;
+      for (int k = 0; k < group_count; k++)
+        if (strcmp(answered_groups[k], g) == 0) {
+          seen = 1;
+          break;
+        }
+      if (!seen && group_count < 16)
+        answered_groups[group_count++] = g;
+    }
+
+    if (!legacy && num_jobs > 1 && trusted && group_count >= 2 &&
         projected >= full_page && elapsed_ms >= 500)
       break;
     if (!legacy && num_jobs > 1 && trusted && engines_so_far >= 1 &&
         projected >= 6 && elapsed_ms >= 550)
       break;
-    if (!legacy && num_jobs > 1 && engines_so_far >= 2 &&
+    if (!legacy && num_jobs > 1 && group_count >= 2 &&
         projected >= full_page && elapsed_ms >= 1200)
       break;
 

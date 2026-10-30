@@ -494,17 +494,35 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
   if (max_rrf <= 0)
     max_rrf = 1.0;
 
-  /* document frequencies over the candidate set */
+  /* Document frequencies over the candidate set.
+     C13: df used to be computed over title+snippet while tf and coverage also
+     looked at URL tokens, so a term that appeared only in a URL had df == 0
+     and was silently dropped from coverage. All three now use the same
+     fields. `in_title_or_url` records whether any candidate carries the term
+     in a non-truncated field, which is what licenses the snippet half-credit
+     below. */
   int df[8] = {0};
+  int in_title_or_url[8] = {0};
   for (int t = 0; t < query->term_count; t++) {
     for (int i = 0; i < count; i++) {
       char tokens[32][32];
       char text[1024];
-      snprintf(text, sizeof(text), "%s %s", docs[i].title ? docs[i].title : "",
-               docs[i].snippet ? docs[i].snippet : "");
+      snprintf(text, sizeof(text), "%s %s %s",
+               docs[i].title ? docs[i].title : "",
+               docs[i].snippet ? docs[i].snippet : "",
+               docs[i].url ? docs[i].url : "");
       int n = tokenize_into(text, tokens, 32);
       if (count_token(tokens, n, query->terms[t]) > 0)
         df[t]++;
+
+      char tu[32][32];
+      char tu_text[768];
+      snprintf(tu_text, sizeof(tu_text), "%s %s",
+               docs[i].title ? docs[i].title : "",
+               docs[i].url ? docs[i].url : "");
+      int tun = tokenize_into(tu_text, tu, 32);
+      if (count_token(tu, tun, query->terms[t]) > 0)
+        in_title_or_url[t] = 1;
     }
   }
 
@@ -552,11 +570,28 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
         phrase = 0.5;
     }
 
-    int engines = 0;
-    for (int bit = 0; bit < 32; bit++)
-      if (doc->engine_mask & (1 << bit))
-        engines++;
-    double consensus = (engines - 1) / 3.0;
+    /* Consensus counts independent INDEXES, not engines (F2): Yahoo's web
+       results are largely Bing's and DuckDuckGo's partly so, so Bing+Yahoo
+       agreeing is one opinion with one failure mode, not two. Counting them
+       separately inflated consensus exactly when the shared index was wrong. */
+    const char *groups[8] = {0};
+    int group_count = 0;
+    for (int bit = 0; bit < 32; bit++) {
+      if (!(doc->engine_mask & (1u << bit)))
+        continue;
+      if (!doc->engine_groups[bit])
+        continue;
+      int seen = 0;
+      for (int g = 0; g < group_count; g++) {
+        if (strcmp(groups[g], doc->engine_groups[bit]) == 0) {
+          seen = 1;
+          break;
+        }
+      }
+      if (!seen && group_count < 8)
+        groups[group_count++] = doc->engine_groups[bit];
+    }
+    double consensus = (group_count - 1) / 3.0;
     if (consensus < 0)
       consensus = 0;
     if (consensus > 1)
@@ -593,9 +628,18 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
       if (!hit && snippet_truncated) {
         /* Unknown, not absent: the engine cut the text, so half credit. Fully
            dropping the term pushed every truncated result to coverage 1.0 and
-           destroyed the signal (measured: hit@3 0.41 -> 0.29). */
-        idf_sum += idf;
-        idf_hit += idf * 0.5;
+           destroyed the signal (measured: hit@3 0.41 -> 0.29).
+
+           The credit is capped, though: if the term appears in NO candidate's
+           title or URL, the snippet says nothing and the query is simply
+           unrelated ("zzqqxx vbbnmm"). Without this cap every nonsense query
+           scored ~0.5 and rendered junk (measured: 13 results for garbage). */
+        if (in_title_or_url[t]) {
+          idf_sum += idf;
+          idf_hit += idf * 0.5;
+        } else {
+          continue;
+        }
         continue;
       }
       idf_sum += idf;

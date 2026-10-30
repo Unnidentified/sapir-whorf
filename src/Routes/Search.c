@@ -1139,6 +1139,68 @@ int results_handler(UrlParams *params) {
   if (engine_idx > 0) {
     scrape_engines_parallel(jobs, engine_idx);
   }
+
+  /* F2 recovery, bounded to one extra round: if the batch under-delivered and
+     there are healthy engines that were not queried, hedge to them rather than
+     render a thin page. The round is only entered when the first pass clearly
+     failed, so the normal path pays nothing. */
+  {
+    int delivered = 0;
+    for (int i = 0; i < engine_idx; i++)
+      if (jobs[i].results_count > 0)
+        delivered++;
+
+    if (delivered < 2 && user_engine_count == 0 && engine_idx < ENGINE_COUNT &&
+        page == 1) {
+      int added = 0;
+      for (int i = 0; i < ENGINE_COUNT && engine_idx < ENGINE_COUNT; i++) {
+        const SearchEngine *cand = &ENGINE_REGISTRY[i];
+        if (!cand->enabled || !(cand->verticals & V_WEB))
+          continue;
+        if (!engine_health_allow(cand->id))
+          continue;
+        int already = 0;
+        for (int j = 0; j < engine_idx; j++)
+          if (jobs[j].engine == cand)
+            already = 1;
+        if (already)
+          continue;
+
+        all_results[engine_idx] = NULL;
+        jobs[engine_idx].engine = cand;
+        jobs[engine_idx].query = jobs[engine_idx].query_text;
+        snprintf(jobs[engine_idx].query_text,
+                 sizeof(jobs[engine_idx].query_text), "%s", engine_query);
+        snprintf(jobs[engine_idx].lang, sizeof(jobs[engine_idx].lang), "%s",
+                 lang);
+        snprintf(jobs[engine_idx].region, sizeof(jobs[engine_idx].region), "%s",
+                 region);
+        snprintf(jobs[engine_idx].accept_language,
+                 sizeof(jobs[engine_idx].accept_language), "%s",
+                 accept_language);
+        jobs[engine_idx].out_results = &all_results[engine_idx];
+        jobs[engine_idx].max_results = MAX_RESULTS_PER_ENGINE;
+        jobs[engine_idx].results_count = 0;
+        jobs[engine_idx].page = page;
+        jobs[engine_idx].handle = NULL;
+        jobs[engine_idx].response.memory = NULL;
+        jobs[engine_idx].response.size = 0;
+        jobs[engine_idx].response.capacity = 0;
+        jobs[engine_idx].http_status = 0;
+        jobs[engine_idx].status = SCRAPE_STATUS_PENDING;
+        engine_idx++;
+        added++;
+        if (added >= 3)
+          break;
+      }
+
+      if (added > 0) {
+        if (getenv("OMNI_PERF"))
+          fprintf(stderr, "[F2] recovery round: hedging to %d engines\n", added);
+        scrape_engines_parallel(&jobs[engine_idx - added], added);
+      }
+    }
+  }
   clock_gettime(CLOCK_MONOTONIC, &perf_engines);
 
   if (page == 1) {
@@ -1303,6 +1365,9 @@ int results_handler(UrlParams *params) {
           cands[existing].score += score;
           cands[existing].rrf += score;
           cands[existing].engine_mask |= (1 << i);
+          if (i < 32)
+            cands[existing].engine_groups[i] =
+                jobs[i].engine ? jobs[i].engine->index_group : NULL;
           if (strlen(cleaned) > strlen(cands[existing].snippet)) {
             free(cands[existing].snippet);
             cands[existing].snippet = strdup(cleaned);
@@ -1328,6 +1393,9 @@ int results_handler(UrlParams *params) {
         cand->score = score;
         cand->rrf = score;
         cand->engine_mask = (1 << i);
+        if (i < 32)
+          cand->engine_groups[i] =
+              jobs[i].engine ? jobs[i].engine->index_group : NULL;
         cand->order = cand_count;
         rank_domain_of(cand->url, cand->domain, sizeof(cand->domain));
 
@@ -1460,6 +1528,28 @@ int results_handler(UrlParams *params) {
       free(seen_data);
     free(seen_key);
 
+    /* A2: per-engine quality. Count, per engine, how many of the results it
+       returned survived the floor and the join with the candidate pool. An
+       engine that answered 200 with ten results that all got dropped scores 0
+       here while its health stays "closed". */
+    {
+      int returned[32] = {0};
+      int useful[32] = {0};
+      for (int i = 0; i < enabled_engine_count; i++)
+        returned[i] = jobs[i].results_count;
+      for (int c = 0; c < cand_count; c++) {
+        for (int bit = 0; bit < 32 && bit < enabled_engine_count; bit++) {
+          if (cands[c].engine_mask & (1 << bit))
+            useful[bit]++;
+        }
+      }
+      for (int i = 0; i < enabled_engine_count; i++) {
+        if (jobs[i].engine && returned[i] > 0)
+          engine_health_record_quality(jobs[i].engine->id, returned[i],
+                                       useful[i]);
+      }
+    }
+
     qsort(cands, cand_count, sizeof(ResultCandidate), candidate_cmp);
 
     char host_seen[64][128];
@@ -1561,6 +1651,44 @@ int results_handler(UrlParams *params) {
 
     context_set(&ctx, "results_state",
                 results_matrix.count > 0 ? "ok" : "empty");
+
+    /* F1/F2: a thin page must say why it is thin, and offer the patient view.
+       Silence here is what made "page 1 is empty but page 2 is fine" look like
+       a bug the user could not act on. */
+    if (results_matrix.count > 0 && results_matrix.count < 6) {
+      int cut = 0, broke = 0;
+      for (int i = 0; i < enabled_engine_count; i++) {
+        if (jobs[i].status == SCRAPE_STATUS_CANCELLED)
+          cut++;
+        else if (jobs[i].status == SCRAPE_STATUS_BLOCKED ||
+                 jobs[i].status == SCRAPE_STATUS_FETCH_ERROR)
+          broke++;
+      }
+      if (cut > 0 || broke > 0) {
+        char note[320];
+        snprintf(note, sizeof(note),
+                 "Only %d results: %d source%s %s still answering and %d "
+                 "could not be reached.",
+                 results_matrix.count, cut, cut == 1 ? "" : "s",
+                 cut == 1 ? "was" : "were", broke);
+        context_set(&ctx, "partial_note", note);
+      }
+    }
+
+    {
+      /* the patient link needs an encoded query */
+      char enc[512] = {0};
+      CURL *c = curl_easy_init();
+      if (c) {
+        char *e = curl_easy_escape(c, raw_query, 0);
+        if (e) {
+          snprintf(enc, sizeof(enc), "%s", e);
+          curl_free(e);
+        }
+        curl_easy_cleanup(c);
+      }
+      context_set(&ctx, "query_encoded", enc);
+    }
 
     /* F1 funnel: where did the results go? Without this a thin page is
        indistinguishable from a slow one or a blocked one. */

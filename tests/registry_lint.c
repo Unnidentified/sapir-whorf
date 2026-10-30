@@ -56,6 +56,12 @@ int main(void) {
     if ((e->verticals & 1u) && e->supports_site != 0 && e->supports_site != 1)
       fail(e->id, "supports_site must be explicitly 0 or 1");
 
+    /* every engine must declare which index answers it: consensus and the
+       early exit both count groups, so a missing group silently becomes its
+       own opinion (F2) */
+    if (!e->index_group || !e->index_group[0])
+      fail(e->id, "no index_group");
+
     /* a "trusted" web engine for the batch deadline is weight >= 1.1; make the
        intent explicit so a silent weight edit cannot change batch behaviour */
     if ((e->verticals & 1u) && e->weight >= 1.1 && !e->supports_site)

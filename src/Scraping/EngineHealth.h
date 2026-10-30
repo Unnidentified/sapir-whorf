@@ -20,6 +20,12 @@ typedef struct {
   unsigned long total_blocked;
   unsigned long total_errors;
   double total_latency_ms;
+  /* A2: quality of what the engine returns, independent of whether it answered
+     at all. An engine can be perfectly healthy (200, ten results, no warning)
+     and still be returning junk that the coverage floor throws away - that is
+     what Bing did for "best podcast app". */
+  unsigned long quality_samples;
+  double quality_ewma;      /* 0..1, share of its results that survived      */
 } EngineHealthEntry;
 
 void engine_health_init(const char *cache_dir);
@@ -35,5 +41,9 @@ void engine_health_record(const char *id, int status, long http_status,
 EngineHealthEntry *engine_health_get(const char *id);
 const char *engine_health_state_name(BreakerState state);
 void engine_health_persist(void);
+
+/* A2: feed back how many of this engine's results survived ranking. `useful`
+   is the count that passed the floor and were backed by another index. */
+void engine_health_record_quality(const char *id, int returned, int useful);
 
 #endif

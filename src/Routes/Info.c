@@ -54,14 +54,17 @@ int info_handler(UrlParams *params) {
     if (append_json(json, sizeof(json), &used,
                     "%s{\"id\":\"%s\",\"name\":\"%s\","
                     "\"health\":\"%s\",\"requests\":%lu,\"ok\":%lu,"
-                    "\"blocked\":%lu,\"errors\":%lu}",
+                    "\"blocked\":%lu,\"errors\":%lu,"
+                    "\"quality\":%.2f,\"quality_samples\":%lu}",
                     first ? "" : ",", ENGINE_REGISTRY[i].id,
                     ENGINE_REGISTRY[i].name,
                     health ? engine_health_state_name(health->state) : "unknown",
                     health ? health->total_requests : 0UL,
                     health ? health->total_ok : 0UL,
                     health ? health->total_blocked : 0UL,
-                    health ? health->total_errors : 0UL) != 0) {
+                    health ? health->total_errors : 0UL,
+                    health && health->quality_samples ? health->quality_ewma : -1.0,
+                    health ? health->quality_samples : 0UL) != 0) {
       send_response("Failed to build instance info");
       return -1;
     }

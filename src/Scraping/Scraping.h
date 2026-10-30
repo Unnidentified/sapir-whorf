@@ -51,6 +51,11 @@ typedef struct {
   int verticals;       /* EngineVertical bitmask */
   double weight;       /* routing weight, 1.0 default */
   int supports_site;   /* passes site:<host> through */
+  /* Which search index actually answers this engine. Yahoo's web results are
+     largely Bing's and DuckDuckGo's partly so; counting them as independent
+     opinions inflates consensus and lets one index's failure look like three
+     engines agreeing. Engines sharing a group are one vote. */
+  const char *index_group;
 } SearchEngine;
 
 typedef struct {

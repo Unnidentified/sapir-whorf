@@ -187,6 +187,31 @@ void engine_health_record(const char *id, int status, long http_status,
   pthread_mutex_unlock(&health_mutex);
 }
 
+/* Exponentially weighted, alpha 0.2: five bad queries move it ~70% of the way,
+   so a temporary bad patch does not condemn an engine but a persistent one
+   shows up within a handful of queries. */
+void engine_health_record_quality(const char *id, int returned, int useful) {
+  if (!id || returned <= 0)
+    return;
+  if (useful < 0)
+    useful = 0;
+  if (useful > returned)
+    useful = returned;
+
+  pthread_mutex_lock(&health_mutex);
+  EngineHealthEntry *entry = find_or_create(id);
+  if (entry) {
+    double sample = (double)useful / (double)returned;
+    double alpha = 0.2;
+    if (entry->quality_samples == 0)
+      entry->quality_ewma = sample;
+    else
+      entry->quality_ewma = (1.0 - alpha) * entry->quality_ewma + alpha * sample;
+    entry->quality_samples++;
+  }
+  pthread_mutex_unlock(&health_mutex);
+}
+
 void engine_health_persist(void) {
   if (!health_file[0])
     return;

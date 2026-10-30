@@ -15,6 +15,7 @@ typedef struct {
   double coverage;        /* IDF-weighted share of query terms hit */
   int order;              /* first-seen order, tie breaker         */
   int engine_mask;        /* bit i set when engine i returned it   */
+  const char *engine_groups[32]; /* index group of each contributing engine */
 } RankDoc;
 
 /* canonical URL / registrable domain (public suffix subset) */

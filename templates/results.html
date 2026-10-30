@@ -64,6 +64,15 @@
                 <p class="cached-note">Some sources were unavailable; {{results_cached}} answered from cache.</p>
                 {{endif}}
 
+                {{if exists partial_note}}
+                <div class="partial-note">
+                    <p>{{partial_note}}</p>
+                    <p class="partial-note-hint">
+                        <a href="/search?q={{query_encoded}}&amp;patient=1">Wait for all sources</a>
+                    </p>
+                </div>
+                {{endif}}
+
                 {{if exists engine_warnings}}
                 <div class="engine-warnings">
                     <p class="engine-warnings-title">Some sources did not answer</p>
