@@ -50,7 +50,13 @@ size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
 }
 
 const char *get_random_user_agent(void) {
-  return USER_AGENTS[rand() % USER_AGENT_COUNT];
+  static __thread unsigned int user_agent_seed = 0;
+  if (user_agent_seed == 0) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    user_agent_seed = (unsigned int)(ts.tv_nsec ^ (ts.tv_sec << 16)) | 1u;
+  }
+  return USER_AGENTS[rand_r(&user_agent_seed) % USER_AGENT_COUNT];
 }
 
 /* one stable identity per engine: rotating the UA on every request is a
@@ -128,6 +134,6 @@ struct curl_slist *build_request_headers(const char *host_header,
   return headers;
 }
 
-void http_delay(void) {
-  usleep(HTTP_DELAY_MIN_US + (rand() % HTTP_DELAY_RANGE_US));
-}
+/* Unused since the 100-200ms pre-fetch sleep was removed (C7). Kept as a
+   no-op for any out-of-tree caller. */
+void http_delay(void) {}

@@ -52,7 +52,6 @@ void engine_health_set_limits(int threshold, int cooldown) {
 }
 
 void engine_health_init(const char *cache_dir) {
-  srand((unsigned)time(NULL));
   pthread_mutex_lock(&health_mutex);
   entry_count = 0;
   memset(entries, 0, sizeof(entries));
@@ -132,6 +131,18 @@ int engine_health_allow(const char *id) {
   return allow;
 }
 
+/* rand() is not thread-safe and this runs on request threads (C17) */
+static __thread unsigned int jitter_state = 0;
+
+static unsigned int backoff_seed(void) {
+  if (jitter_state == 0) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    jitter_state = (unsigned int)(ts.tv_nsec ^ (ts.tv_sec << 16)) | 1u;
+  }
+  return (unsigned int)rand_r(&jitter_state);
+}
+
 /* Repeated trips mean the source is still unhappy: wait longer each time,
    with jitter so parallel engines do not retry in lockstep. */
 static int backoff_seconds(int trips, int retry_after) {
@@ -146,7 +157,7 @@ static int backoff_seconds(int trips, int retry_after) {
     wait = retry_after;
   if (wait > 60) {
     int spread = (int)(wait / 5);
-    wait += (rand() % (2 * spread + 1)) - spread;
+    wait += (backoff_seed() % (2 * spread + 1)) - spread;
   }
   return (int)wait;
 }

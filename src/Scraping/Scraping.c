@@ -690,7 +690,10 @@ retry:;
     setup_job(&jobs[i], multi_handle);
   }
 
-  http_delay();
+  /* No artificial delay here. It slept 100-200ms before the first
+     curl_multi_perform, including when every job had been served from cache -
+     a quarter of the page latency, and jitter that did nothing useful because
+     every engine started at once anyway. */
 
   /* results already served from cache count towards the early exit */
   int total_so_far = 0;
