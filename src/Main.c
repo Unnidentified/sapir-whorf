@@ -18,6 +18,7 @@
 #include "Routes/ImageProxy.h"
 #include "Routes/Images.h"
 #include "Routes/Info.h"
+#include "Routes/Metrics.h"
 #include "Routes/Search.h"
 #include "Limiter/RateLimit.h"
 #include "Routes/Settings.h"
@@ -248,6 +249,7 @@ int main(int argc, char **argv) {
   set_handler("/images", images_handler);
   set_handler("/proxy", image_proxy_handler);
   set_handler("/info", info_handler);
+  set_handler("/metrics", metrics_handler);
   set_handler("/settings", settings_handler);
   set_handler("/history", history_handler);
   set_handler("/save_settings", settings_save_handler);
