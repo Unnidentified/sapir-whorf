@@ -325,6 +325,24 @@ eval:
 eval-strict:
 	@python3 tools/eval.py $(BASE) --strict
 
+# A7: one command that runs everything the project has, including a sanitizer
+# build when asked. This is the substitute for the CI the project does not have.
+verify: build check
+	@echo "verify: all checks passed"
+
+asan:
+	@$(CC) $(CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer \
+		-g -o /tmp/omnisearch-asan $(SRCS) $(LDFLAGS) $(LIBS) \
+		|| { echo "asan build failed"; exit 1; }
+	@echo "asan binary: /tmp/omnisearch-asan"
+
+dist:
+	@git archive --format=tar.gz --prefix=omnisearch-$(VERSION)/ \
+		-o /tmp/omnisearch-$(VERSION).tar.gz HEAD
+	@echo "dist: /tmp/omnisearch-$(VERSION).tar.gz"
+	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
+		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
+
 check: check-themes registry-lint fixtures canonical config-check smoke
 
-.PHONY: all run clean rebuild info check check-themes registry-lint fixtures canonical config-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
