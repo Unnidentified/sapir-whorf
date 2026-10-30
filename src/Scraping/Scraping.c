@@ -1,4 +1,5 @@
 #include "Scraping.h"
+#include <pthread.h>
 #include "BlockDetection.h"
 #include "Replay.h"
 
@@ -21,6 +22,31 @@ __thread int request_is_patient = 0;
 #include <time.h>
 
 static void cookie_jar_path(const char *engine_id, char *out, size_t size);
+
+/* C14: one jar file per engine was read and rewritten by every concurrent
+   request (curl rewrites it at handle cleanup), and a failure path remove()d it
+   while other requests were mid-flight. Serialise jar use per engine so a
+   cookie read cannot see a half-written file and a removal cannot race a load.
+   Only Yahoo really needs a jar; the others are stateless by design. */
+#define MAX_JAR_LOCKS 16
+static pthread_mutex_t jar_locks[MAX_JAR_LOCKS];
+static int jar_locks_ready = 0;
+
+static pthread_mutex_t *jar_lock_for(const char *engine_id) {
+  static pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
+  pthread_mutex_lock(&init_mutex);
+  if (!jar_locks_ready) {
+    for (int i = 0; i < MAX_JAR_LOCKS; i++)
+      pthread_mutex_init(&jar_locks[i], NULL);
+    jar_locks_ready = 1;
+  }
+  pthread_mutex_unlock(&init_mutex);
+
+  unsigned int h = 0;
+  for (const char *p = engine_id ? engine_id : ""; *p; p++)
+    h = h * 31u + (unsigned char)*p;
+  return &jar_locks[h % MAX_JAR_LOCKS];
+}
 
 static int response_contains(const char *response, const char *needle) {
   return response && needle && strstr(response, needle) != NULL;
@@ -376,8 +402,11 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
        zero_web_results)) {
     char jar_path[BUFFER_SIZE_LARGE];
     cookie_jar_path(job->engine->id, jar_path, sizeof(jar_path));
-    if (jar_path[0])
+    if (jar_path[0]) {
+      pthread_mutex_lock(jar_lock_for(job->engine->id));
       remove(jar_path);
+      pthread_mutex_unlock(jar_lock_for(job->engine->id));
+    }
   }
 
   cleanup_job_handle(job, handle);
