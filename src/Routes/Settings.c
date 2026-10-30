@@ -122,9 +122,11 @@ int settings_handler(UrlParams *params) {
   int themes_count = 0;
   get_available_themes(&themes, &themes_count);
 
+  char ***theme_ptrs = NULL;
+  int *theme_inner = NULL;
   if (themes_count > 0) {
-    char ***theme_ptrs = malloc(sizeof(char **) * themes_count);
-    int *theme_inner = malloc(sizeof(int) * themes_count);
+    theme_ptrs = malloc(sizeof(char **) * themes_count);
+    theme_inner = malloc(sizeof(int) * themes_count);
     for (int i = 0; i < themes_count; i++) {
       theme_ptrs[i] = malloc(sizeof(char *) * 2);
       theme_ptrs[i][0] = themes[i];
@@ -133,12 +135,6 @@ int settings_handler(UrlParams *params) {
     }
     context_set_array_of_arrays(&ctx, "themes", theme_ptrs, themes_count,
                                 theme_inner);
-    for (int i = 0; i < themes_count; i++) {
-      free(theme_ptrs[i][1]);
-      free(theme_ptrs[i]);
-    }
-    free(theme_ptrs);
-    free(theme_inner);
   }
 
   if (enabled_count > 0) {
@@ -165,6 +161,15 @@ int settings_handler(UrlParams *params) {
     for (int i = 0; i < user_engine_count; i++)
       free(user_engines[i]);
     free(user_engines);
+  }
+
+  if (theme_ptrs) {
+    for (int i = 0; i < themes_count; i++) {
+      free(theme_ptrs[i][1]);
+      free(theme_ptrs[i]);
+    }
+    free(theme_ptrs);
+    free(theme_inner);
   }
 
   free(rendered_html);

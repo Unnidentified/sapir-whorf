@@ -7,6 +7,9 @@
 #include "../Infobox/UnitConversion.h"
 #include "../Infobox/Wikipedia.h"
 #include "../Limiter/RateLimit.h"
+#include "../Scraping/EngineHealth.h"
+#include "../Query/QueryAnalysis.h"
+#include "../Ranking/Ranker.h"
 #include "../Scraping/Scraping.h"
 #include "../Utility/Display.h"
 #include "../Utility/Unescape.h"
@@ -23,6 +26,7 @@
 
 typedef struct {
   const char *query;
+  char lang[8];
   InfoBox result;
   int success;
 } InfoBoxThreadData;
@@ -39,6 +43,15 @@ enum {
 
 static InfoBox fetch_wiki_wrapper(char *query) {
   char *url = construct_wiki_url(query);
+  if (!url)
+    return (InfoBox){NULL};
+  InfoBox result = fetch_wiki_data(url);
+  free(url);
+  return result;
+}
+
+static InfoBox fetch_wiki_wrapper_lang(char *query, const char *lang) {
+  char *url = construct_wiki_url_lang(query, lang);
   if (!url)
     return (InfoBox){NULL};
   InfoBox result = fetch_wiki_data(url);
@@ -125,14 +138,7 @@ static int url_host_matches(const char *url, const char *host) {
 #define MAX_PER_DOMAIN 3
 #define RRF_K 60.0
 
-typedef struct {
-  char *url;
-  char *title;
-  char *snippet;
-  char *key;
-  double score;
-  int order;
-} ResultCandidate;
+typedef RankDoc ResultCandidate;
 
 static int prefix_ci(const char *s, const char *prefix) {
   while (*prefix) {
@@ -146,53 +152,6 @@ static int prefix_ci(const char *s, const char *prefix) {
       return 0;
   }
   return 1;
-}
-
-static const char *url_body(const char *url) {
-  const char *p = url;
-  if (prefix_ci(p, "https://"))
-    p += 8;
-  else if (prefix_ci(p, "http://"))
-    p += 7;
-  if (prefix_ci(p, "www."))
-    p += 4;
-  return p;
-}
-
-static void normalize_url_key(const char *url, char *out, size_t size) {
-  out[0] = '\0';
-  if (!url || size == 0)
-    return;
-
-  const char *p = url_body(url);
-  size_t o = 0;
-  for (; *p && o + 1 < size; p++) {
-    if (*p == '#')
-      break;
-    char c = *p;
-    if (c >= 'A' && c <= 'Z')
-      c += 32;
-    out[o++] = c;
-  }
-  out[o] = '\0';
-  while (o > 0 && out[o - 1] == '/')
-    out[--o] = '\0';
-}
-
-static void extract_host(const char *url, char *out, size_t size) {
-  out[0] = '\0';
-  if (!url || size == 0)
-    return;
-
-  const char *p = url_body(url);
-  size_t o = 0;
-  for (; *p && *p != '/' && *p != '?' && o + 1 < size; p++) {
-    char c = *p;
-    if (c >= 'A' && c <= 'Z')
-      c += 32;
-    out[o++] = c;
-  }
-  out[o] = '\0';
 }
 
 static int is_month_abbrev(const char *s) {
@@ -463,8 +422,8 @@ static void sanitize_query(const char *in, char *out, size_t size) {
 }
 
 static int candidate_cmp(const void *a, const void *b) {
-  const ResultCandidate *x = (const ResultCandidate *)a;
-  const ResultCandidate *y = (const ResultCandidate *)b;
+  const RankDoc *x = (const RankDoc *)a;
+  const RankDoc *y = (const RankDoc *)b;
   if (x->score > y->score)
     return -1;
   if (x->score < y->score)
@@ -590,7 +549,10 @@ static void *infobox_thread_func(void *arg) {
     return NULL;
   }
 
-  data->result = h->fetch_fn((char *)data->query);
+  if (h->fetch_fn == fetch_wiki_wrapper)
+    data->result = fetch_wiki_wrapper_lang((char *)data->query, data->lang);
+  else
+    data->result = h->fetch_fn((char *)data->query);
 
   int relevant = 1;
   {
@@ -829,19 +791,6 @@ int results_handler(UrlParams *params) {
   if (!no_results_msg)
     no_results_msg = "No results found";
 
-  char page_str[16];
-  snprintf(page_str, sizeof(page_str), "%d", page);
-  context_set(&ctx, "page", page_str);
-
-  char prev_str[16], next_str[16], two_prev_str[16], two_next_str[16];
-  snprintf(prev_str, sizeof(prev_str), "%d", page > 1 ? page - 1 : 0);
-  snprintf(next_str, sizeof(next_str), "%d", page + 1);
-  snprintf(two_prev_str, sizeof(two_prev_str), "%d", page > 2 ? page - 2 : 0);
-  snprintf(two_next_str, sizeof(two_next_str), "%d", page + 2);
-  context_set(&ctx, "prev_page", prev_str);
-  context_set(&ctx, "next_page", next_str);
-  context_set(&ctx, "two_prev_page", two_prev_str);
-  context_set(&ctx, "two_next_page", two_next_str);
 
   if (!raw_query || strlen(raw_query) == 0) {
     send_redirect("/");
@@ -864,9 +813,7 @@ int results_handler(UrlParams *params) {
     snprintf(selected_engine_id, sizeof(selected_engine_id), "all");
   }
 
-  context_set(&ctx, "selected_engine", selected_engine_id);
   char *search_href = build_search_href(raw_query, selected_engine_id, 1);
-  context_set(&ctx, "search_href", search_href ? search_href : "/search");
   context_set(&ctx, "chrome_action", "/search");
   context_set(&ctx, "chrome_active", "all");
   context_set(&ctx, "chrome_engine",
@@ -875,19 +822,126 @@ int results_handler(UrlParams *params) {
               search_href ? search_href : "/search");
   free(search_href);
 
-  int enabled_engine_count = 0;
+  /* eligible engines for this request: filtered once so the counting and the
+     job setup below can never disagree */
+  const SearchEngine *eligible[ENGINE_COUNT];
+  int eligible_count = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
-    if (ENGINE_REGISTRY[i].enabled &&
-        (!selected_engine || &ENGINE_REGISTRY[i] == selected_engine) &&
-        engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
-                                user_engine_count, has_user_pref)) {
-      enabled_engine_count++;
+    if (!ENGINE_REGISTRY[i].enabled)
+      continue;
+    if (selected_engine && &ENGINE_REGISTRY[i] != selected_engine)
+      continue;
+    if (!engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
+                                 user_engine_count, has_user_pref))
+      continue;
+    eligible[eligible_count++] = &ENGINE_REGISTRY[i];
+  }
+
+  /* skip engines whose breaker is open, but never leave the page without one */
+  if (eligible_count > 0) {
+    int healthy[ENGINE_COUNT];
+    int healthy_count = 0;
+    for (int i = 0; i < eligible_count; i++) {
+      healthy[i] = engine_health_allow(eligible[i]->id);
+      if (healthy[i])
+        healthy_count++;
+    }
+    if (healthy_count > 0 && healthy_count < eligible_count) {
+      int kept = 0;
+      for (int i = 0; i < eligible_count; i++)
+        if (healthy[i])
+          eligible[kept++] = eligible[i];
+      eligible_count = kept;
+    }
+  }
+  int enabled_engine_count = eligible_count;
+
+  char lang[8], region[8];
+  locale_parts(locale, lang, sizeof(lang), region, sizeof(region));
+  if (!lang[0])
+    snprintf(lang, sizeof(lang), "en");
+
+  char accept_language[64];
+  if (region[0])
+    snprintf(accept_language, sizeof(accept_language),
+             "%s-%s,%s;q=0.9,en;q=0.4", lang, region, lang);
+  else
+    snprintf(accept_language, sizeof(accept_language), "%s;q=0.9,en;q=0.4",
+             lang);
+
+  /* operators (site:, -term, "phrase", filetype:) and intent */
+  SearchQuery analysis;
+  query_analyze(raw_query, locale, &analysis);
+
+  /* vertical routing: the intent selects specialised engines first, then
+     general web engines fill the remaining slots so recall never depends on a
+     single API */
+  {
+    const SearchEngine *routed[ENGINE_COUNT];
+    int routed_count = 0;
+    int max_engines = 6;
+    int want = V_WEB;
+    switch (analysis.intent) {
+    case QI_CODE:
+      want = V_CODE;
+      break;
+    case QI_ACADEMIC:
+      want = V_ACADEMIC;
+      break;
+    case QI_ENTITY:
+      want = V_ENTITY;
+      break;
+    case QI_NEWS:
+      want = V_NEWS;
+      break;
+    default:
+      want = V_WEB;
+      break;
+    }
+
+    for (int pass = 0; pass < 2 && routed_count < max_engines; pass++) {
+      for (int i = 0; i < eligible_count && routed_count < max_engines; i++) {
+        int verticals = eligible[i]->verticals;
+        if (pass == 0 && (verticals & want) == 0)
+          continue;
+        if (pass == 1 && (verticals & V_WEB) == 0)
+          continue;
+        int duplicate = 0;
+        for (int k = 0; k < routed_count; k++) {
+          if (routed[k] == eligible[i]) {
+            duplicate = 1;
+            break;
+          }
+        }
+        if (duplicate)
+          continue;
+        routed[routed_count++] = eligible[i];
+      }
+    }
+
+    /* strongest first */
+    for (int i = 1; i < routed_count; i++) {
+      const SearchEngine *key = routed[i];
+      int j = i - 1;
+      while (j >= 0 && routed[j]->weight < key->weight) {
+        routed[j + 1] = routed[j];
+        j--;
+      }
+      routed[j + 1] = key;
+    }
+
+    if (routed_count > 0) {
+      for (int i = 0; i < routed_count; i++)
+        eligible[i] = routed[i];
+      eligible_count = routed_count;
     }
   }
 
+
   /* engines choke on some punctuation; keep the typed text for display only */
   char engine_query[BUFFER_SIZE_LARGE];
-  sanitize_query(raw_query, engine_query, sizeof(engine_query));
+  sanitize_query(analysis.clean[0] ? analysis.clean : raw_query, engine_query,
+                 sizeof(engine_query));
   if (engine_query[0] == '\0')
     snprintf(engine_query, sizeof(engine_query), "%s", raw_query);
 
@@ -896,22 +950,35 @@ int results_handler(UrlParams *params) {
 
   for (int i = 0; i < HANDLER_COUNT; i++) {
     infobox_data[i].query = raw_query;
+    snprintf(infobox_data[i].lang, sizeof(infobox_data[i].lang), "%s", lang);
     infobox_data[i].success = i;
     infobox_data[i].result = (InfoBox){NULL};
   }
 
   ScrapeJob jobs[ENGINE_COUNT];
   SearchResult *all_results[ENGINE_COUNT];
+  memset(jobs, 0, sizeof(jobs));
+  memset(all_results, 0, sizeof(all_results));
 
   int engine_idx = 0;
-  for (int i = 0; i < ENGINE_COUNT; i++) {
-    if (ENGINE_REGISTRY[i].enabled &&
-        (!selected_engine || &ENGINE_REGISTRY[i] == selected_engine) &&
-        engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
-                                user_engine_count, has_user_pref)) {
+  for (int i = 0; i < eligible_count; i++) {
+    {
       all_results[engine_idx] = NULL;
-      jobs[engine_idx].engine = &ENGINE_REGISTRY[i];
-      jobs[engine_idx].query = engine_query;
+      jobs[engine_idx].engine = eligible[i];
+      jobs[engine_idx].query = jobs[engine_idx].query_text;
+      query_engine_text(&analysis, eligible[i]->supports_site, 1,
+                        jobs[engine_idx].query_text,
+                        sizeof(jobs[engine_idx].query_text));
+      if (jobs[engine_idx].query_text[0] == '\0')
+        snprintf(jobs[engine_idx].query_text,
+                 sizeof(jobs[engine_idx].query_text), "%s", engine_query);
+      snprintf(jobs[engine_idx].lang, sizeof(jobs[engine_idx].lang), "%s",
+               lang);
+      snprintf(jobs[engine_idx].region, sizeof(jobs[engine_idx].region), "%s",
+               region);
+      snprintf(jobs[engine_idx].accept_language,
+               sizeof(jobs[engine_idx].accept_language), "%s",
+               accept_language);
       jobs[engine_idx].out_results = &all_results[engine_idx];
       jobs[engine_idx].max_results = MAX_RESULTS_PER_ENGINE;
       jobs[engine_idx].results_count = 0;
@@ -968,52 +1035,6 @@ int results_handler(UrlParams *params) {
     }
   }
 
-  int filter_engine_count = 0;
-  for (int i = 0; i < ENGINE_COUNT; i++) {
-    if (ENGINE_REGISTRY[i].enabled &&
-        engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
-                                user_engine_count, has_user_pref))
-      filter_engine_count++;
-  }
-
-  if (filter_engine_count > 1) {
-    StringMatrix filter_matrix;
-    string_matrix_init(&filter_matrix);
-    char *all_href = build_search_href(raw_query, "all", 1);
-    const char *all_values[LINK_FIELD_COUNT] = {
-        all_href, "All",
-        selected_engine ? "engine-filter" : "engine-filter active"};
-
-    string_matrix_append(&filter_matrix, all_values, LINK_FIELD_COUNT);
-    free(all_href);
-
-    for (int i = 0; i < ENGINE_COUNT; i++) {
-      if (!ENGINE_REGISTRY[i].enabled ||
-          !engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
-                                   user_engine_count, has_user_pref))
-        continue;
-
-      char *filter_href =
-          build_search_href(raw_query, ENGINE_REGISTRY[i].id, 1);
-      const char *filter_class =
-          (selected_engine && &ENGINE_REGISTRY[i] == selected_engine)
-              ? "engine-filter active"
-              : "engine-filter";
-
-      const char *filter_values[LINK_FIELD_COUNT] = {
-          filter_href, ENGINE_REGISTRY[i].name, filter_class};
-      string_matrix_append(&filter_matrix, filter_values, LINK_FIELD_COUNT);
-      free(filter_href);
-    }
-
-    if (filter_matrix.count > 0) {
-      context_set_array_of_arrays(&ctx, "engine_filters", filter_matrix.rows,
-                                  filter_matrix.count,
-                                  filter_matrix.field_counts);
-    }
-    string_matrix_free(&filter_matrix);
-  }
-
   if (page == 1) {
     for (int i = 0; i < HANDLER_COUNT; i++) {
       pthread_create(&infobox_threads[i], NULL, infobox_thread_func,
@@ -1030,6 +1051,7 @@ int results_handler(UrlParams *params) {
       pthread_join(infobox_threads[i], NULL);
     }
   }
+
 
   if (btnI) {
     for (int i = 0; i < engine_idx; i++) {
@@ -1081,6 +1103,17 @@ int results_handler(UrlParams *params) {
   }
   string_matrix_free(&infobox_matrix);
 
+  int stale_count = 0;
+  for (int i = 0; i < enabled_engine_count; i++) {
+    if (jobs[i].stale)
+      stale_count++;
+  }
+  if (stale_count > 0) {
+    char stale_label[32];
+    snprintf(stale_label, sizeof(stale_label), "%d", stale_count);
+    context_set(&ctx, "results_cached", stale_label);
+  }
+
   int warning_count = 0;
   for (int i = 0; i < enabled_engine_count; i++) {
     if (warning_message_for_job(&jobs[i], locale))
@@ -1122,8 +1155,7 @@ int results_handler(UrlParams *params) {
     total_results += jobs[i].results_count;
   }
 
-  /* let the template render an explicit empty state instead of a blank page */
-  context_set(&ctx, "results_state", total_results > 0 ? "ok" : "empty");
+  /* results_state is derived from what is actually rendered, below */
 
   if (total_results > 0) {
     StringMatrix results_matrix;
@@ -1156,7 +1188,7 @@ int results_handler(UrlParams *params) {
         }
 
         char key[BUFFER_SIZE_LARGE];
-        normalize_url_key(raw_url, key, sizeof(key));
+        rank_canonical_url(raw_url, key, sizeof(key));
 
         char cleaned[BUFFER_SIZE_LARGE];
         clean_snippet(raw_snippet, cleaned, sizeof(cleaned));
@@ -1173,6 +1205,8 @@ int results_handler(UrlParams *params) {
 
         if (existing >= 0) {
           cands[existing].score += score;
+          cands[existing].rrf += score;
+          cands[existing].engine_mask |= (1 << i);
           if (strlen(cleaned) > strlen(cands[existing].snippet)) {
             free(cands[existing].snippet);
             cands[existing].snippet = strdup(cleaned);
@@ -1196,7 +1230,10 @@ int results_handler(UrlParams *params) {
         cand->title = strdup(raw_title ? raw_title : "Untitled");
         cand->snippet = strdup(cleaned);
         cand->score = score;
+        cand->rrf = score;
+        cand->engine_mask = (1 << i);
         cand->order = cand_count;
+        rank_domain_of(cand->url, cand->domain, sizeof(cand->domain));
 
         if (cand->key && cand->url && cand->title && cand->snippet) {
           cand_count++;
@@ -1217,24 +1254,9 @@ int results_handler(UrlParams *params) {
       free(all_results[i]);
     }
 
-    /* prefer titles that actually contain the query terms */
-    char query_tokens[8][32];
-    int query_token_count = tokenize_query(raw_query, query_tokens, 8);
-    if (query_token_count > 0) {
-      for (int c = 0; c < cand_count; c++) {
-        int title_hits = 0;
-        int snippet_hits = 0;
-        for (int t = 0; t < query_token_count; t++) {
-          if (contains_ci(cands[c].title, query_tokens[t]))
-            title_hits++;
-          if (contains_ci(cands[c].snippet, query_tokens[t]))
-            snippet_hits++;
-        }
-        cands[c].score +=
-            0.05 * ((double)title_hits / query_token_count) +
-            0.02 * ((double)snippet_hits / query_token_count);
-      }
-    }
+    /* collapse syndicated copies, then score with the ranker */
+    cand_count = rank_dedupe(cands, cand_count);
+    rank_score(cands, cand_count, &analysis);
 
     /* drop anything already shown on an earlier page of this query */
     /* cache keys are hashed; a raw "seen|<client>|<query>" string is rejected */
@@ -1291,7 +1313,7 @@ int results_handler(UrlParams *params) {
 
     for (int c = 0; c < cand_count; c++) {
       char host[128];
-      extract_host(cands[c].url, host, sizeof(host));
+      snprintf(host, sizeof(host), "%s", cands[c].domain);
 
       int slot = -1;
       for (int h = 0; h < host_total; h++) {
@@ -1307,10 +1329,7 @@ int results_handler(UrlParams *params) {
       }
 
       if (slot >= 0 && host_counts[slot] >= MAX_PER_DOMAIN) {
-        free(cands[c].key);
-        free(cands[c].url);
-        free(cands[c].title);
-        free(cands[c].snippet);
+        rank_doc_free(&cands[c]);
         continue;
       }
       if (slot >= 0)
@@ -1330,10 +1349,7 @@ int results_handler(UrlParams *params) {
 
       free(pretty_url);
       free(base_url);
-      free(cands[c].key);
-      free(cands[c].url);
-      free(cands[c].title);
-      free(cands[c].snippet);
+      rank_doc_free(&cands[c]);
     }
 
     context_set_array_of_arrays(&ctx, "results", results_matrix.rows,
@@ -1352,6 +1368,19 @@ int results_handler(UrlParams *params) {
                                   pager_matrix.field_counts);
     }
 
+    context_set(&ctx, "results_state",
+                results_matrix.count > 0 ? "ok" : "empty");
+
+    if (results_matrix.count == 0 && total_results > 0) {
+      fprintf(stderr,
+              "[WARN] %d raw hits collapsed to zero rendered results (query "
+              "\"%s\"):",
+              total_results, raw_query);
+      for (int i = 0; i < enabled_engine_count; i++)
+        fprintf(stderr, " %s=%d", jobs[i].engine->id, jobs[i].results_count);
+      fprintf(stderr, "\n");
+    }
+
     char *html = render_template("results.html", &ctx);
     if (html) {
       send_response(html);
@@ -1364,6 +1393,7 @@ int results_handler(UrlParams *params) {
     string_matrix_free(&pager_matrix);
     string_matrix_free(&results_matrix);
   } else {
+    context_set(&ctx, "results_state", "empty");
     char *html = render_template("results.html", &ctx);
     if (html) {
       send_response(html);

@@ -13,6 +13,10 @@ static int cache_ttl_search_val = DEFAULT_CACHE_TTL_SEARCH;
 static int cache_ttl_infobox_val = DEFAULT_CACHE_TTL_INFOBOX;
 static int cache_ttl_image_val = DEFAULT_CACHE_TTL_IMAGE;
 
+const char *cache_get_dir(void) {
+  return cache_dir;
+}
+
 void set_cache_ttl_search(int ttl) { cache_ttl_search_val = ttl; }
 
 void set_cache_ttl_infobox(int ttl) { cache_ttl_infobox_val = ttl; }
@@ -78,6 +82,10 @@ int cache_init(const char *dir) {
       mkdir(subdir_path, 0755);
     }
   }
+
+  char cookies_dir[BUFFER_SIZE_LARGE];
+  snprintf(cookies_dir, sizeof(cookies_dir), "%s/cookies", cache_dir);
+  mkdir(cookies_dir, 0755);
 
   return 0;
 }

@@ -1,0 +1,3 @@
+# One domain suffix per line. Matching hosts get a ranking penalty.
+# Empty by default: static/authority.tsv plus the generic spam heuristics
+# (keyword-stuffed slugs, query-echo titles, stub snippets) do most of the work.

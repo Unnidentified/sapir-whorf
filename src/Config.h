@@ -8,6 +8,8 @@
 #define DEFAULT_CACHE_TTL_INFOBOX 86400
 #define DEFAULT_CACHE_TTL_IMAGE 604800
 #define DEFAULT_MAX_PROXY_RETRIES 3
+#define DEFAULT_BREAKER_THRESHOLD 3
+#define DEFAULT_BREAKER_COOLDOWN 900
 #define DEFAULT_YACY_INSTANCE "http://127.0.0.1:8090"
 
 #define BUFFER_SIZE_SMALL 256
@@ -52,6 +54,8 @@ typedef struct {
   int rate_limit_search_interval;
   int rate_limit_images_requests;
   int rate_limit_images_interval;
+  int breaker_threshold;
+  int breaker_cooldown;
 } Config;
 
 void config_set_defaults(Config *config);

@@ -1,7 +1,7 @@
 CC      := cc
 UNAME_S := $(shell uname -s)
 PKG_CONFIG ?= pkg-config
-PKG_DEPS   := libxml-2.0 libcurl openssl
+PKG_DEPS   := libxml-2.0 libcurl openssl jansson
 
 GIT_HASH  := $(shell git rev-parse --short HEAD)
 GIT_DATE  := $(shell git log -1 --format='%ad' --date='format:%y.%m.%d')
@@ -22,7 +22,7 @@ CFLAGS  += -I$(BREW_PREFIX)/include $(DEP_CFLAGS)
 LIBS    := -L$(BREW_PREFIX)/lib -lbeaker $(DEP_LIBS) -lpthread -lm
 else
 CFLAGS  += -I/usr/include/libxml2
-LIBS    := -lbeaker -lcurl -lxml2 -lpthread -lm -lssl -lcrypto
+LIBS    := -lbeaker -lcurl -lxml2 -ljansson -lpthread -lm -lssl -lcrypto
 endif
 
 LDFLAGS :=
@@ -45,8 +45,13 @@ $(TARGET): $(OBJS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 	@echo "Compiled: $<"
+
+# header dependencies: without these a struct change silently mixed old object
+# layouts with new ones
+DEPS := $(OBJS:.o=.d)
+-include $(DEPS)
 
 run: $(TARGET)
 	./$(TARGET)
@@ -254,6 +259,12 @@ check-themes:
 smoke:
 	@./tools/smoke.sh $(BASE)
 
+eval:
+	@python3 tools/eval.py $(BASE)
+
+eval-strict:
+	@python3 tools/eval.py $(BASE) --strict
+
 check: check-themes smoke
 
-.PHONY: all run clean rebuild info check check-themes smoke install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info check check-themes smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

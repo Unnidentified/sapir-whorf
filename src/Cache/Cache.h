@@ -15,6 +15,7 @@ void cache_cleanup(time_t max_age);
 
 char *cache_compute_key(const char *query, int page, const char *engine_name);
 
+const char *cache_get_dir(void);
 void set_cache_ttl_search(int ttl);
 void set_cache_ttl_infobox(int ttl);
 void set_cache_ttl_image(int ttl);

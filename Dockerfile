@@ -6,6 +6,7 @@ RUN apk add --no-cache \
     curl-dev \
     libxml2-dev \
     openssl-dev \
+    jansson-dev \
     git \
     pkgconf
 
@@ -25,6 +26,7 @@ FROM alpine:3.20
 RUN apk add --no-cache \
     libcurl \
     libxml2 \
+    jansson \
     openssl
 
 WORKDIR /app

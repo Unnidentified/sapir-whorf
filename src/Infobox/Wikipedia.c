@@ -154,7 +154,7 @@ InfoBox fetch_wiki_data(char *api_url) {
 /* One request instead of two: the search generator returns the best matching
    article together with its intro extract and thumbnail. The old code did a
    title lookup and then a second fetch for the extract. */
-char *construct_wiki_url(const char *search_term) {
+char *construct_wiki_url_lang(const char *search_term, const char *lang) {
   if (!search_term || search_term[0] == '\0')
     return NULL;
 
@@ -162,9 +162,12 @@ char *construct_wiki_url(const char *search_term) {
   if (!escaped_term)
     return NULL;
 
-  const char *base =
-      "https://en.wikipedia.org/w/api.php?action=query&generator=search"
-      "&gsrnamespace=0&gsrlimit=1&gsrsearch=";
+  const char *wiki_lang = (lang && lang[0]) ? lang : "en";
+  char base[256];
+  snprintf(base, sizeof(base),
+           "https://%s.wikipedia.org/w/api.php?action=query&generator=search"
+           "&gsrnamespace=0&gsrlimit=1&gsrsearch=",
+           wiki_lang);
   const char *suffix = "&prop=extracts|pageimages&exintro&explaintext"
                        "&pithumbsize=400&format=xml&origin=*&redirects=1";
 
@@ -178,4 +181,8 @@ char *construct_wiki_url(const char *search_term) {
 
   curl_free(escaped_term);
   return full_url;
+}
+
+char *construct_wiki_url(const char *search_term) {
+  return construct_wiki_url_lang(search_term, "en");
 }

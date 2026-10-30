@@ -5,7 +5,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
         <title>
-            Sapir-Whorf - {{query}}
+            sp-engine — {{query}}
         </title>
         <link rel="stylesheet" href="static/main.css">
         <link rel="stylesheet" href="static/themes/{{theme}}.css">
@@ -57,6 +57,21 @@
                 <div class="no-results">
                     <p>No results found for <span class="no-results-query">{{query}}</span>.</p>
                     <p class="no-results-hint">The search engines may be busy — try again in a moment.</p>
+                </div>
+                {{endif}}
+
+                {{if exists results_cached}}
+                <p class="cached-note">Some sources were unavailable; {{results_cached}} answered from cache.</p>
+                {{endif}}
+
+                {{if exists engine_warnings}}
+                <div class="engine-warnings">
+                    <p class="engine-warnings-title">Some sources did not answer</p>
+                    <ul>
+                        {{for w in engine_warnings}}
+                        <li><span class="engine-warning-name">{{w[0]}}</span> {{w[1]}}</li>
+                        {{endfor}}
+                    </ul>
                 </div>
                 {{endif}}
 

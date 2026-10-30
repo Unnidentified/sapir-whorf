@@ -46,6 +46,8 @@ void init_themes(const char *static_path);
 void get_available_themes(char ***out_themes, int *out_count);
 void set_default_locale(const char *locale);
 char *get_locale(const char *default_locale);
+void locale_parts(const char *locale, char *lang, size_t lang_size, char *region,
+                  size_t region_size);
 
 int is_engine_id_enabled(const char *engine_id);
 int get_user_engines(char ***out_ids, int *out_count);

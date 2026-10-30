@@ -286,6 +286,33 @@ static int engine_id_casecmp(const char *a, const char *b) {
   return *a == *b;
 }
 
+void locale_parts(const char *locale, char *lang, size_t lang_size, char *region,
+                  size_t region_size) {
+  if (lang && lang_size)
+    lang[0] = '\0';
+  if (region && region_size)
+    region[0] = '\0';
+  if (!locale || !locale[0])
+    return;
+
+  size_t len = 0;
+  while (locale[len] && locale[len] != '_' && locale[len] != '-' &&
+         len + 1 < (lang ? lang_size : 0))
+    len++;
+  if (lang && lang_size)
+    snprintf(lang, lang_size, "%.*s", (int)len, locale);
+
+  const char *sep = strchr(locale, '_');
+  if (!sep)
+    sep = strchr(locale, '-');
+  if (sep && region && region_size) {
+    size_t out = 0;
+    for (const char *p = sep + 1; *p && out + 1 < region_size; p++)
+      region[out++] = (char)((*p >= 'a' && *p <= 'z') ? *p - 32 : *p);
+    region[out] = '\0';
+  }
+}
+
 int is_engine_id_enabled(const char *engine_id) {
   if (!engine_id)
     return 0;

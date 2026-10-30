@@ -17,6 +17,8 @@
 #include "Routes/Search.h"
 #include "Routes/Settings.h"
 #include "Routes/SettingsSave.h"
+#include "Ranking/Ranker.h"
+#include "Scraping/EngineHealth.h"
 #include "Scraping/Scraping.h"
 #include "Utility/Utility.h"
 
@@ -76,6 +78,7 @@ int main() {
 
   set_default_locale(cfg.default_locale);
   init_themes("static");
+  rank_init("static/authority.tsv", "static/spam_hosts.txt");
 
   global_config = cfg;
 
@@ -112,6 +115,8 @@ int main() {
   } else {
     fprintf(stderr, "[INFO] Cache initialized at %s\n", cfg.cache_dir);
     cache_cleanup(cfg.cache_ttl_search);
+    engine_health_set_limits(cfg.breaker_threshold, cfg.breaker_cooldown);
+    engine_health_init(cfg.cache_dir);
   }
 
   set_cache_ttl_search(cfg.cache_ttl_search);
@@ -156,6 +161,7 @@ int main() {
     return EXIT_FAILURE;
   }
 
+  engine_health_persist();
   curl_global_cleanup();
   xmlCleanupParser();
   beaker_free_locales();

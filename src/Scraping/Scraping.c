@@ -1,4 +1,5 @@
 #include "Scraping.h"
+#include "EngineHealth.h"
 #include "../Cache/Cache.h"
 #include "../Proxy/Proxy.h"
 #include "../Utility/XmlHelper.h"
@@ -10,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+static void cookie_jar_path(const char *engine_id, char *out, size_t size);
 
 static int response_contains(const char *response, const char *needle) {
   return response && needle && strstr(response, needle) != NULL;
@@ -75,6 +78,21 @@ static void classify_job_response(ScrapeJob *job, const char *response,
     return;
   }
 
+  if (job->engine->body_parser) {
+    job->results_count = job->engine->body_parser(
+        response, response_size, job->lang, job->out_results, job->max_results);
+    if (job->results_count > 0) {
+      job->status = SCRAPE_STATUS_OK;
+      return;
+    }
+    if (job->http_status >= 400) {
+      job->status = SCRAPE_STATUS_FETCH_ERROR;
+      return;
+    }
+    job->status = SCRAPE_STATUS_EMPTY;
+    return;
+  }
+
   xmlDocPtr doc;
   if (job->engine->is_xml) {
     doc = xmlReadMemory(response, response_size, NULL, NULL,
@@ -113,11 +131,18 @@ static void classify_job_response(ScrapeJob *job, const char *response,
   job->status = SCRAPE_STATUS_EMPTY;
 }
 
+static void job_cache_salt(const ScrapeJob *job, char *out, size_t size) {
+  snprintf(out, size, "%s|%s", job->engine ? job->engine->name : "?",
+           job->lang[0] ? job->lang : "en");
+}
+
 int check_cache_for_job(ScrapeJob *job) {
   if (get_cache_ttl_search() <= 0)
     return 0;
 
-  char *key = cache_compute_key(job->query, job->page, job->engine->name);
+  char salt[128];
+  job_cache_salt(job, salt, sizeof(salt));
+  char *key = cache_compute_key(job->query, job->page, salt);
   if (!key)
     return 0;
 
@@ -148,6 +173,48 @@ int check_cache_for_job(ScrapeJob *job) {
   return 0;
 }
 
+#define STALE_CACHE_TTL (7 * 86400)
+
+static void stale_cache_key(const ScrapeJob *job, char *out, size_t size) {
+  char salt[160];
+  snprintf(salt, sizeof(salt), "%s|%s|stale",
+           job->engine ? job->engine->name : "?",
+           job->lang[0] ? job->lang : "en");
+  char *key = cache_compute_key(job->query, job->page, salt);
+  if (key) {
+    snprintf(out, size, "%s", key);
+    free(key);
+  } else {
+    out[0] = '\0';
+  }
+}
+
+/* a failed fetch falls back to the last body that produced results */
+static int load_stale_results(ScrapeJob *job) {
+  char key[BUFFER_SIZE_LARGE];
+  stale_cache_key(job, key, sizeof(key));
+  if (!key[0])
+    return 0;
+
+  char *cached = NULL;
+  size_t cached_size = 0;
+  if (cache_get(key, STALE_CACHE_TTL, &cached, &cached_size) != 0 ||
+      !cached || cached_size == 0) {
+    free(cached);
+    return 0;
+  }
+
+  classify_job_response(job, cached, cached_size);
+  free(cached);
+
+  if (job->results_count > 0) {
+    job->stale = 1;
+    job->status = SCRAPE_STATUS_OK;
+    return 1;
+  }
+  return 0;
+}
+
 void parse_and_cache_response(ScrapeJob *job) {
   if (job->response.size == 0) {
     job->results_count = 0;
@@ -158,10 +225,19 @@ void parse_and_cache_response(ScrapeJob *job) {
   classify_job_response(job, job->response.memory, job->response.size);
 
   if (job->status == SCRAPE_STATUS_OK || job->status == SCRAPE_STATUS_EMPTY) {
-    char *key = cache_compute_key(job->query, job->page, job->engine->name);
+    char salt[128];
+    job_cache_salt(job, salt, sizeof(salt));
+    char *key = cache_compute_key(job->query, job->page, salt);
     if (key && get_cache_ttl_search() > 0)
       cache_set(key, job->response.memory, job->response.size);
     free(key);
+  }
+
+  if (job->status == SCRAPE_STATUS_OK) {
+    char stale_key[BUFFER_SIZE_LARGE];
+    stale_cache_key(job, stale_key, sizeof(stale_key));
+    if (stale_key[0])
+      cache_set(stale_key, job->response.memory, job->response.size);
   }
 }
 
@@ -188,6 +264,11 @@ static void cleanup_job_handle(ScrapeJob *job, CURL *handle) {
 }
 
 void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
+  struct timespec finished;
+  clock_gettime(CLOCK_MONOTONIC, &finished);
+  job->elapsed_ms = (double)(finished.tv_sec - job->started.tv_sec) * 1000.0 +
+                    (double)(finished.tv_nsec - job->started.tv_nsec) / 1e6;
+
   curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &job->http_status);
 
   if (msg->data.result == CURLE_OK)
@@ -197,7 +278,56 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
     job->status = SCRAPE_STATUS_FETCH_ERROR;
   }
 
+  if (job->results_count == 0 &&
+      job->status != SCRAPE_STATUS_EMPTY) {
+    load_stale_results(job);
+  }
+
+  if (job->engine)
+    engine_health_record(job->engine->id, (int)job->status, job->http_status,
+                         job->elapsed_ms);
+
+  /* a challenge cookie poisons every later request: drop the jar on a block */
+  if (job->engine &&
+      (job->status == SCRAPE_STATUS_BLOCKED || job->http_status == 429 ||
+       job->http_status == 202)) {
+    char jar_path[BUFFER_SIZE_LARGE];
+    cookie_jar_path(job->engine->id, jar_path, sizeof(jar_path));
+    if (jar_path[0])
+      remove(jar_path);
+  }
+
   cleanup_job_handle(job, handle);
+}
+
+static void cookie_jar_path(const char *engine_id, char *out, size_t size) {
+  out[0] = '\0';
+  const char *dir = cache_get_dir();
+  if (!dir || !dir[0] || !engine_id || !engine_id[0])
+    return;
+  snprintf(out, size, "%s/cookies/%s.txt", dir, engine_id);
+}
+
+static void append_locale_params(const SearchEngine *engine, const ScrapeJob *job,
+                                 char *url, size_t size) {
+  if (!engine || !url || !job->lang[0])
+    return;
+
+  char region_lower[8] = "";
+  for (size_t i = 0; job->region[i] && i + 1 < sizeof(region_lower); i++)
+    region_lower[i] = (char)((job->region[i] >= 'A' && job->region[i] <= 'Z')
+                                 ? job->region[i] + 32
+                                 : job->region[i]);
+
+  size_t used = strlen(url);
+  if (strcmp(engine->id, "ddg") == 0 && region_lower[0])
+    snprintf(url + used, size - used, "&kl=%s-%s", region_lower, job->lang);
+  else if (strcmp(engine->id, "bing") == 0)
+    snprintf(url + used, size - used, "&setlang=%s&cc=%s", job->lang,
+             job->region[0] ? job->region : "US");
+  else if (strcmp(engine->id, "brave") == 0)
+    snprintf(url + used, size - used, "&country=%s&search_lang=%s",
+             job->region[0] ? job->region : "US", job->lang);
 }
 
 int setup_job(ScrapeJob *job, CURLM *multi_handle) {
@@ -215,6 +345,9 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   cleanup_job_results(job);
   job->http_status = 0;
   job->status = SCRAPE_STATUS_PENDING;
+  job->stale = 0;
+  job->elapsed_ms = 0;
+  clock_gettime(CLOCK_MONOTONIC, &job->started);
 
   if (check_cache_for_job(job))
     return 0;
@@ -239,11 +372,18 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   }
   *write = '\0';
 
-  char *full_url =
-      build_search_url(job->engine->base_url, job->engine->page_param,
-                       job->engine->page_multiplier, job->engine->page_base,
-                       encoded_query, job->page);
+  char *full_url = job->engine->build_url
+                       ? job->engine->build_url(encoded_query, job->page,
+                                                job->lang)
+                       : build_search_url(job->engine->base_url,
+                                          job->engine->page_param,
+                                          job->engine->page_multiplier,
+                                          job->engine->page_base,
+                                          encoded_query, job->page);
   free(encoded_query);
+
+  if (full_url)
+    append_locale_params(job->engine, job, full_url, BUFFER_SIZE_LARGE);
 
   if (!full_url) {
     job->status = SCRAPE_STATUS_FETCH_ERROR;
@@ -270,10 +410,23 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   }
 
   struct curl_slist *headers =
-      build_request_headers(job->engine->host_header, job->engine->referer);
+      build_request_headers(job->engine->host_header, job->engine->referer,
+                            job->accept_language);
 
   configure_curl_handle(job->handle, full_url, &job->response, headers,
-                        job->engine ? job->engine->timeout_secs : 0);
+                        job->engine ? job->engine->timeout_secs : 0,
+                        job->engine ? job->engine->id : NULL);
+
+  /* per-engine cookie jar: some engines only answer after a challenge cookie */
+  {
+    char jar_path[BUFFER_SIZE_LARGE];
+    cookie_jar_path(job->engine ? job->engine->id : NULL, jar_path,
+                    sizeof(jar_path));
+    if (jar_path[0]) {
+      curl_easy_setopt(job->handle, CURLOPT_COOKIEFILE, jar_path);
+      curl_easy_setopt(job->handle, CURLOPT_COOKIEJAR, jar_path);
+    }
+  }
   curl_easy_setopt(job->handle, CURLOPT_PRIVATE, headers);
 
   free(full_url);
@@ -374,7 +527,7 @@ retry:;
 
   while (mc == CURLM_OK && still_running) {
     /* never let one slow engine set the page latency */
-    if (time(NULL) - batch_started >= 5) {
+    if (time(NULL) - batch_started >= 3) {
       mc = CURLM_OK;
       break;
     }

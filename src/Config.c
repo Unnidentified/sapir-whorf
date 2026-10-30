@@ -49,6 +49,8 @@ static const ConfigOption CONFIG_OPTIONS[] = {
     INTEGER_OPTION("rate_limit", "search_interval", rate_limit_search_interval),
     INTEGER_OPTION("rate_limit", "images_requests", rate_limit_images_requests),
     INTEGER_OPTION("rate_limit", "images_interval", rate_limit_images_interval),
+    INTEGER_OPTION("health", "breaker_threshold", breaker_threshold),
+    INTEGER_OPTION("health", "cooldown_seconds", breaker_cooldown),
 };
 
 void config_set_defaults(Config *config) {
@@ -65,6 +67,8 @@ void config_set_defaults(Config *config) {
       .cache_ttl_search = DEFAULT_CACHE_TTL_SEARCH,
       .cache_ttl_infobox = DEFAULT_CACHE_TTL_INFOBOX,
       .cache_ttl_image = DEFAULT_CACHE_TTL_IMAGE,
+      .breaker_threshold = DEFAULT_BREAKER_THRESHOLD,
+      .breaker_cooldown = DEFAULT_BREAKER_COOLDOWN,
   };
 }
 

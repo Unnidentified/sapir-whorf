@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 #include <libxml/HTMLparser.h>
 #include <libxml/xpath.h>
+#include <time.h>
 
 typedef struct {
   char *url;
@@ -11,8 +12,25 @@ typedef struct {
   char *snippet;
 } SearchResult;
 
+typedef enum {
+  V_WEB = 1u << 0,
+  V_CODE = 1u << 1,
+  V_ACADEMIC = 1u << 2,
+  V_ENTITY = 1u << 3,
+  V_NEWS = 1u << 4,
+  V_MEDIA = 1u << 5
+} EngineVertical;
+
 typedef int (*ParserFunc)(const char *engine_name, xmlDocPtr doc,
                           SearchResult **out_results, int max_results);
+
+/* JSON/Atom APIs: parse the raw body directly */
+typedef int (*BodyParserFn)(const char *body, size_t len, const char *lang,
+                            SearchResult **out_results, int max_results);
+
+/* custom URL template for engines that are not "?q=...&page=" shaped */
+typedef char *(*UrlBuilderFn)(const char *encoded_query, int page,
+                              const char *lang);
 
 typedef struct {
   const char *id;
@@ -25,9 +43,14 @@ typedef struct {
   int page_multiplier;
   int page_base;
   ParserFunc parser;
+  BodyParserFn body_parser;
+  UrlBuilderFn build_url;
   int enabled;
   int is_xml;
-  int timeout_secs; /* 0 = CURL_TIMEOUT_SECS */
+  int timeout_secs;    /* 0 = CURL_TIMEOUT_SECS */
+  int verticals;       /* EngineVertical bitmask */
+  double weight;       /* routing weight, 1.0 default */
+  int supports_site;   /* passes site:<host> through */
 } SearchEngine;
 
 typedef struct {
@@ -48,6 +71,10 @@ typedef enum {
 typedef struct {
   const SearchEngine *engine;
   char *query;
+  char query_text[512];
+  char lang[8];
+  char region[8];
+  char accept_language[64];
   SearchResult **out_results;
   int max_results;
   int page;
@@ -55,6 +82,9 @@ typedef struct {
   MemoryBuffer response;
   int results_count;
   long http_status;
+  int stale;                 /* served from the last-known-good cache */
+  double elapsed_ms;
+  struct timespec started;
   ScrapeStatus status;
 } ScrapeJob;
 
@@ -68,19 +98,21 @@ size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
 const char *get_random_user_agent(void);
 void configure_curl_handle(CURL *curl, const char *full_url,
                            MemoryBuffer *chunk, struct curl_slist *headers,
-                           long timeout_secs);
+                           long timeout_secs, const char *engine_id);
+const char *get_engine_user_agent(const char *engine_id);
 char *build_search_url(const char *base_url, const char *page_param,
                        int page_multiplier, int page_base,
                        const char *encoded_query, int page);
 struct curl_slist *build_request_headers(const char *host_header,
-                                         const char *referer);
+                                         const char *referer,
+                                         const char *accept_language);
 void http_delay(void);
 
 xmlXPathContextPtr create_xpath_context(xmlDocPtr doc);
 void free_xpath_objects(xmlXPathContextPtr ctx, xmlXPathObjectPtr obj);
 SearchResult *alloc_results_array(int capacity, int max_results);
-void assign_result(SearchResult *result, char *url, char *title, char *snippet,
-                   int unescape);
+int assign_result(SearchResult *result, char *url, char *title, char *snippet,
+                  int unescape);
 void free_xml_node_list(char *title, char *url, char *snippet);
 
 int scrape_engine(const SearchEngine *engine, const char *query,

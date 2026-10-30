@@ -1,0 +1,60 @@
+# category	query	expected hint (optional)
+navigational	wikipedia	wikipedia.org
+navigational	github	github.com
+navigational	hacker news	news.ycombinator.com
+broad	best noise cancelling headphones	
+broad	how to tie a tie	
+broad	what is a monad	
+broad	cheapest flights to lisbon	
+broad	how does a refrigerator work	
+entity	marilyn monroe	wikipedia.org
+entity	who wrote dune	wikipedia.org
+entity	nikola tesla born	wikipedia.org
+entity	tallest mountain in japan	wikipedia.org
+entity	sony wh-1000xm5	
+code	python asyncio gather exception handling	stackoverflow.com
+code	rust borrow checker error e0502	rust-lang.org
+code	cmake target_include_directories SYSTEM	cmake.org
+code	sqlite wal mode checkpoint	sqlite.org
+code	postgres index bloat check	postgresql.org
+code	javascript array flatmap	developer.mozilla.org
+code	git undo last commit	
+code	docker compose healthcheck depends_on	
+code	regex lookbehind python	
+academic	attention is all you need	arxiv.org
+academic	score based diffusion sampling	
+academic	transformer architecture survey	
+academic	crispr off target effects	doi.org
+academic	graph neural network expressivity	
+academic	climate tipping points 2024	nature.com
+news	latest eu ai act news	
+news	nasa artemis launch date	
+news	election results madrid	
+news	interest rates decision today	
+medical	nsaid contraindications	
+medical	gout treatment guidelines	
+medical	vitamin d deficiency symptoms	
+medical	adhd medication side effects	
+longtail	replace brake pads 2016 honda civic	
+longtail	error 0x80070005 windows update	
+longtail	raspberry pi 5 power supply requirements	
+longtail	how to descale delonghi magnifica	
+longtail	ikea billy bookcase assembly instructions	
+nonenglish	recetas de paella	
+nonenglish	meilleur restaurant paris	
+nonenglish	was ist quantenphysik	
+nonenglish	receita de brigadeiro	
+typo	recieve email python	
+typo	kubernets ingress tls	
+typo	javscript promise all	
+typo	postgress vacuum full	
+operators	site:doc.rust-lang.org e0502	doc.rust-lang.org
+operators	filetype:pdf climate report	
+operators	"borrow checker" e0502	
+operators	linux -ubuntu	
+operators	site:stackoverflow.com asyncio gather	stackoverflow.com
+performance	python	learn
+performance	linux	kernel.org
+performance	openbsd	openbsd.org
+performance	postgresql documentation	postgresql.org
+performance	sqlite	c

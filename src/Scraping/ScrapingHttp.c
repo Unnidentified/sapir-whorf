@@ -53,14 +53,24 @@ const char *get_random_user_agent(void) {
   return USER_AGENTS[rand() % USER_AGENT_COUNT];
 }
 
+/* one stable identity per engine: rotating the UA on every request is a
+   fingerprint of its own, and some engines challenge the mismatch */
+const char *get_engine_user_agent(const char *engine_id) {
+  unsigned long hash = 5381;
+  for (const char *p = engine_id ? engine_id : ""; *p; p++)
+    hash = hash * 33 + (unsigned char)*p;
+  return USER_AGENTS[hash % USER_AGENT_COUNT];
+}
+
 void configure_curl_handle(CURL *curl, const char *full_url,
                            MemoryBuffer *chunk, struct curl_slist *headers,
-                           long timeout_secs) {
+                           long timeout_secs, const char *engine_id) {
   curl_easy_setopt(curl, CURLOPT_URL, full_url);
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)chunk);
-  curl_easy_setopt(curl, CURLOPT_USERAGENT, get_random_user_agent());
+  curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                   get_engine_user_agent(engine_id));
 
   curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
   curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
@@ -87,7 +97,8 @@ char *build_search_url(const char *base_url, const char *page_param,
 }
 
 struct curl_slist *build_request_headers(const char *host_header,
-                                         const char *referer) {
+                                         const char *referer,
+                                         const char *accept_language) {
   struct curl_slist *headers = NULL;
   char host_buf[BUFFER_SIZE_MEDIUM], ref_buf[BUFFER_SIZE_MEDIUM];
 
@@ -103,7 +114,11 @@ struct curl_slist *build_request_headers(const char *host_header,
       headers,
       "Accept: "
       "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-  headers = curl_slist_append(headers, "Accept-Language: en-US,en;q=0.5");
+  char accept_buf[BUFFER_SIZE_MEDIUM];
+  snprintf(accept_buf, sizeof(accept_buf), "Accept-Language: %s",
+           accept_language && accept_language[0] ? accept_language
+                                                 : "en-US,en;q=0.5");
+  headers = curl_slist_append(headers, accept_buf);
   headers = curl_slist_append(headers, "DNT: 1");
 
   return headers;

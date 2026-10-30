@@ -1,6 +1,7 @@
 #include "../Utility/Unescape.h"
 #include "../Utility/XmlHelper.h"
 #include "Config.h"
+#include "ApiEngines.h"
 #include "Scraping.h"
 #include <libxml/HTMLparser.h>
 #include <libxml/xpath.h>
@@ -23,11 +24,24 @@ SearchResult *alloc_results_array(int capacity, int max_results) {
   return xml_result_alloc(capacity, count);
 }
 
-void assign_result(SearchResult *result, char *url, char *title, char *snippet,
-                   int unescape) {
+int assign_result(SearchResult *result, char *url, char *title, char *snippet,
+                  int unescape) {
   result->url = unescape ? unescape_search_url(url) : strdup(url ? url : "");
   result->title = strdup(title ? title : "No Title");
   result->snippet = strdup(snippet ? snippet : "");
+
+  /* a hit with no usable link is not a result: it used to be counted, which
+     left the fusion stage with zero candidates and a blank page. */
+  if (!result->url || result->url[0] == '\0') {
+    free(result->url);
+    free(result->title);
+    free(result->snippet);
+    result->url = NULL;
+    result->title = NULL;
+    result->snippet = NULL;
+    return 0;
+  }
+  return 1;
 }
 
 void free_xml_node_list(char *title, char *url, char *snippet) {
@@ -91,9 +105,9 @@ static int parse_ddg_lite(const char *engine_name, xmlDocPtr doc,
       }
     }
 
-    assign_result(&(*out_results)[found_count], url, title, snippet_text, 1);
+    if (assign_result(&(*out_results)[found_count], url, title, snippet_text, 1))
+      found_count++;
     free_xml_node_list(title, url, snippet_text);
-    found_count++;
   }
 
   free_xpath_objects(ctx, obj);
@@ -151,10 +165,9 @@ static int parse_yahoo(const char *engine_name, xmlDocPtr doc,
             ? xml_node_content(snippet_obj->nodesetval->nodeTab[0])
             : NULL;
 
-    if (url && title) {
-      assign_result(&(*out_results)[found_count], url, title, snippet_text, 1);
+    if (url && title &&
+        assign_result(&(*out_results)[found_count], url, title, snippet_text, 1))
       found_count++;
-    }
 
     free_xml_node_list(title, url, snippet_text);
     if (link_obj)
@@ -218,10 +231,9 @@ static int parse_yacy(const char *engine_name, xmlDocPtr doc,
             ? xml_node_content(desc_obj->nodesetval->nodeTab[0])
             : NULL;
 
-    if (url && title) {
-      assign_result(&(*out_results)[found_count], url, title, snippet_text, 0);
+    if (url && title &&
+        assign_result(&(*out_results)[found_count], url, title, snippet_text, 0))
       found_count++;
-    }
 
     free_xml_node_list(title, url, snippet_text);
     if (title_obj)
@@ -354,10 +366,9 @@ static int parse_bing(const char *engine_name, xmlDocPtr doc,
     char *decoded = bing_decode_target(href);
     const char *url = decoded ? decoded : href;
 
-    if (url && title) {
-      assign_result(&(*out_results)[found_count], (char *)url, title, snippet, 0);
+    if (url && title &&
+        assign_result(&(*out_results)[found_count], (char *)url, title, snippet, 0))
       found_count++;
-    }
 
     free(decoded);
     free_xml_node_list(title, href, snippet);
@@ -423,10 +434,9 @@ static int parse_brave(const char *engine_name, xmlDocPtr doc,
                         ? xml_node_content(snip_obj->nodesetval->nodeTab[0])
                         : NULL;
 
-    if (url && title) {
-      assign_result(&(*out_results)[found_count], url, title, snippet, 0);
+    if (url && title &&
+        assign_result(&(*out_results)[found_count], url, title, snippet, 0))
       found_count++;
-    }
 
     free_xml_node_list(title, url, snippet);
     if (link_obj)
@@ -453,7 +463,8 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_base = 0,
      .parser = parse_ddg_lite,
      .enabled = 1,
-     .timeout_secs = 6},
+     .timeout_secs = 5,
+     .supports_site = 1, .verticals = V_WEB, .weight = 1.0},
     {.id = "bing",
      .name = "Bing",
      .base_url = "https://www.bing.com/search?q=",
@@ -464,7 +475,8 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_base = 1,
      .parser = parse_bing,
      .enabled = 1,
-     .timeout_secs = 7},
+     .timeout_secs = 5,
+     .supports_site = 1, .verticals = V_WEB, .weight = 1.1},
     {.id = "yahoo",
      .name = "Yahoo",
      .base_url = "https://search.yahoo.com/search?p=",
@@ -475,7 +487,8 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_base = 1,
      .parser = parse_yahoo,
      .enabled = 1,
-     .timeout_secs = 6},
+     .timeout_secs = 5,
+     .supports_site = 1, .verticals = V_WEB, .weight = 0.9},
     {.id = "brave",
      .name = "Brave",
      .base_url = "https://search.brave.com/search?q=",
@@ -486,7 +499,111 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_base = 0,
      .parser = parse_brave,
      .enabled = 1,
-     .timeout_secs = 7},
+     .timeout_secs = 5,
+     .supports_site = 0, .verticals = V_WEB, .weight = 1.0},
+
+    {.id = "openalex",
+     .name = "OpenAlex",
+     .base_url = "",
+     .host_header = "api.openalex.org",
+     .referer = NULL,
+     .page_param = "page",
+     .page_multiplier = 10,
+     .page_base = 1,
+     .parser = NULL,
+     .body_parser = api_parse_openalex,
+     .build_url = api_url_openalex,
+     .enabled = 1,
+     .is_xml = 0,
+     .timeout_secs = 3,
+     .verticals = V_ACADEMIC,
+     .weight = 1.3,
+     .supports_site = 0},
+    {.id = "crossref",
+     .name = "Crossref",
+     .base_url = "",
+     .host_header = "api.crossref.org",
+     .referer = NULL,
+     .page_param = "offset",
+     .page_multiplier = 10,
+     .page_base = 0,
+     .parser = NULL,
+     .body_parser = api_parse_crossref,
+     .build_url = api_url_crossref,
+     .enabled = 1,
+     .is_xml = 0,
+     .timeout_secs = 3,
+     .verticals = V_ACADEMIC,
+     .weight = 1.0,
+     .supports_site = 0},
+    {.id = "arxiv",
+     .name = "arXiv",
+     .base_url = "",
+     .host_header = "export.arxiv.org",
+     .referer = NULL,
+     .page_param = "start",
+     .page_multiplier = 10,
+     .page_base = 0,
+     .parser = NULL,
+     .body_parser = api_parse_arxiv,
+     .build_url = api_url_arxiv,
+     .enabled = 1,
+     .is_xml = 1,
+     .timeout_secs = 4,
+     .verticals = V_ACADEMIC,
+     .weight = 1.0,
+     .supports_site = 0},
+    {.id = "stackexchange",
+     .name = "Stack Overflow",
+     .base_url = "",
+     .host_header = "api.stackexchange.com",
+     .referer = NULL,
+     .page_param = "page",
+     .page_multiplier = 10,
+     .page_base = 1,
+     .parser = NULL,
+     .body_parser = api_parse_stackexchange,
+     .build_url = api_url_stackexchange,
+     .enabled = 1,
+     .is_xml = 0,
+     .timeout_secs = 3,
+     .verticals = V_CODE,
+     .weight = 1.2,
+     .supports_site = 0},
+    {.id = "hn",
+     .name = "Hacker News",
+     .base_url = "",
+     .host_header = "hn.algolia.com",
+     .referer = NULL,
+     .page_param = "page",
+     .page_multiplier = 10,
+     .page_base = 0,
+     .parser = NULL,
+     .body_parser = api_parse_hn,
+     .build_url = api_url_hn,
+     .enabled = 1,
+     .is_xml = 0,
+     .timeout_secs = 3,
+     .verticals = V_CODE | V_NEWS,
+     .weight = 0.8,
+     .supports_site = 0},
+    {.id = "wikipedia",
+     .name = "Wikipedia",
+     .base_url = "",
+     .host_header = "en.wikipedia.org",
+     .referer = NULL,
+     .page_param = "sroffset",
+     .page_multiplier = 10,
+     .page_base = 0,
+     .parser = NULL,
+     .body_parser = api_parse_wikipedia,
+     .build_url = api_url_wikipedia,
+     .enabled = 1,
+     .is_xml = 0,
+     .timeout_secs = 3,
+     .verticals = V_ENTITY,
+     .weight = 1.2,
+     .supports_site = 0},
     {.id = "yacy",
      .name = "YaCy",
      .base_url = "",
@@ -497,7 +614,8 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_base = 0,
      .parser = parse_yacy,
      .enabled = 0,
-     .is_xml = 1}};
+     .is_xml = 1,
+     .supports_site = 0, .verticals = V_WEB, .weight = 0.6}};
 
 const int ENGINE_COUNT = sizeof(ENGINE_REGISTRY) / sizeof(SearchEngine);
 

@@ -1705,3 +1705,39 @@ input[type="color"]:focus-visible {
         gap: 2px;
     }
 }
+
+/* ---------- upstream warnings ---------- */
+
+.engine-warnings {
+    margin: 28px 0 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.7;
+}
+
+.engine-warnings-title {
+    margin: 0 0 4px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+}
+
+.engine-warnings ul {
+    margin: 0;
+    padding: 0 0 0 16px;
+    list-style: square;
+}
+
+.engine-warning-name {
+    color: var(--text-secondary);
+}
+
+.cached-note {
+    margin: 18px 0 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}

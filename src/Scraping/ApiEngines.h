@@ -1,0 +1,28 @@
+#ifndef API_ENGINES_H
+#define API_ENGINES_H
+
+#include "Scraping.h"
+
+/* JSON/Atom API engines: no HTML scraping, predictable schemas. */
+int api_parse_openalex(const char *body, size_t len, const char *lang,
+                       SearchResult **out, int max);
+int api_parse_crossref(const char *body, size_t len, const char *lang,
+                       SearchResult **out, int max);
+int api_parse_stackexchange(const char *body, size_t len, const char *lang,
+                            SearchResult **out, int max);
+int api_parse_hn(const char *body, size_t len, const char *lang,
+                 SearchResult **out, int max);
+int api_parse_wikipedia(const char *body, size_t len, const char *lang,
+                        SearchResult **out, int max);
+int api_parse_arxiv(const char *body, size_t len, const char *lang,
+                    SearchResult **out, int max);
+
+char *api_url_openalex(const char *encoded_query, int page, const char *lang);
+char *api_url_crossref(const char *encoded_query, int page, const char *lang);
+char *api_url_stackexchange(const char *encoded_query, int page,
+                            const char *lang);
+char *api_url_hn(const char *encoded_query, int page, const char *lang);
+char *api_url_wikipedia(const char *encoded_query, int page, const char *lang);
+char *api_url_arxiv(const char *encoded_query, int page, const char *lang);
+
+#endif
