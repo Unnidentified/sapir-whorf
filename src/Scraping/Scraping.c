@@ -497,7 +497,26 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   }
 
   if (getenv("OMNI_PERF"))
-    fprintf(stderr, "[URL] %s %s\n", job->engine->id, full_url);
+  {
+    /* API keys travel in the query string (Google CSE's key=, for one), so the
+       URL log is redacted before it is written. */
+    char safe[BUFFER_SIZE_XLARGE];
+    snprintf(safe, sizeof(safe), "%s", full_url);
+    const char *secrets[] = {"key=", "apikey=", "api_key=", "token=",
+                             "access_token=", "secret="};
+    for (size_t k = 0; k < sizeof(secrets) / sizeof(secrets[0]); k++) {
+      char *hit = strcasestr(safe, secrets[k]);
+      if (!hit)
+        continue;
+      char *val = hit + strlen(secrets[k]);
+      char *end = strpbrk(val, "& \"");
+      if (end)
+        snprintf(val, strlen(val) + 1, "REDACTED%s", end);
+      else
+        snprintf(val, strlen(val) + 1, "REDACTED");
+    }
+    fprintf(stderr, "[URL] %s %s\n", job->engine->id, safe);
+  }
 
   job->handle = curl_easy_init();
   if (!job->handle) {

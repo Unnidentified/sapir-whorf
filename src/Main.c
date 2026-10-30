@@ -234,7 +234,20 @@ int main(int argc, char **argv) {
   set_proxy_config(cfg.proxy, cfg.randomize_username, cfg.randomize_password);
 
   if (proxy_url[0] != '\0') {
-    fprintf(stderr, "[INFO] Using proxy: %s\n", proxy_url);
+    /* proxy URLs routinely carry credentials: never write them verbatim */
+    char redacted[512];
+    snprintf(redacted, sizeof(redacted), "%s", proxy_url);
+    char *at = strchr(redacted, '@');
+    if (at) {
+      char *scheme = strstr(redacted, "://");
+      if (scheme && scheme < at) {
+        char tail[512];
+        snprintf(tail, sizeof(tail), "%s", at + 1);
+        snprintf(scheme + 3, (size_t)(redacted + sizeof(redacted) - scheme - 3),
+                 "***:***@%s", tail);
+      }
+    }
+    fprintf(stderr, "[INFO] Using proxy: %s\n", redacted);
   } else if (proxy_count > 0) {
     fprintf(stderr, "[INFO] Using %d proxies from %s\n", proxy_count,
             cfg.proxy_list_file);
