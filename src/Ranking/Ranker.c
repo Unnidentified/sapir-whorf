@@ -429,6 +429,26 @@ static int edit_distance_at_most(const char *a, const char *b, int max) {
   return prev[lb] <= max;
 }
 
+/* does this snippet end in an ellipsis, i.e. was it cut by the engine? */
+static int snippet_ellipsis(const char *snippet) {
+  if (!snippet)
+    return 0;
+  size_t n = strlen(snippet);
+  while (n > 0 && (snippet[n - 1] == ' ' || snippet[n - 1] == '\n' ||
+                   snippet[n - 1] == '\r' || snippet[n - 1] == '\t'))
+    n--;
+  if (n == 0)
+    return 0;
+  if (n >= 3 && strncmp(snippet + n - 3, "...", 3) == 0)
+    return 1;
+  /* UTF-8 ellipsis E2 80 A6 */
+  if (n >= 3 && (unsigned char)snippet[n - 3] == 0xE2 &&
+      (unsigned char)snippet[n - 2] == 0x80 &&
+      (unsigned char)snippet[n - 1] == 0xA6)
+    return 1;
+  return 0;
+}
+
 static int coverage_token_matches(const char *token, const char *term) {
   if (strcmp(token, term) == 0)
     return 1;
@@ -548,6 +568,14 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
     /* IDF-weighted coverage: a page that only matches the common word of the
        query ("best hotels" for "best mechanical keyboard") must not win on
        engine consensus or domain authority alone. */
+    /* A snippet the engine truncated tells us nothing about the words that
+       were cut off. Bing truncates 406 of 472 snippets to ~126 chars while
+       Yahoo averages 212, so charging a term as missing penalised the page for
+       the engine's formatting, not its relevance. Terms absent from a
+       truncated snippet are treated as unknown and dropped from the
+       denominator, exactly like terms no candidate contains. */
+    int snippet_truncated = snippet_ellipsis(doc->snippet);
+
     double idf_sum = 0.0;
     double idf_hit = 0.0;
     for (int t = 0; t < query->term_count; t++) {
@@ -558,11 +586,20 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
          it as missing would let one typo blank an otherwise good page */
       if (df[t] == 0)
         continue;
+      int hit = coverage_has_term(title_tokens, title_n, query->terms[t]) ||
+                coverage_has_term(snippet_tokens, snippet_n, query->terms[t]) ||
+                coverage_has_term(url_tokens, url_n, query->terms[t]);
       double idf = log(1.0 + ((double)count - df[t] + 0.5) / (df[t] + 0.5));
+      if (!hit && snippet_truncated) {
+        /* Unknown, not absent: the engine cut the text, so half credit. Fully
+           dropping the term pushed every truncated result to coverage 1.0 and
+           destroyed the signal (measured: hit@3 0.41 -> 0.29). */
+        idf_sum += idf;
+        idf_hit += idf * 0.5;
+        continue;
+      }
       idf_sum += idf;
-      if (coverage_has_term(title_tokens, title_n, query->terms[t]) ||
-          coverage_has_term(snippet_tokens, snippet_n, query->terms[t]) ||
-          coverage_has_term(url_tokens, url_n, query->terms[t]))
+      if (hit)
         idf_hit += idf;
     }
     /* nothing matched at all: every term was unknown to the result set */

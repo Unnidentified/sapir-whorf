@@ -29,12 +29,30 @@ typedef struct {
 } QueryRecord;
 
 /* minimal containment test so this harness does not drag in the whole app */
+/* Is `expected` the registrable host of `url`, or a parent of it?
+   "en.wikipedia.org" matches "wikipedia.org"; "notwikipedia.org" does not. */
 static int host_matches(const char *url, const char *expected) {
   if (!url || !expected || !expected[0])
     return 0;
   const char *p = strstr(url, "://");
   p = p ? p + 3 : url;
-  return strncasecmp(p, expected, strlen(expected)) == 0;
+  if (strncasecmp(p, "www.", 4) == 0)
+    p += 4;
+
+  /* host ends at the first / ? # or : */
+  size_t hlen = strcspn(p, "/?#:");
+  if (hlen == 0)
+    return 0;
+
+  size_t elen = strlen(expected);
+  if (elen > hlen)
+    return 0;
+  if (strncasecmp(p + (hlen - elen), expected, elen) != 0)
+    return 0;
+  /* require a dot boundary: match the whole host or a subdomain of it */
+  if (hlen == elen)
+    return 1;
+  return p[hlen - elen - 1] == '.';
 }
 
 /* judgments: "query<TAB>expected-host[<TAB>grade]" */

@@ -136,6 +136,7 @@ static int url_host_matches(const char *url, const char *host) {
 
 #define MAX_CANDIDATES 128
 #define MAX_PER_DOMAIN 3
+#define MAX_PER_DOMAIN_RELAXED 5
 #define MIN_WEB_ENGINES 3
 #define RRF_K 60.0
 
@@ -1081,6 +1082,14 @@ int results_handler(UrlParams *params) {
   char client_key[BUFFER_SIZE_SMALL];
   rate_limit_get_client_key(client_key, sizeof(client_key));
 
+  /* &patient=1: do not take the early exit, wait for every source (F1) */
+  request_is_patient = 0;
+  for (int i = 0; i < params->count; i++) {
+    if (strcmp(params->params[i].key, "patient") == 0 &&
+        strcmp(params->params[i].value, "1") == 0)
+      request_is_patient = 1;
+  }
+
   char *request_cache_key = build_search_request_cache_key(
       raw_query, selected_engine_id, page, client_key);
   int request_is_cached = 0;
@@ -1350,19 +1359,57 @@ int results_handler(UrlParams *params) {
     /* Relevance floor: if a result shares almost none of the query's
        information mass, it is a "relaxed" engine hit, not an answer. Without
        this, a nonsense query renders whatever popular pages an engine fell
-       back to. */
+       back to.
+
+       F1 top-up: when the surviving set cannot fill a page and the engines
+       were cut short, retry with a lower floor rather than shipping a thin
+       page. The floor never reaches zero, so a nonsense query still renders
+       nothing. */
     {
-      int kept = 0;
-      for (int c = 0; c < cand_count; c++) {
-        if (cands[c].coverage < 0.15) {
-          rank_doc_free(&cands[c]);
-          continue;
+      int any_cancelled = 0;
+      for (int i = 0; i < enabled_engine_count; i++)
+        if (jobs[i].status == SCRAPE_STATUS_CANCELLED)
+          any_cancelled = 1;
+
+      /* Decide membership over the ORIGINAL array before moving anything:
+         compacting first and then re-reading the tail is what caused a double
+         free (the tail had already been moved to the front). */
+      char *keep = calloc((size_t)cand_count + 1, 1);
+      if (keep) {
+        int kept = 0;
+        for (int c = 0; c < cand_count; c++) {
+          if (cands[c].coverage >= 0.15) {
+            keep[c] = 1;
+            kept++;
+          }
         }
-        if (kept != c)
-          cands[kept] = cands[c];
-        kept++;
+
+        if (kept < 6 && any_cancelled) {
+          int relaxed = 0;
+          for (int c = 0; c < cand_count; c++) {
+            if (!keep[c] && cands[c].coverage >= 0.08) {
+              keep[c] = 1;
+              kept++;
+              relaxed++;
+            }
+          }
+          if (relaxed > 0 && getenv("OMNI_PERF"))
+            fprintf(stderr, "[F1] top-up floor relaxed: +%d results\n", relaxed);
+        }
+
+        int out = 0;
+        for (int c = 0; c < cand_count; c++) {
+          if (!keep[c]) {
+            rank_doc_free(&cands[c]);
+            continue;
+          }
+          if (out != c)
+            cands[out] = cands[c];
+          out++;
+        }
+        cand_count = out;
+        free(keep);
       }
-      cand_count = kept;
     }
     int funnel_floored = cand_count;
 
@@ -1419,6 +1466,23 @@ int results_handler(UrlParams *params) {
     int host_counts[64];
     int host_total = 0;
 
+    /* F1 top-up: if the page would still be thin, allow more results per host
+       rather than shipping five results when fifteen were available. */
+    int domain_cap = MAX_PER_DOMAIN;
+    {
+      int cancelled_here = 0;
+      for (int i = 0; i < enabled_engine_count; i++)
+        if (jobs[i].status == SCRAPE_STATUS_CANCELLED)
+          cancelled_here = 1;
+      if (cancelled_here) {
+        int cap_probe = 0;
+        for (int c = 0; c < cand_count && c < 40; c++)
+          cap_probe++;
+        if (cap_probe < 12)
+          domain_cap = MAX_PER_DOMAIN_RELAXED;
+      }
+    }
+
     for (int c = 0; c < cand_count; c++) {
       char host[128];
       snprintf(host, sizeof(host), "%s", cands[c].domain);
@@ -1436,7 +1500,7 @@ int results_handler(UrlParams *params) {
         host_counts[slot] = 0;
       }
 
-      if (slot >= 0 && host_counts[slot] >= MAX_PER_DOMAIN) {
+      if (slot >= 0 && host_counts[slot] >= domain_cap) {
         rank_doc_free(&cands[c]);
         continue;
       }

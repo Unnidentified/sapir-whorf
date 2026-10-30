@@ -1,6 +1,10 @@
 #include "Scraping.h"
 #include "BlockDetection.h"
 #include "Replay.h"
+#include "../Ranking/Ranker.h"
+
+/* set by the results handler when the request asked to wait for all sources */
+__thread int request_is_patient = 0;
 #include "EngineHealth.h"
 #include "../Cache/Cache.h"
 #include "../Proxy/Proxy.h"
@@ -597,10 +601,66 @@ static int all_jobs_empty(ScrapeJob *jobs, int num_jobs) {
   return 1;
 }
 
+/* Projected yield: the number of results the page can actually render, which
+   is NOT the raw hit count. The old early exit counted raw hits, so two engines
+   with four results each ended the batch at 1.2s even when dedupe and the
+   relevance floor would leave three. This counts what survives instead. */
+static int projected_yield(ScrapeJob *jobs, int num_jobs, int per_domain_cap) {
+  char domains[128][128];
+  int domain_counts[128];
+  int ndomains = 0;
+  int yield_total = 0;
+
+  for (int i = 0; i < num_jobs; i++) {
+    if (!jobs[i].out_results || !jobs[i].out_results[0])
+      continue;
+    for (int r = 0; r < jobs[i].results_count; r++) {
+      const char *url = jobs[i].out_results[0][r].url;
+      if (!url)
+        continue;
+      char dom[128] = {0};
+      rank_domain_of(url, dom, sizeof(dom));
+      if (!dom[0])
+        continue;
+
+      int slot = -1;
+      for (int d = 0; d < ndomains; d++) {
+        if (strcmp(domains[d], dom) == 0) {
+          slot = d;
+          break;
+        }
+      }
+      if (slot < 0) {
+        if (ndomains >= 128)
+          continue;
+        slot = ndomains++;
+        snprintf(domains[slot], sizeof(domains[slot]), "%s", dom);
+        domain_counts[slot] = 0;
+      }
+      if (domain_counts[slot] < per_domain_cap) {
+        domain_counts[slot]++;
+        yield_total++;
+      }
+    }
+  }
+  return yield_total;
+}
+
 int scrape_engines_parallel(ScrapeJob *jobs, int num_jobs) {
   /* measurement hook: OMNI_LEGACY restores the pre-optimisation batch policy */
   int legacy = getenv("OMNI_LEGACY") != NULL;
+  /* hard cap: never let one slow engine set the page latency.
+     soft cap: when the page would still be thin, allow a little longer. */
   long batch_cap_ms = legacy ? 7000 : 2000;
+  long soft_cap_ms = legacy ? 7000 : 3000;
+  /* &patient=1 (or OMNI_PATIENT=1) waits for every engine up to the hard cap */
+  int patient = getenv("OMNI_PATIENT") != NULL;
+
+  if (!legacy && !patient) {
+    /* &patient=1 is set by the results handler for the current request */
+    if (request_is_patient)
+      patient = 1;
+  }
   int retries = 0;
   int empty_retry_done = 0;
 
@@ -660,10 +720,13 @@ retry:;
     long elapsed_ms =
         (long)((now_ts.tv_sec - batch_start.tv_sec) * 1000 +
                (now_ts.tv_nsec - batch_start.tv_nsec) / 1000000);
-    /* enough good answers already: stop paying for the slowest engine */
-    /* A "trusted" engine is one whose SERP we rank highly (Yahoo, Brave).
-       Bing and DuckDuckGo answer in 300ms but sometimes with relaxed junk, so
-       their early answer alone must not end the batch. */
+    /* Exit on projected yield, not on raw hits (F1): a page that will render
+       three results is not a page that can be left alone. The batch stops
+       early only when enough results would survive dedupe and the domain cap
+       to fill a page; otherwise the remaining engines are allowed to answer
+       up to a softer cap. A "trusted" engine is one whose SERP we rank highly
+       (Yahoo, Brave); Bing and DuckDuckGo answer fast but sometimes with
+       relaxed junk, so their answer alone must not end the batch. */
     double best_weight = 0.0;
     for (int i = 0; i < num_jobs; i++)
       if (jobs[i].results_count > 0 && jobs[i].engine &&
@@ -671,17 +734,24 @@ retry:;
         best_weight = jobs[i].engine->weight;
     int trusted = best_weight >= 1.1;
 
+    int projected = projected_yield(jobs, num_jobs, 3);
+    int full_page = 10;
+
     if (!legacy && num_jobs > 1 && trusted && engines_so_far >= 2 &&
-        total_so_far >= 8 && elapsed_ms >= 500)
+        projected >= full_page && elapsed_ms >= 500)
       break;
     if (!legacy && num_jobs > 1 && trusted && engines_so_far >= 1 &&
-        total_so_far >= 6 && elapsed_ms >= 550)
+        projected >= 6 && elapsed_ms >= 550)
       break;
-    if (!legacy && num_jobs > 1 && engines_so_far >= 2 && total_so_far >= 8 &&
-        elapsed_ms >= 1200)
+    if (!legacy && num_jobs > 1 && engines_so_far >= 2 &&
+        projected >= full_page && elapsed_ms >= 1200)
       break;
-    /* never let one slow engine set the page latency */
-    if (elapsed_ms >= batch_cap_ms)
+
+    /* Not enough to fill a page: keep waiting, but not forever. This is the
+       soft cap that used to be a hard 2s cut, which is what left pages thin. */
+    int thin = projected < full_page;
+    long cap = (thin || patient) ? soft_cap_ms : batch_cap_ms;
+    if (elapsed_ms >= cap)
       break;
   }
 

@@ -113,6 +113,9 @@ struct curl_slist *build_request_headers(const char *host_header,
                                          const char *accept_language);
 void http_delay(void);
 
+/* set per request: wait for every engine instead of taking the early exit */
+extern __thread int request_is_patient;
+
 xmlXPathContextPtr create_xpath_context(xmlDocPtr doc);
 void free_xpath_objects(xmlXPathContextPtr ctx, xmlXPathObjectPtr obj);
 SearchResult *alloc_results_array(int capacity, int max_results);
