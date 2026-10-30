@@ -66,6 +66,9 @@ typedef enum {
   SCRAPE_STATUS_FETCH_ERROR,
   SCRAPE_STATUS_PARSE_MISMATCH,
   SCRAPE_STATUS_BLOCKED,
+  /* the batch deadline stopped us before the engine could answer: not a
+     failure, and it must not count against the engine's health */
+  SCRAPE_STATUS_CANCELLED,
 } ScrapeStatus;
 
 typedef struct {

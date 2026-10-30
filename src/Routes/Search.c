@@ -618,8 +618,22 @@ static void free_infobox_results(InfoBoxThreadData *data) {
 
 static const char *warning_message_for_job(const ScrapeJob *job,
                                            const char *locale) {
+  /* rate limits and challenge pages are temporary and self-healing: say so
+     instead of reporting a generic failure */
+  if (job->http_status == 429 || job->http_status == 202) {
+    const char *limited =
+        beaker_get_locale_value(locale, "warning_rate_limited");
+    if (limited)
+      return limited;
+  }
   switch (job->status) {
   case SCRAPE_STATUS_FETCH_ERROR: {
+    if (job->elapsed_ms >= 4000.0) {
+      const char *timeout_msg =
+          beaker_get_locale_value(locale, "warning_timeout");
+      if (timeout_msg)
+        return timeout_msg;
+    }
     const char *msg = beaker_get_locale_value(locale, "warning_fetch_error");
     return msg ? msg
                : "request failed before OmniSearch could read search results.";
@@ -630,6 +644,9 @@ static const char *warning_message_for_job(const ScrapeJob *job,
                : "returned search results in a format OmniSearch could not "
                  "parse.";
   }
+  case SCRAPE_STATUS_CANCELLED:
+    /* we stopped waiting; the source may well have answered a moment later */
+    return NULL;
   case SCRAPE_STATUS_BLOCKED: {
     const char *msg = beaker_get_locale_value(locale, "warning_blocked");
     return msg ? msg
@@ -868,11 +885,13 @@ int results_handler(UrlParams *params) {
     for (int i = 0; i < eligible_count; i++)
       if (eligible[i]->verticals & V_WEB)
         web_count++;
+    /* Only healthy engines are added back: firing at a breaker that just
+       tripped only produces a failure notice, not results. */
     for (int want = MIN_WEB_ENGINES; web_count < want; ) {
       const SearchEngine *best = NULL;
       for (int i = 0; i < eligible_all_count; i++) {
         const SearchEngine *e = eligible_all[i];
-        if (!(e->verticals & V_WEB))
+        if (!(e->verticals & V_WEB) || !healthy[i])
           continue;
         int already = 0;
         for (int j = 0; j < eligible_count; j++)
@@ -887,6 +906,21 @@ int results_handler(UrlParams *params) {
         break;
       eligible[eligible_count++] = best;
       web_count++;
+    }
+
+    /* If every general engine is broken, still probe the strongest one so a
+       general query is never answered by vertical APIs alone. */
+    if (web_count == 0) {
+      const SearchEngine *best = NULL;
+      for (int i = 0; i < eligible_all_count; i++) {
+        const SearchEngine *e = eligible_all[i];
+        if (!(e->verticals & V_WEB))
+          continue;
+        if (!best || e->weight > best->weight)
+          best = e;
+      }
+      if (best && eligible_count < ENGINE_COUNT)
+        eligible[eligible_count++] = best;
     }
   }
   int enabled_engine_count = eligible_count;
@@ -1040,6 +1074,9 @@ int results_handler(UrlParams *params) {
       engine_idx++;
     }
   }
+  /* the router narrows the engine list after this count is taken, so the real
+     job count is engine_idx: anything larger walks past jobs[].engine */
+  enabled_engine_count = engine_idx;
 
   char client_key[BUFFER_SIZE_SMALL];
   rate_limit_get_client_key(client_key, sizeof(client_key));
@@ -1308,6 +1345,24 @@ int results_handler(UrlParams *params) {
     cand_count = rank_dedupe(cands, cand_count);
     rank_score(cands, cand_count, &analysis);
 
+    /* Relevance floor: if a result shares almost none of the query's
+       information mass, it is a "relaxed" engine hit, not an answer. Without
+       this, a nonsense query renders whatever popular pages an engine fell
+       back to. */
+    {
+      int kept = 0;
+      for (int c = 0; c < cand_count; c++) {
+        if (cands[c].coverage < 0.15) {
+          rank_doc_free(&cands[c]);
+          continue;
+        }
+        if (kept != c)
+          cands[kept] = cands[c];
+        kept++;
+      }
+      cand_count = kept;
+    }
+
     /* drop anything already shown on an earlier page of this query */
     /* cache keys are hashed; a raw "seen|<client>|<query>" string is rejected */
     char *seen_key = cache_compute_key(raw_query, 0, client_key);
@@ -1402,21 +1457,28 @@ int results_handler(UrlParams *params) {
       rank_doc_free(&cands[c]);
     }
 
-    context_set_array_of_arrays(&ctx, "results", results_matrix.rows,
-                                results_matrix.count,
-                                results_matrix.field_counts);
+    if (results_matrix.count > 0)
+      context_set_array_of_arrays(&ctx, "results", results_matrix.rows,
+                                  results_matrix.count,
+                                  results_matrix.field_counts);
+
 
     StringMatrix pager_matrix;
     SearchHrefData href_data = {.query = raw_query,
                                 .engine_id = selected_engine_id};
-    int pagination_result = string_matrix_build_pagination(
-        page, search_href_builder, &href_data, &pager_matrix);
+    int pagination_result = 0;
+    if (results_matrix.count > 0)
+      pagination_result = string_matrix_build_pagination(
+          page, search_href_builder, &href_data, &pager_matrix);
+    else
+      string_matrix_init(&pager_matrix);
 
     if (pagination_result == 0 && pager_matrix.count > 0) {
       context_set_array_of_arrays(&ctx, "pagination_links", pager_matrix.rows,
                                   pager_matrix.count,
                                   pager_matrix.field_counts);
     }
+
 
     clock_gettime(CLOCK_MONOTONIC, &perf_done);
     if (getenv("OMNI_PERF")) {

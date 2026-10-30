@@ -12,6 +12,7 @@ typedef struct {
   char domain[128];       /* registrable domain                    */
   double rrf;             /* reciprocal rank fusion score          */
   double score;           /* final blended score                   */
+  double coverage;        /* IDF-weighted share of query terms hit */
   int order;              /* first-seen order, tie breaker         */
   int engine_mask;        /* bit i set when engine i returned it   */
 } RankDoc;

@@ -393,6 +393,59 @@ static double reddit_relevance(const RankDoc *doc, const SearchQuery *query) {
   return coverage >= 0.66 ? 1.0 : 0.0;
 }
 
+/* Bounded edit distance: "hipity" and "hippity" are the same word typed
+   twice, and the coverage floor must not throw that result away. */
+static int edit_distance_at_most(const char *a, const char *b, int max) {
+  size_t la = strlen(a), lb = strlen(b);
+  if (la > 31 || lb > 31)
+    return 0;
+  if ((int)(la > lb ? la - lb : lb - la) > max)
+    return 0;
+
+  int prev[32], cur[32];
+  for (size_t j = 0; j <= lb; j++)
+    prev[j] = (int)j;
+
+  for (size_t i = 1; i <= la; i++) {
+    cur[0] = (int)i;
+    int row_min = cur[0];
+    for (size_t j = 1; j <= lb; j++) {
+      int cost = (a[i - 1] == b[j - 1]) ? 0 : 1;
+      int del = prev[j] + 1;
+      int ins = cur[j - 1] + 1;
+      int sub = prev[j - 1] + cost;
+      int best = del < ins ? del : ins;
+      if (sub < best)
+        best = sub;
+      cur[j] = best;
+      if (best < row_min)
+        row_min = best;
+    }
+    if (row_min > max)
+      return 0;
+    for (size_t j = 0; j <= lb; j++)
+      prev[j] = cur[j];
+  }
+  return prev[lb] <= max;
+}
+
+static int coverage_token_matches(const char *token, const char *term) {
+  if (strcmp(token, term) == 0)
+    return 1;
+  if (strlen(term) < 5)
+    return 0;
+  if (strstr(token, term))
+    return 1;
+  return edit_distance_at_most(token, term, 1);
+}
+
+static int coverage_has_term(char tokens[MAX_TOKENS][32], int n, const char *term) {
+  for (int i = 0; i < n; i++)
+    if (coverage_token_matches(tokens[i], term))
+      return 1;
+  return 0;
+}
+
 static double url_quality(const RankDoc *doc) {
   double score = 0.0;
   if (strncasecmp(doc->url, "https://", 8) == 0)
@@ -503,13 +556,14 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
         continue;
       double idf = log(1.0 + ((double)count - df[t] + 0.5) / (df[t] + 0.5));
       idf_sum += idf;
-      if (count_token(title_tokens, title_n, query->terms[t]) > 0 ||
-          count_token(snippet_tokens, snippet_n, query->terms[t]) > 0 ||
-          count_token(url_tokens, url_n, query->terms[t]) > 0)
+      if (coverage_has_term(title_tokens, title_n, query->terms[t]) ||
+          coverage_has_term(snippet_tokens, snippet_n, query->terms[t]) ||
+          coverage_has_term(url_tokens, url_n, query->terms[t]))
         idf_hit += idf;
     }
     double coverage = idf_sum > 0.0 ? idf_hit / idf_sum : 1.0;
 
+    doc->coverage = coverage;
     doc->score = W_RRF * (doc->rrf / max_rrf) + W_BM25 * bm25 +
                  W_AUTHORITY * authority + W_PHRASE * phrase +
                  W_CONSENSUS * consensus + W_URL_QUALITY * url_quality(doc) +

@@ -72,7 +72,9 @@ void configure_curl_handle(CURL *curl, const char *full_url,
   curl_easy_setopt(curl, CURLOPT_USERAGENT,
                    get_engine_user_agent(engine_id));
 
-  curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
+  /* HTTP/1.1 on purpose: Yahoo (and some other front ends) abort the transfer
+     with "Error in the HTTP2 framing layer", which reads as an engine failure */
+  curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
   curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
   curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, CURL_DNS_TIMEOUT_SECS);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);

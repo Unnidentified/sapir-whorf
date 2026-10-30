@@ -292,6 +292,9 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
   else {
     job->results_count = 0;
     job->status = SCRAPE_STATUS_FETCH_ERROR;
+    if (getenv("OMNI_PERF") && job->engine)
+      fprintf(stderr, "[FETCHERR] %s: %s (http=%ld)\n", job->engine->id,
+              curl_easy_strerror(msg->data.result), job->http_status);
   }
 
   if (job->results_count == 0 &&
@@ -316,7 +319,8 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
       job->results_count == 0 && job->http_status == 200;
   if (job->engine &&
       (job->status == SCRAPE_STATUS_BLOCKED || job->http_status == 429 ||
-       job->http_status == 202 || zero_web_results)) {
+       job->http_status == 202 || job->http_status >= 500 ||
+       zero_web_results)) {
     char jar_path[BUFFER_SIZE_LARGE];
     cookie_jar_path(job->engine->id, jar_path, sizeof(jar_path));
     if (jar_path[0])
@@ -327,11 +331,13 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
 }
 
 /* These engines serve a worse page to a session cookie than to a clean client:
-   Bing in particular answers a repeat visit with its empty "no results" shell. */
+   Bing in particular answers a repeat visit with its empty "no results" shell.
+   Yahoo is the opposite: it 307s to a bot-check gif that sets YBV, and only a
+   cookie jar lets that round trip finish, so it keeps its jar. */
 static int engine_wants_no_cookies(const char *engine_id) {
   return engine_id &&
-         (!strcmp(engine_id, "bing") || !strcmp(engine_id, "yahoo") ||
-          !strcmp(engine_id, "ddg") || !strcmp(engine_id, "mojeek"));
+         (!strcmp(engine_id, "bing") || !strcmp(engine_id, "ddg") ||
+          !strcmp(engine_id, "mojeek"));
 }
 
 static void cookie_jar_path(const char *engine_id, char *out, size_t size) {
@@ -501,12 +507,8 @@ static void cleanup_unfinished_jobs(CURLM *multi_handle, ScrapeJob *jobs,
     curl_easy_cleanup(jobs[i].handle);
     jobs[i].handle = NULL;
 
-    if (jobs[i].status == SCRAPE_STATUS_PENDING) {
-      jobs[i].status = SCRAPE_STATUS_FETCH_ERROR;
-      if (jobs[i].engine)
-        engine_health_record(jobs[i].engine->id, (int)jobs[i].status, 0,
-                             jobs[i].elapsed_ms);
-    }
+    if (jobs[i].status == SCRAPE_STATUS_PENDING)
+      jobs[i].status = SCRAPE_STATUS_CANCELLED;
   }
 }
 
@@ -622,13 +624,24 @@ retry:;
         (long)((now_ts.tv_sec - batch_start.tv_sec) * 1000 +
                (now_ts.tv_nsec - batch_start.tv_nsec) / 1000000);
     /* enough good answers already: stop paying for the slowest engine */
-    /* Never decide the page on one engine: a single fast SERP can be junk,
-       and the second engine's agreement is what makes the ranking trustworthy. */
-    if (!legacy && num_jobs > 1 && engines_so_far >= 2 && total_so_far >= 8 &&
-        elapsed_ms >= 650)
+    /* A "trusted" engine is one whose SERP we rank highly (Yahoo, Brave).
+       Bing and DuckDuckGo answer in 300ms but sometimes with relaxed junk, so
+       their early answer alone must not end the batch. */
+    double best_weight = 0.0;
+    for (int i = 0; i < num_jobs; i++)
+      if (jobs[i].results_count > 0 && jobs[i].engine &&
+          jobs[i].engine->weight > best_weight)
+        best_weight = jobs[i].engine->weight;
+    int trusted = best_weight >= 1.1;
+
+    if (!legacy && num_jobs > 1 && trusted && engines_so_far >= 2 &&
+        total_so_far >= 8 && elapsed_ms >= 500)
       break;
-    if (!legacy && num_jobs > 1 && engines_so_far >= 1 && total_so_far >= 8 &&
-        elapsed_ms >= 750)
+    if (!legacy && num_jobs > 1 && trusted && engines_so_far >= 1 &&
+        total_so_far >= 6 && elapsed_ms >= 550)
+      break;
+    if (!legacy && num_jobs > 1 && engines_so_far >= 2 && total_so_far >= 8 &&
+        elapsed_ms >= 1200)
       break;
     /* never let one slow engine set the page latency */
     if (elapsed_ms >= batch_cap_ms)
