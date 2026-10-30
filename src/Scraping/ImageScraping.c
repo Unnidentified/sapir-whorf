@@ -1,5 +1,6 @@
 #include "ImageScraping.h"
 #include "../Utility/HttpClient.h"
+#include "../Routes/ImageProxy.h"
 #include "Config.h"
 #include <libxml/HTMLparser.h>
 #include <libxml/xpath.h>
@@ -10,22 +11,9 @@
 static char *build_proxy_url(const char *image_url) {
   if (!image_url)
     return NULL;
-
-  char *proxy_url = NULL;
-  CURL *curl = curl_easy_init();
-  if (curl) {
-    char *encoded = curl_easy_escape(curl, (char *)image_url, 0);
-    if (encoded) {
-      size_t len = strlen("/proxy?url=") + strlen(encoded) + 1;
-      proxy_url = malloc(len);
-      if (proxy_url)
-        snprintf(proxy_url, len, "/proxy?url=%s", encoded);
-      curl_free(encoded);
-    }
-    curl_easy_cleanup(curl);
-  }
-
-  return proxy_url;
+  /* links must carry the HMAC: /proxy refuses unsigned requests so it cannot be
+     used as an open fetch relay */
+  return image_proxy_sign_url(image_url);
 }
 
 static char *extract_json_string(const char *json, const char *key) {
