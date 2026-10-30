@@ -204,7 +204,9 @@ int check_cache_for_job(ScrapeJob *job) {
 
 static void stale_cache_key(const ScrapeJob *job, char *out, size_t size) {
   char salt[160];
-  snprintf(salt, sizeof(salt), "%s|%s|stale",
+  /* the "stale_" tag is load-bearing: cache_cleanup sweeps this class at the
+     7-day TTL while everything else sweeps at the search TTL */
+  snprintf(salt, sizeof(salt), "stale_%s|%s",
            job->engine ? job->engine->name : "?",
            job->lang[0] ? job->lang : "en");
   char *key = cache_compute_key(job->query, job->page, salt);

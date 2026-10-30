@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 static char cache_dir[BUFFER_SIZE_MEDIUM] = {0};
 static int cache_ttl_search_val = DEFAULT_CACHE_TTL_SEARCH;
@@ -160,6 +161,9 @@ int cache_get(const char *key, time_t max_age, char **out_data,
   return 0;
 }
 
+/* Write through a temp file and rename() into place: a concurrent reader either
+   sees the previous body or the new one, never a half-written file (a truncated
+   image from the proxy used to be possible here). */
 int cache_set(const char *key, const char *data, size_t size) {
   if (!key || !data || size == 0 || cache_dir[0] == '\0') {
     return -1;
@@ -169,53 +173,95 @@ int cache_set(const char *key, const char *data, size_t size) {
   snprintf(filepath, sizeof(filepath), "%s/%c/%s.cache", cache_dir, key[0],
            key);
 
-  FILE *fp = fopen(filepath, "wb");
+  char tmp_path[BUFFER_SIZE_XLARGE];
+  snprintf(tmp_path, sizeof(tmp_path), "%s.tmp.%ld", filepath,
+           (long)getpid());
+
+  FILE *fp = fopen(tmp_path, "wb");
   if (!fp) {
     return -1;
   }
 
   size_t written = fwrite(data, 1, size, fp);
+  int fl = fflush(fp);
   fclose(fp);
 
-  if (written != size) {
-    remove(filepath);
+  if (written != size || fl != 0) {
+    remove(tmp_path);
+    return -1;
+  }
+
+  if (rename(tmp_path, filepath) != 0) {
+    remove(tmp_path);
     return -1;
   }
 
   return 0;
 }
 
-void cache_cleanup(time_t max_age) {
-  if (cache_dir[0] == '\0' || max_age <= 0) {
+/* Cache entries are split by class because their lifetimes differ by two orders
+   of magnitude. Sweeping them all at the search TTL (1 h) used to delete the
+   stale bodies (7 d), infobox answers (24 h) and images (7 d) on every restart,
+   which quietly disabled the stale fallback. The class is encoded in the key
+   salt by the callers; here we only need per-class TTLs to sweep with. */
+typedef struct {
+  const char *suffix; /* matched against the key inside the filename */
+  time_t ttl;
+} CacheClass;
+
+static void sweep_dir(const char *subdir_path, const CacheClass *classes,
+                      int nclasses, int fallback_ttl, time_t now) {
+  DIR *dir = opendir(subdir_path);
+  if (!dir)
     return;
+
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != NULL) {
+    /* ".cache" is six characters: this was len-7, so the comparison never
+       matched and cache_cleanup() had never deleted a single file. */
+    size_t len = strlen(entry->d_name);
+    if (len <= 6 || strcmp(entry->d_name + len - 6, ".cache") != 0)
+      continue;
+
+    char filepath[BUFFER_SIZE_XLARGE];
+    snprintf(filepath, sizeof(filepath), "%s/%s", subdir_path, entry->d_name);
+
+    /* stale_* bodies live 7 days; everything else sweeps at its own class TTL */
+    time_t ttl = fallback_ttl;
+    for (int c = 0; c < nclasses; c++) {
+      if (classes[c].suffix && strstr(entry->d_name, classes[c].suffix)) {
+        ttl = classes[c].ttl;
+        break;
+      }
+    }
+
+    struct stat st;
+    if (stat(filepath, &st) == 0 && st.st_mtime < now - ttl) {
+      remove(filepath);
+    }
   }
+  closedir(dir);
+}
+
+void cache_cleanup(time_t max_age) {
+  if (cache_dir[0] == '\0')
+    return;
 
   time_t now = time(NULL);
-  time_t cutoff = now - max_age;
+  /* max_age <= 0 used to mean "do nothing"; a zero search TTL (caching off)
+     should still sweep the other classes, so treat it as "search class only". */
+  time_t search_ttl = max_age > 0 ? max_age : (time_t)get_cache_ttl_search();
+
+  CacheClass classes[] = {
+      {"stale_", (time_t)STALE_CACHE_TTL_SECONDS},
+      {"info_", (time_t)get_cache_ttl_infobox()},
+      {"img_", (time_t)get_cache_ttl_image()},
+  };
 
   for (int d = 0; HEX_CHARS[d]; d++) {
     char subdir_path[BUFFER_SIZE_LARGE];
     snprintf(subdir_path, sizeof(subdir_path), "%s/%c", cache_dir,
              HEX_CHARS[d]);
-
-    DIR *dir = opendir(subdir_path);
-    if (!dir)
-      continue;
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-      size_t len = strlen(entry->d_name);
-      if (len > 7 && strcmp(entry->d_name + len - 7, ".cache") == 0) {
-        char filepath[BUFFER_SIZE_XLARGE];
-        snprintf(filepath, sizeof(filepath), "%s/%s", subdir_path,
-                 entry->d_name);
-
-        struct stat st;
-        if (stat(filepath, &st) == 0 && st.st_mtime < cutoff) {
-          remove(filepath);
-        }
-      }
-    }
-    closedir(dir);
+    sweep_dir(subdir_path, classes, 3, (int)search_ttl, now);
   }
 }

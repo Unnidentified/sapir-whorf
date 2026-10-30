@@ -1,8 +1,11 @@
 #include <beaker.h>
 #include <curl/curl.h>
 #include <libxml/parser.h>
+#include <pthread.h>
 #include <signal.h>
+#include <unistd.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "Cache/Cache.h"
@@ -22,6 +25,52 @@
 #include "Scraping/EngineHealth.h"
 #include "Scraping/Scraping.h"
 #include "Utility/Utility.h"
+
+/* Runtime sweeping: expired entries were only removed when the same key was
+   read again, so a long-lived process grew the cache without bound. One thread
+   wakes hourly and sweeps each class at its own TTL. */
+static pthread_mutex_t sweeper_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int sweeper_started = 0;
+
+static void *cache_sweeper_thread(void *arg) {
+  time_t search_ttl = (time_t)(intptr_t)arg;
+  for (;;) {
+    for (int i = 0; i < 60; i++) {
+      sleep(60);
+      /* stop cleanly on shutdown */
+      pthread_mutex_lock(&sweeper_mutex);
+      int run = sweeper_started;
+      pthread_mutex_unlock(&sweeper_mutex);
+      if (!run)
+        return NULL;
+    }
+    cache_cleanup(search_ttl);
+  }
+  return NULL;
+}
+
+static void start_cache_sweeper(int search_ttl) {
+  pthread_t tid;
+  pthread_mutex_lock(&sweeper_mutex);
+  if (sweeper_started) {
+    pthread_mutex_unlock(&sweeper_mutex);
+    return;
+  }
+  sweeper_started = 1;
+  pthread_mutex_unlock(&sweeper_mutex);
+
+  if (pthread_create(&tid, NULL, cache_sweeper_thread,
+                     (void *)(intptr_t)(search_ttl > 0 ? search_ttl : 60)) !=
+      0) {
+    pthread_mutex_lock(&sweeper_mutex);
+    sweeper_started = 0;
+    pthread_mutex_unlock(&sweeper_mutex);
+    fprintf(stderr, "[WARN] Could not start cache sweeper thread\n");
+    return;
+  }
+  pthread_detach(tid);
+  fprintf(stderr, "[INFO] Cache sweeper running hourly\n");
+}
 
 Config global_config;
 
@@ -131,6 +180,7 @@ int main() {
   } else {
     fprintf(stderr, "[INFO] Cache initialized at %s\n", cfg.cache_dir);
     cache_cleanup(cfg.cache_ttl_search);
+    start_cache_sweeper(cfg.cache_ttl_search);
     engine_health_set_limits(cfg.breaker_threshold, cfg.breaker_cooldown);
     engine_health_init(cfg.cache_dir);
   }

@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <time.h>
 
+#define STALE_CACHE_TTL_SECONDS (7 * 86400)
+
 int cache_init(const char *cache_dir);
 void cache_shutdown(void);
 
@@ -12,6 +14,7 @@ int cache_get(const char *key, time_t max_age, char **out_data,
 int cache_set(const char *key, const char *data, size_t size);
 
 void cache_cleanup(time_t max_age);
+void cache_sweep_periodic(time_t search_ttl);
 
 char *cache_compute_key(const char *query, int page, const char *engine_name);
 
