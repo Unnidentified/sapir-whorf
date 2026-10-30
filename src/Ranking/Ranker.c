@@ -23,6 +23,8 @@
 #define BM25_B 0.75
 #define MAX_TOKENS 64
 
+static double freshness_score(const RankDoc *doc);
+
 /* ---------- registrable domain ---------- */
 
 /* C11: the suffix list is data, not code. A 14-entry hand list knew co.uk but
@@ -720,10 +722,64 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
     doc->score = W_RRF * (doc->rrf / max_rrf) + W_BM25 * bm25 +
                  W_AUTHORITY * authority + W_PHRASE * phrase +
                  W_CONSENSUS * consensus + W_URL_QUALITY * url_quality(doc) +
-                 W_FRESHNESS * 0.5 - W_SPAM * spam +
+                 W_FRESHNESS * freshness_score(doc) - W_SPAM * spam +
                  W_REDDIT * reddit_relevance(doc, query) -
                  W_COVERAGE * (1.0 - coverage);
   }
+}
+
+/* C13: freshness was the constant 0.5 for every document while SETUP described
+   "date fragments in snippet". Engines do put a date at the start of the
+   snippet ("2 days ago - ...", "Jan 4, 2025 - ..."), so read it. Anything we
+   cannot date scores neutral. */
+static double freshness_score(const RankDoc *doc) {
+  if (!doc || !doc->snippet)
+    return 0.5;
+
+  const char *s = doc->snippet;
+  time_t now = time(NULL);
+  struct tm tm;
+  double result = 0.5;
+
+  /* relative forms */
+  if (strstr(s, "hour ago") || strstr(s, "hours ago"))
+    return 0.9;
+  if (strstr(s, "minute ago") || strstr(s, "minutes ago"))
+    return 0.95;
+  if (strstr(s, "day ago") || strstr(s, "days ago"))
+    return 0.85;
+  if (strstr(s, "week ago") || strstr(s, "weeks ago"))
+    return 0.7;
+  if (strstr(s, "month ago") || strstr(s, "months ago"))
+    return 0.5;
+  if (strstr(s, "year ago") || strstr(s, "years ago"))
+    return 0.3;
+
+  /* absolute dates: only within the first ~24 characters, where engines put
+     them; matching mid-snippet picks up incidental numbers */
+  char head[32];
+  snprintf(head, sizeof(head), "%s", s);
+  memset(&tm, 0, sizeof(tm));
+  const char *formats[] = {"%b %d, %Y", "%d %b %Y", "%Y-%m-%d", "%b %d %Y"};
+  for (size_t i = 0; i < sizeof(formats) / sizeof(formats[0]); i++) {
+    if (strptime(head, formats[i], &tm) != NULL) {
+      tm.tm_isdst = -1;
+      time_t then = mktime(&tm);
+      if (then > 0 && then <= now) {
+        double years = (double)(now - then) / (365.25 * 86400.0);
+        if (years < 0.25)
+          result = 0.9;
+        else if (years < 1.0)
+          result = 0.7;
+        else if (years < 3.0)
+          result = 0.45;
+        else
+          result = 0.25;
+      }
+      break;
+    }
+  }
+  return result;
 }
 
 /* ---------- near duplicate titles ---------- */
@@ -759,8 +815,14 @@ int rank_dedupe(RankDoc *docs, int count) {
         duplicate_of = j;
         break;
       }
-      if (title_jaccard(docs[i].title, docs[j].title) &&
-          strcmp(docs[i].domain, docs[j].domain) != 0) {
+      /* C13: title similarity alone merged DIFFERENT pages across sites -
+         "How to install X on Ubuntu 22.04" from two vendors is not a
+         duplicate. Require the snippets to agree as well, and only then
+         across domains; the same-domain case is already covered by the
+         canonical URL test above. */
+      if (strcmp(docs[i].domain, docs[j].domain) != 0 &&
+          title_jaccard(docs[i].title, docs[j].title) &&
+          title_jaccard(docs[i].snippet, docs[j].snippet)) {
         duplicate_of = j;
         break;
       }
