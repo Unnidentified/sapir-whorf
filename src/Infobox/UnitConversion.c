@@ -544,6 +544,30 @@ static char *build_html(double value, const UnitDef *from, double result,
   return html;
 }
 
+/* G4: the same conversion, as one plain sentence. The answer box needs text -
+   the infobox HTML is a card, not an answer. */
+int unit_conv_answer(const char *query, char *out, size_t size) {
+  if (!query || !out || size == 0)
+    return 0;
+  double value = 0;
+  const UnitDef *from = NULL;
+  const UnitDef *to = NULL;
+  if (!parse_conversion_query(query, &value, &from, &to))
+    return 0;
+  if (!from || !to || from->type != to->type)
+    return 0;
+  double result = convert_value(value, from, to);
+  if (result == 0 && value != 0 && from->type != UNIT_TEMP)
+    return 0;
+  char val_buf[64], res_buf[64], from_buf[64], to_buf[64];
+  format_number(value, val_buf, sizeof(val_buf));
+  format_number(result, res_buf, sizeof(res_buf));
+  pluralize(from->name, value, from_buf, sizeof(from_buf));
+  pluralize(to->name, result, to_buf, sizeof(to_buf));
+  snprintf(out, size, "%s %s = %s %s", val_buf, from_buf, res_buf, to_buf);
+  return 1;
+}
+
 InfoBox fetch_unit_conv_data(const char *query) {
   InfoBox info = {NULL, NULL, NULL, NULL};
   if (!query)

@@ -8,6 +8,7 @@
 #include "../Infobox/Wikipedia.h"
 #include "../Limiter/RateLimit.h"
 #include "../Scraping/EngineHealth.h"
+#include "../Infobox/AnswerBox.h"
 #include "../Query/QueryAnalysis.h"
 #include "../Ranking/Ranker.h"
 #include "../Scraping/Scraping.h"
@@ -444,59 +445,6 @@ static int is_media_result(const char *url) {
     if (url_host_matches(url, MEDIA_HOSTS[i]))
       return 1;
   }
-  return 0;
-}
-
-static int is_calculator_query(const char *query) {
-  if (!query)
-    return 0;
-
-  int has_digit = 0;
-  int has_math_operator = 0;
-
-  for (const char *p = query; *p; p++) {
-    if (isdigit(*p) || *p == '.') {
-      has_digit = 1;
-    }
-    if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '^') {
-      has_math_operator = 1;
-    }
-  }
-
-  if (!has_digit || !has_math_operator)
-    return 0;
-
-  int len = strlen(query);
-  for (int i = 0; i < len; i++) {
-    char c = query[i];
-    if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^') {
-      int has_num_before = 0;
-      int has_num_after = 0;
-
-      for (int j = i - 1; j >= 0; j--) {
-        if (isdigit(query[j]) || query[j] == '.') {
-          has_num_before = 1;
-          break;
-        }
-        if (query[j] != ' ')
-          break;
-      }
-
-      for (int j = i + 1; j < len; j++) {
-        if (isdigit(query[j]) || query[j] == '.') {
-          has_num_after = 1;
-          break;
-        }
-        if (query[j] != ' ')
-          break;
-      }
-
-      if (has_num_before || has_num_after) {
-        return 1;
-      }
-    }
-  }
-
   return 0;
 }
 
@@ -1835,6 +1783,23 @@ int results_handler(UrlParams *params) {
                         "down."
                       : "The search engines may be busy — try again in a "
                         "moment.");
+    }
+
+    /* G4: the answer box. Local answerers only, resolved on the request path -
+       they are pure computation, so this costs nothing measurable. If nothing
+       local answers, the infobox card carries the network answer instead. */
+    {
+      AnswerBoxResult ans;
+      if (answer_box_resolve_local(raw_query, &ans)) {
+        context_set(&ctx, "answer_text", ans.answer);
+        if (ans.detail[0])
+          context_set(&ctx, "answer_detail", ans.detail);
+        context_set(&ctx, "answer_source", ans.source);
+        /* "2+2" answered 4: telling the user nothing was found on top of that
+           would be silly. "answered" is not a state the empty block matches. */
+        if (results_matrix.count == 0)
+          context_set(&ctx, "results_state", "answered");
+      }
     }
 
     /* G2: a paused engine is not an outage, and it is not invisible either. */

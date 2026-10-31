@@ -37,6 +37,16 @@
             <aside class="sidebar-spacer">
             </aside>
             <main class="results-container">
+                {{if exists answer_text}}
+                <section class="answer-box" aria-label="Direct answer">
+                    <p class="answer-box-text">{{answer_text}}</p>
+                    {{if exists answer_detail}}
+                    <p class="answer-box-detail">{{answer_detail}}</p>
+                    {{endif}}
+                    <p class="answer-box-source">Answered locally by {{answer_source}}</p>
+                </section>
+                {{endif}}
+
                 {{for result in results}}
                 <div class="result">
                     <span class="url">

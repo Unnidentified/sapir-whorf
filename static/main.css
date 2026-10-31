@@ -710,6 +710,35 @@ header .logo-link:hover {
 
 /* G2: engine status panel. Plain table, no JS - it has to work with scripts
    off like everything else here. */
+/* G4: the answer box. Shown above the results when an answerer could answer
+   without the network, so it costs no latency and needs no JS. */
+.answer-box {
+  margin: 0 0 1.25rem 0;
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--border, #d8d8d8);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+.answer-box-text {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.answer-box-detail {
+  margin: 0.4rem 0 0 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.answer-box-source {
+  margin: 0.5rem 0 0 0;
+  color: var(--text-muted, #777);
+  font-size: 0.78rem;
+}
+
 .settings-table-wrap {
   overflow-x: auto;
   margin-top: 0.75rem;

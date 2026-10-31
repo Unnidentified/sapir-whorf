@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 static const unsigned char HEX_VALS[256] = {
     ['0'] = 0,  ['1'] = 1,  ['2'] = 2,  ['3'] = 3,  ['4'] = 4,  ['5'] = 5,
@@ -96,6 +97,19 @@ int is_colour_code_query(const char *query) {
   if (!query)
     return 0;
   const char *p = query;
+  /* G4: rgb() is how most people paste a colour, and without this the answer
+     box fell through to a network lookup for a question it can answer
+     instantly. */
+  if (strncasecmp(p, "rgb(", 4) == 0 || strncasecmp(p, "rgba(", 5) == 0) {
+    int r = -1, g = -1, b = -1;
+    const char *open = strchr(p, '(');
+    if (!open)
+      return 0;
+    if (sscanf(open + 1, "%d ,%d ,%d", &r, &g, &b) != 3 &&
+        sscanf(open + 1, "%d, %d, %d", &r, &g, &b) != 3)
+      return 0;
+    return r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255;
+  }
   if (p[0] == '#') {
     p++;
     while (*p == ' ')
@@ -115,6 +129,46 @@ InfoBox fetch_colour_data(char *query) {
     return info;
 
   const char *p = query;
+  if (strncasecmp(p, "rgb(", 4) == 0 || strncasecmp(p, "rgba(", 5) == 0) {
+    int r = -1, g = -1, b = -1;
+    const char *open = strchr(p, '(');
+    if (!open)
+      return info;
+    if (sscanf(open + 1, "%d ,%d ,%d", &r, &g, &b) != 3 &&
+        sscanf(open + 1, "%d, %d, %d", &r, &g, &b) != 3)
+      return info;
+    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255)
+      return info;
+
+    int h, s2, l, hh, ss, v, c, m, y, k;
+    rgb_to_hsl(r, g, b, &h, &s2, &l);
+    rgb_to_hsv(r, g, b, &hh, &ss, &v);
+    rgb_to_cmyk(r, g, b, &c, &m, &y, &k);
+
+    char html[1024];
+    snprintf(html, sizeof(html),
+             "<div class='colour-container' style='line-height: 1.6;'>"
+             "<div style='display: flex; align-items: flex-start; gap: 16px;'>"
+             "<div style='width: 100px; height: 100px; border-radius: 12px; "
+             "border: 1px solid #ddd; background-color: rgb(%d,%d,%d); "
+             "flex-shrink: 0;'></div>"
+             "<div>"
+             "<div style='font-size: 1.3em; font-weight: bold; margin-bottom: "
+             "8px;'>#%02X%02X%02X</div>"
+             "<div style='color: #666; margin-bottom: 4px;'>RGB(%d, %d, "
+             "%d)</div>"
+             "<div style='color: #666; margin-bottom: 4px;'>HSL(%d, %d%%, "
+             "%d%%)</div>"
+             "<div style='color: #666; margin-bottom: 4px;'>HSV(%d, %d%%, "
+             "%d%%)</div>"
+             "<div style='color: #666;'>CMYK(%d%%, %d%%, %d%%, %d%%)</div>"
+             "</div></div></div>",
+             r, g, b, r, g, b, r, g, b, h, s2, l, hh, ss, v, c, m, y, k);
+    info.title = strdup("Colour");
+    info.extract = strdup(html);
+    info.url = strdup("#");
+    return info;
+  }
   if (p[0] != '#')
     return info;
   p++;

@@ -15,6 +15,7 @@ typedef struct {
 } Parser;
 
 static double parse_expression(Parser *p);
+static double parse_power(Parser *p);
 
 static void skip_ws(Parser *p) {
   while (p->buffer[p->pos] == ' ')
@@ -40,14 +41,37 @@ static double parse_factor(Parser *p) {
   return val;
 }
 
+/* G4: "^" was in the matcher but never in the parser, so "2^10" quietly
+   answered 2 - a confidently wrong number, which is worse than no answer.
+   Right-associative and binding tighter than * and /, like the usual
+   convention (2^3^2 is 2^(3^2)). */
+static double parse_power(Parser *p) {
+  double base = parse_factor(p);
+  skip_ws(p);
+  if (p->buffer[p->pos] == '^') {
+    p->pos++;
+    double exponent = parse_power(p);
+    double result = 1.0;
+    if (exponent == (int)exponent && exponent >= 0 && exponent <= 1024) {
+      for (int i = 0; i < (int)exponent; i++)
+        result *= base;
+    } else {
+      result = pow(base, exponent);
+    }
+    skip_ws(p);
+    return result;
+  }
+  return base;
+}
+
 static double parse_term(Parser *p) {
-  double left = parse_factor(p);
+  double left = parse_power(p);
   while (1) {
     skip_ws(p);
     char op = p->buffer[p->pos];
     if (op == '*' || op == '/') {
       p->pos++;
-      double right = parse_factor(p);
+      double right = parse_power(p);
       double old = left;
       left = (op == '*') ? left * right : left / right;
 
@@ -117,4 +141,59 @@ InfoBox fetch_calc_data(char *math_input) {
   info.url = strdup("#");
 
   return info;
+}
+
+/* G4: the matcher lives with the answer it guards, so the answer-box table
+   is self-contained and the test can drive matcher and answerer together. */
+int is_calculator_query(const char *query) {
+  if (!query)
+    return 0;
+
+  int has_digit = 0;
+  int has_math_operator = 0;
+
+  for (const char *p = query; *p; p++) {
+    if (isdigit(*p) || *p == '.') {
+      has_digit = 1;
+    }
+    if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '^') {
+      has_math_operator = 1;
+    }
+  }
+
+  if (!has_digit || !has_math_operator)
+    return 0;
+
+  int len = strlen(query);
+  for (int i = 0; i < len; i++) {
+    char c = query[i];
+    if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^') {
+      int has_num_before = 0;
+      int has_num_after = 0;
+
+      for (int j = i - 1; j >= 0; j--) {
+        if (isdigit(query[j]) || query[j] == '.') {
+          has_num_before = 1;
+          break;
+        }
+        if (query[j] != ' ')
+          break;
+      }
+
+      for (int j = i + 1; j < len; j++) {
+        if (isdigit(query[j]) || query[j] == '.') {
+          has_num_after = 1;
+          break;
+        }
+        if (query[j] != ' ')
+          break;
+      }
+
+      if (has_num_before || has_num_after) {
+        return 1;
+      }
+    }
+  }
+
+  return 0;
 }

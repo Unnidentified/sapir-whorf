@@ -315,6 +315,22 @@ tests/test_g3_cse_element: tests/test_g3_cse_element.c $(LINT_SRCS) \
 cse-check: tests/test_g3_cse_element
 	@./tests/test_g3_cse_element
 
+# G4: the answer-box table (local answerers only - no network needed)
+tests/test_g4_answerbox: tests/test_g4_answerbox.c $(LINT_SRCS) \
+                         src/Cache/Cache.c src/Config.c src/Proxy/Proxy.c \
+                         src/Utility/JsonHelper.c src/Utility/HttpClient.c \
+                         src/Ranking/Ranker.c src/Query/QueryAnalysis.c \
+                         src/Infobox/AnswerBox.c src/Infobox/Calculator.c \
+                         src/Infobox/UnitConversion.c \
+                         src/Infobox/ColourCode.c \
+                         src/Infobox/CurrencyConversion.c \
+                         src/Infobox/Dictionary.c src/Infobox/Wikipedia.c \
+                         src/Infobox/Infobox.c
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto -lm
+
+answer-check: tests/test_g4_answerbox
+	@./tests/test_g4_answerbox
+
 # A3: offline relevance benchmark. Reranks a recorded replay file with the
 # production ranker - no network, no server, deterministic.
 tests/offline_rank: tests/offline_rank.c src/Ranking/Ranker.c \
@@ -365,6 +381,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check smoke
 
-.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
