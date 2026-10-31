@@ -1,4 +1,5 @@
 #include "AnswerBox.h"
+#include <math.h>
 #include "AnswerLocal.h"
 #include "Calculator.h"
 #include "ColourCode.h"
@@ -74,8 +75,16 @@ static int answer_arithmetic(const char *query, AnswerBoxResult *out) {
   char expression[512];
   strip_thousands_commas(query, expression, sizeof(expression));
   double value = evaluate(expression);
-  if (value != value) /* NaN */
+  if (value != value) /* NaN: the parse failed, so there is no answer */
     return 0;
+  if (isinf(value)) {
+    /* J4a: Google prints Infinity for 1/0; "inf" is not a word */
+    snprintf(out->answer, sizeof(out->answer), "%s",
+             value < 0 ? "-Infinity" : "Infinity");
+    snprintf(out->detail, sizeof(out->detail), "%s", expression);
+    out->confidence = 1.0;
+    return 1;
+  }
   if (value == (long long)value && value < 1e15 && value > -1e15)
     snprintf(out->answer, sizeof(out->answer), "%lld", (long long)value);
   else

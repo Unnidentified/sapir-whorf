@@ -46,6 +46,10 @@ int api_cse_extract_token_for_test(const char *body, size_t len);
 
 /* SearXNG instance acting as a bridge to Google and other engines */
 void api_searxng_configure(const char *base_url, const char *engines);
+/* the normalised, bang-resolved engine list actually sent upstream */
+const char *api_searxng_engines(void);
+/* one request each at startup: JSON output on, configured names known */
+void api_searxng_validate(void);
 int api_searxng_available(void);
 int api_parse_searxng(const char *body, size_t len, const char *lang,
                       SearchResult **out, int max);

@@ -12,31 +12,53 @@ static __thread char logic_log[4096];
 typedef struct {
   const char *buffer;
   int pos;
+  /* J4a: the parser had no error channel, so "5 + * 3" answered 5 and
+     "(2+3" answered 5 - a confidently wrong number, which is worse than no
+     answer at all. */
+  int error;
 } Parser;
 
 static double parse_expression(Parser *p);
 static double parse_power(Parser *p);
+static double parse_unary(Parser *p);
 
 static void skip_ws(Parser *p) {
   while (p->buffer[p->pos] == ' ')
     p->pos++;
 }
 
-static double parse_factor(Parser *p) {
+static double parse_unary(Parser *p) {
   skip_ws(p);
   if (p->buffer[p->pos] == '-') {
     p->pos++;
-    return -parse_factor(p);
+    return -parse_unary(p);
   }
+  if (p->buffer[p->pos] == '+') {
+    p->pos++;
+    return parse_unary(p);
+  }
+  return parse_power(p);
+}
+
+static double parse_factor(Parser *p) {
+  skip_ws(p);
   if (p->buffer[p->pos] == '(') {
     p->pos++;
     double res = parse_expression(p);
+    skip_ws(p);
     if (p->buffer[p->pos] == ')')
       p->pos++;
+    else
+      p->error = 1; /* unbalanced: "5 * (2+3" is not a number */
     return res;
   }
   char *endptr;
   double val = strtod(&p->buffer[p->pos], &endptr);
+  if (endptr == &p->buffer[p->pos]) {
+    /* nothing consumable here: "5 + * 3", "()" and "" all land here */
+    p->error = 1;
+    return 0.0;
+  }
   p->pos = (int)(endptr - p->buffer);
   return val;
 }
@@ -50,7 +72,8 @@ static double parse_power(Parser *p) {
   skip_ws(p);
   if (p->buffer[p->pos] == '^') {
     p->pos++;
-    double exponent = parse_power(p);
+    /* the exponent takes a unary sign (2^-1) and ^ is right-associative */
+    double exponent = parse_unary(p);
     double result = 1.0;
     if (exponent == (int)exponent && exponent >= 0 && exponent <= 1024) {
       for (int i = 0; i < (int)exponent; i++)
@@ -65,20 +88,21 @@ static double parse_power(Parser *p) {
 }
 
 static double parse_term(Parser *p) {
-  double left = parse_power(p);
+  double left = parse_unary(p);
   while (1) {
     skip_ws(p);
     char op = p->buffer[p->pos];
     if (op == '*' || op == '/') {
       p->pos++;
-      double right = parse_power(p);
+      double right = parse_unary(p);
       double old = left;
       left = (op == '*') ? left * right : left / right;
 
       char step[256];
 
-      snprintf(step, sizeof(step), "<div>%g %c %g = <b>%g</b></div>", old, op,
-               right, left);
+      snprintf(step, sizeof(step),
+               "<div>%.12g %c %.12g = <b>%.12g</b></div>", old, op, right,
+               left);
       strncat(logic_log, step, sizeof(logic_log) - strlen(logic_log) - 1);
     } else
       break;
@@ -99,8 +123,9 @@ static double parse_expression(Parser *p) {
 
       char step[256];
 
-      snprintf(step, sizeof(step), "<div>%g %c %g = <b>%g</b></div>", old, op,
-               right, left);
+      snprintf(step, sizeof(step),
+               "<div>%.12g %c %.12g = <b>%.12g</b></div>", old, op, right,
+               left);
       strncat(logic_log, step, sizeof(logic_log) - strlen(logic_log) - 1);
     } else
       break;
@@ -111,9 +136,16 @@ static double parse_expression(Parser *p) {
 double evaluate(const char *expr) {
   logic_log[0] = '\0';
   if (!expr || strlen(expr) == 0)
-    return 0.0;
-  Parser p = {expr, 0};
-  return parse_expression(&p);
+    return NAN;
+  Parser p = {expr, 0, 0};
+  double value = parse_expression(&p);
+  /* a parse that did not consume the whole string did not understand it */
+  skip_ws(&p);
+  if (p.buffer[p.pos] != '\0')
+    p.error = 1;
+  if (p.error)
+    return NAN;
+  return value;
 }
 
 InfoBox fetch_calc_data(char *math_input) {
@@ -123,16 +155,31 @@ InfoBox fetch_calc_data(char *math_input) {
 
   double result = evaluate(math_input);
 
+  /* J4a: say what happened instead of printing a number that is not one.
+     Google prints Infinity for 1/0, and Error for something it cannot parse. */
+  const char *shown;
+  char number[64];
+  if (isnan(result)) {
+    shown = "Error";
+    snprintf(number, sizeof(number), "%s", shown);
+  } else if (isinf(result)) {
+    shown = result < 0 ? "-Infinity" : "Infinity";
+    snprintf(number, sizeof(number), "%s", shown);
+  } else {
+    snprintf(number, sizeof(number), "%.12g", result);
+    shown = number;
+  }
+
   char html_output[5120];
   snprintf(html_output, sizeof(html_output),
            "<div class='calc-container'>"
            "%s"
            "<div class='calc-steps'>"
-           "<b>%.12g</b>"
+           "<b>%s</b>"
            "</div>"
            "</div>",
            strlen(logic_log) > 0 ? logic_log : "<div>Constant value</div>",
-           result);
+           shown);
 
   info.title = strdup("Calculation");
   info.extract = strdup(html_output);

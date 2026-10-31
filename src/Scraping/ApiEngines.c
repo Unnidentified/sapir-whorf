@@ -759,15 +759,177 @@ int api_parse_google_cse(const char *body, size_t len, const char *lang,
 /* ---- SearXNG bridge ------------------------------------------------ */
 
 static char searxng_base[256];
-static char searxng_engines[128];
+static char searxng_engines[1024];
+
+/* J5.6: SearXNG's own engine list is written with bangs ("!go", "!ddg") while
+   the `engines=` parameter takes names ("google", "duckduckgo"). Accept either
+   form. The names and shortcuts here are facts from SearXNG's settings.yml,
+   not code from its repository. */
+typedef struct {
+  const char *shortcut;
+  const char *name;
+} SearxngBang;
+
+static const SearxngBang SEARXNG_BANGS[] = {
+    {"go", "google"},         {"g", "google"},          {"ddg", "duckduckgo"},
+    {"b", "bing"},            {"bi", "bing images"},    {"br", "brave"},
+    {"qw", "qwant"},          {"yh", "yahoo"},          {"sp", "startpage"},
+    {"mw", "mojeek"},         {"wp", "wikipedia"},      {"wn", "wikinews"},
+    {"wb", "wikibooks"},      {"wq", "wikiquote"},      {"ws", "wikisource"},
+    {"wv", "wikivoyage"},     {"wy", "wiktionary"},     {"gd", "github"},
+    {"gl", "gitlab"},         {"so", "stackoverflow"},  {"se", "stackexchange"},
+    {"ap", "arch linux"},     {"wpkg", "npm"},          {"cr", "crates"},
+    {"mdn", "mdn"},           {"yx", "yandex"},         {"bd", "baidu"},
+    {"sc", "soundcloud"},     {"bc", "bandcamp"},       {"mg", "marginalia"},
+    {"mn", "mwmbl"},          {"sx", "seznam"},         {"pp", "photon"},
+    {"osm", "openstreetmap"}, {"ol", "openlibrary"},    {"pm", "pubmed"},
+    {"ar", "arxiv"},          {"sd", "semantic scholar"},
+    {"do", "docker hub"},     {"hg", "huggingface"},    {"fm", "film"},
+    {"py", "pypi"},           {"hex", "hex"},           {"pc", "packagist"},
+};
+
+/* Writes the SearXNG engine name for a configured token, which may be a bare
+   shortcut, a "!shortcut" bang, or a name. */
+static void searxng_normalise_name(const char *token, char *out, size_t size) {
+  while (*token == '!')
+    token++;
+  for (size_t i = 0; i < sizeof(SEARXNG_BANGS) / sizeof(SEARXNG_BANGS[0]); i++) {
+    if (strcasecmp(token, SEARXNG_BANGS[i].shortcut) == 0) {
+      snprintf(out, size, "%s", SEARXNG_BANGS[i].name);
+      return;
+    }
+  }
+  snprintf(out, size, "%s", token);
+}
 
 void api_searxng_configure(const char *base_url, const char *engines) {
   snprintf(searxng_base, sizeof(searxng_base), "%s", base_url ? base_url : "");
   size_t n = strlen(searxng_base);
   while (n > 0 && searxng_base[n - 1] == '/')
     searxng_base[--n] = '\0';
-  snprintf(searxng_engines, sizeof(searxng_engines), "%s",
-           (engines && engines[0]) ? engines : "google");
+
+  searxng_engines[0] = '\0';
+  if (!engines || !engines[0]) {
+    snprintf(searxng_engines, sizeof(searxng_engines), "google");
+    return;
+  }
+  char work[1024];
+  snprintf(work, sizeof(work), "%s", engines);
+  char *saveptr = NULL;
+  char *token = strtok_r(work, ", \t", &saveptr);
+  while (token) {
+    char name[64];
+    size_t used = strlen(searxng_engines);
+    searxng_normalise_name(token, name, sizeof(name));
+    int dup = 0;
+    if (used) {
+      char probe[1100];
+      snprintf(probe, sizeof(probe), ",%s,", name);
+      char haystack[1100];
+      snprintf(haystack, sizeof(haystack), ",%s,", searxng_engines);
+      dup = strstr(haystack, probe) != NULL;
+    }
+    if (name[0] && !dup && used + strlen(name) + 2 < sizeof(searxng_engines)) {
+      snprintf(searxng_engines + used, sizeof(searxng_engines) - used, "%s%s",
+               used ? "," : "", name);
+    }
+    token = strtok_r(NULL, ", \t", &saveptr);
+  }
+  if (!searxng_engines[0])
+    snprintf(searxng_engines, sizeof(searxng_engines), "google");
+}
+
+const char *api_searxng_engines(void) { return searxng_engines; }
+
+/* J5.6: two failures were silent before. An instance with format=json turned
+   off answers 403, and an engine name that does not exist on that instance
+   answers 200 with no results. Both looked exactly like "SearXNG is broken".
+   One request each, at startup, with one clear line per problem. */
+void api_searxng_validate(void) {
+  if (!searxng_base[0])
+    return;
+
+  char url[1024];
+  snprintf(url, sizeof(url), "%s/search?q=test&format=json&engines=google",
+           searxng_base);
+  HttpResponse resp = http_get_budget(url, "omnisearch/1.0 (search bridge)", 4000);
+  if (!resp.memory) {
+    fprintf(stderr,
+            "[WARN] SearXNG bridge: %s did not answer. The engine stays "
+            "enabled but will fail like this on every search\n",
+            searxng_base);
+    return;
+  }
+  json_error_t error;
+  json_t *root = json_loadb(resp.memory, resp.size, 0, &error);
+  http_response_free(&resp);
+  if (!root) {
+    fprintf(stderr,
+            "[WARN] SearXNG bridge: %s/search?q=test&format=json did not return "
+            "JSON. JSON output is off by default in SearXNG; add\n"
+            "         search:\n           formats:\n             - html\n"
+            "             - json\n"
+            "       to the instance's settings.yml (or set SEARXNG_SETTINGS_PATH) "
+            "and restart it. Until then the bridge cannot work\n",
+            searxng_base);
+    return;
+  }
+  if (!json_object_get(root, "results")) {
+    fprintf(stderr,
+            "[WARN] SearXNG bridge: the JSON answer has no \"results\" array; "
+            "check that this URL is a SearXNG instance\n");
+    json_decref(root);
+    return;
+  }
+  json_decref(root);
+
+  /* the configured names must exist on this instance */
+  snprintf(url, sizeof(url), "%s/config", searxng_base);
+  resp = http_get_budget(url, "omnisearch/1.0 (search bridge)", 4000);
+  if (!resp.memory) {
+    fprintf(stderr, "[WARN] SearXNG bridge: %s/config did not answer; engine "
+                    "names were not checked\n", searxng_base);
+    return;
+  }
+  root = json_loadb(resp.memory, resp.size, 0, &error);
+  http_response_free(&resp);
+  if (!root)
+    return;
+  json_t *engines = json_object_get(root, "engines");
+  if (!json_is_array(engines)) {
+    json_decref(root);
+    return;
+  }
+  char list[1024];
+  snprintf(list, sizeof(list), "%s", searxng_engines);
+  char *saveptr = NULL;
+  char *token = strtok_r(list, ",", &saveptr);
+  while (token) {
+    int found = 0;
+    int enabled = 0;
+    for (size_t i = 0; i < json_array_size(engines); i++) {
+      json_t *e = json_array_get(engines, i);
+      const char *name = json_string_value(json_object_get(e, "name"));
+      if (name && strcasecmp(name, token) == 0) {
+        found = 1;
+        json_t *en = json_object_get(e, "enabled");
+        enabled = !json_is_boolean(en) || json_is_true(en);
+        break;
+      }
+    }
+    if (!found)
+      fprintf(stderr,
+              "[WARN] SearXNG bridge: no engine named \"%s\" on this instance; "
+              "it will be ignored. Check GET %s/config for the names\n",
+              token, searxng_base);
+    else if (!enabled)
+      fprintf(stderr,
+              "[WARN] SearXNG bridge: engine \"%s\" is disabled on the "
+              "instance, so it will return nothing\n",
+              token);
+    token = strtok_r(NULL, ",", &saveptr);
+  }
+  json_decref(root);
 }
 
 int api_searxng_available(void) { return searxng_base[0] != '\0'; }

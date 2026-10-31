@@ -161,6 +161,16 @@ static int set_option(Config *config, const char *section, const char *key,
 
     void *destination = (char *)config + option->offset;
     if (option->type == CONFIG_STRING) {
+      /* J5.6: snprintf truncated silently, so a long searxng_engines list
+         lost names without a word. Say so instead. */
+      if (strlen(value) >= option->size) {
+        fprintf(stderr,
+                "[WARN] config.ini:%d [%s] %s is %zu bytes and the limit is "
+                "%zu; the value was rejected and the default kept. Raise the "
+                "limit in Config.h or shorten the list\n",
+                line_no, section, key, strlen(value), option->size - 1);
+        return -2;
+      }
       snprintf(destination, option->size, "%s", value);
       return 0;
     }
@@ -209,13 +219,26 @@ int load_config(const char *filename, Config *config) {
     return -1;
   }
 
-  char line[1024];
+  /* J5.6: 1024 bytes here was the real limit on any single config value, so
+     raising searxng_engines alone would have changed nothing. A line longer
+     than this is reported rather than silently split. */
+  char line[4096];
   char section[64] = "";
   int line_no = 0;
   int unknown_or_bad = 0;
 
   while (fgets(line, sizeof(line), file)) {
     line_no++;
+    if (!strchr(line, '\n') && !feof(file)) {
+      fprintf(stderr,
+              "[WARN] config.ini:%d is longer than %zu bytes and was split; "
+              "shorten the value\n",
+              line_no, sizeof(line) - 1);
+      int ch;
+      while ((ch = fgetc(file)) != '\n' && ch != EOF)
+        ;
+      continue;
+    }
     line[strcspn(line, "\r\n")] = '\0';
     char *content = trim(line);
 

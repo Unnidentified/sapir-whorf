@@ -2,7 +2,9 @@
    must handle it. The local-only rows run offline and are the ones that matter
    most: a local answer must never lose to a network call. */
 #include "../src/Infobox/AnswerBox.h"
+#include "../src/Infobox/Calculator.h"
 #include "../src/Infobox/AnswerLocal.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -305,6 +307,37 @@ int main(void) {
     answer_normalise_locale_numbers("1.234.567", "es", out, sizeof out);
     if (strcmp(out, "1234567") != 0) {
       printf("FAIL: thousands grouping got \"%s\"\n", out);
+      failures++;
+    }
+  }
+
+  /* J4a: the parser had no error channel. "5 + * 3" answered 5 and "(2+3"
+     answered 5 - a confidently wrong number twice. evaluate() returns NaN when
+     the parse fails or does not consume the whole string, and the answer box
+     treats NaN as "no answer". 1/0 is not an error: it is Infinity. */
+  {
+    struct {
+      const char *expr;
+      int want_nan;
+      double want_value;
+    } cases[] = {
+        {"5 + * 3", 1, 0},   {"(2+3", 1, 0},      {")", 1, 0},
+        {"5 * (2+3", 1, 0},  {"2 +", 1, 0},       {"''", 1, 0},
+        {"2+3", 0, 5},       {"2 * (3+4)", 0, 14}, {"2^10", 0, 1024},
+        {"2^3^2", 0, 512},   {"-2^2", 0, -4},     {"10 - 3", 0, 7},
+        {"0.1 + 0.2", 0, 0.30000000000000004},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      double got = evaluate(cases[i].expr);
+      int ok = cases[i].want_nan ? (got != got) : (got == cases[i].want_value);
+      if (!ok) {
+        printf("FAIL: evaluate(\"%s\") = %g\n", cases[i].expr, got);
+        failures++;
+      }
+    }
+    double inf = evaluate("1/0");
+    if (!isinf(inf) || inf < 0) {
+      printf("FAIL: 1/0 should be Infinity, got %g\n", inf);
       failures++;
     }
   }

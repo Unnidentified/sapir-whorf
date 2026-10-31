@@ -77,7 +77,9 @@ typedef struct {
      Supplying one is an explicit opt-in, and the engine stays off without it. */
   char google_cse_tok[512];
   char searxng_url[256];
-  char searxng_engines[128];
+  /* J5.6: the owner's list is 20+ names; 128 bytes truncated it
+     silently. */
+  char searxng_engines[1024];
   char trusted_proxies[512];
   /* "all"    - every infobox handler, including Wikipedia, dictionary and
                 currency lookups (these leave the machine)

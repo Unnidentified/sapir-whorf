@@ -220,7 +220,10 @@ int main(int argc, char **argv) {
   if (cfg.searxng_url[0] != '\0') {
     api_searxng_configure(cfg.searxng_url, cfg.searxng_engines);
     engine_set_enabled("searxng", 1);
-    fprintf(stderr, "[INFO] SearXNG bridge enabled at %s\n", cfg.searxng_url);
+    fprintf(stderr, "[INFO] SearXNG bridge enabled at %s, engines: %s\n",
+            cfg.searxng_url, api_searxng_engines());
+    /* J5.6: a silently dead bridge is worse than a noisy one */
+    api_searxng_validate();
   }
   configure_yacy_engine(cfg.yacy_instance);
 
