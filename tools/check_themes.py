@@ -177,6 +177,33 @@ def check_layout_once(root):
         for m in re.finditer(dead, css):
             line = css[:m.start()].count("\n") + 1
             problems.append(f"main.css:{line} layout still uses {m.group(0)[:40]!r}")
+
+    # A grid-template-* declaration in a rule that never sets display:grid is
+    # inert, and the element silently falls back to block flow. That shipped:
+    # .content-layout had grid-template-areas "main rail" and display:block, so
+    # the rail sat below the results at every width while the CSS looked
+    # correct. tools/layout_check.py caught it by measuring; this catches it
+    # without a browser.
+    for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", css):
+        selector, body = m.group(1).strip().splitlines()[-1].strip(), m.group(2)
+        if "grid-template" not in body:
+            continue
+        if re.search(r"display\s*:\s*(grid|inline-grid)", body):
+            continue
+        # A compound selector inherits the display of its base class
+        # (".result.result-with-thumb" from ".result"), and a media query may
+        # set it in another rule for the same selector. Only flag a base class
+        # that never gets display:grid anywhere.
+        base = selector.split()[0].split(":")[0].split(".")[1]
+        base = "." + base if base else selector
+        escaped = re.escape(base)
+        elsewhere = re.findall(rf"{escaped}\s*(?:,[^{{}}]*)?\{{([^{{}}]*)", css)
+        if any(re.search(r"display\s*:\s*(grid|inline-grid)", b) for b in elsewhere):
+            continue
+        line = css[:m.start()].count("\n") + 1
+        problems.append(
+            f"main.css:{line} '{selector[:40]}' sets grid-template-* with no "
+            f"display:grid, so the grid is inert")
     return problems
 
 

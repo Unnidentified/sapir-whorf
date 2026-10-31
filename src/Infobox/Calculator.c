@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 /* Per-thread: this file-level buffer was shared by every request thread, so
    two concurrent calculator queries interleaved their working. */
@@ -242,8 +243,44 @@ InfoBox fetch_calc_data(char *math_input) {
 
 /* G4: the matcher lives with the answer it guards, so the answer-box table
    is self-contained and the test can drive matcher and answerer together. */
+/* The only words an expression may contain. "covid-19" has a digit and a
+   minus, which was enough for the old check, so a search about a disease
+   rendered a calculator card that said "Error" - measured in the J2 contact
+   sheet at docs/themes/. A word that is not on this list makes the query a
+   search, not an expression. */
+static int is_expression_word(const char *word, size_t len) {
+  static const char *WORDS[] = {"pi",  "e",    "sqrt", "cbrt", "abs",  "ln",
+                                "log", "log2", "log10", "exp", "sin", "cos",
+                                "tan", "asin", "acos", "atan", "mod", "ans"};
+  for (size_t i = 0; i < sizeof(WORDS) / sizeof(WORDS[0]); i++) {
+    if (strlen(WORDS[i]) == len && strncasecmp(word, WORDS[i], len) == 0)
+      return 1;
+  }
+  return 0;
+}
+
+/* 1 when every alphabetic run in the query is a known function or constant. */
+static int only_expression_words(const char *query) {
+  const char *p = query;
+  while (*p) {
+    if (isalpha((unsigned char)*p)) {
+      const char *start = p;
+      while (isalpha((unsigned char)*p))
+        p++;
+      if (!is_expression_word(start, (size_t)(p - start)))
+        return 0;
+    } else {
+      p++;
+    }
+  }
+  return 1;
+}
+
 int is_calculator_query(const char *query) {
   if (!query)
+    return 0;
+  /* J4a: a word that is not a function or constant cannot be an expression */
+  if (!only_expression_words(query))
     return 0;
 
   int has_digit = 0;

@@ -1,4 +1,5 @@
 CC      := cc
+PYTHON  ?= python3
 UNAME_S := $(shell uname -s)
 PKG_CONFIG ?= pkg-config
 PKG_DEPS   := libxml-2.0 libcurl openssl jansson
@@ -390,6 +391,14 @@ tests/test_j5_defs: tests/test_j5_defs.c src/Scraping/EngineDefs.c $(LINT_SRCS)
 
 defs-check: tests/test_j5_defs
 	@./tests/test_j5_defs
+
+# J1/J2: measured, not asserted. These need Playwright, which is deliberately
+# not a dependency: without it they print a skip and exit 0.
+layout-check:
+	@$(PYTHON) tools/layout_check.py
+
+theme-shots:
+	@$(PYTHON) tools/theme_shot.py
 
 # the template context has 32 slots and beaker drops the 33rd silently
 context-check:

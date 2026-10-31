@@ -1279,6 +1279,11 @@ header .search-box {
    and `grid-column` overrides that fought each other. Narrow is the base:
    the panel sits above the results. Wide moves it into the rail. */
 .content-layout {
+    /* J1: without this the grid-template-* below are inert and the children
+       fall back to block flow - which is why the rail appeared *below* the
+       results at every width while the CSS looked correct. Measured with
+       tools/layout_check.py: display was "block", not "grid". */
+    display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "rail" "main";
     gap: var(--layout-gap);

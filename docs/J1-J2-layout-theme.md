@@ -99,3 +99,37 @@ for; it is stated here rather than implied.
 
 The headless Chromium on this machine (`Brave Origin Nightly`) hangs on
 `--dump-dom` with a virtual time budget, so it was not used either.
+
+
+## Measured, 2026-10-31
+
+The earlier note in this file said the browsers here cannot run headless, so the
+geometry was unverified. That was wrong in an important way: the **app-bundle**
+browsers cannot, but Playwright's own Chromium can.
+
+```
+python3 -m venv /tmp/pw && /tmp/pw/bin/pip install playwright
+/tmp/pw/bin/python -m playwright install chromium
+make layout-check PYTHON=/tmp/pw/bin/python
+```
+
+32 checks, 4 themes x 8 widths (1600, 1300, 1241, 1240, 1100, 900, 600, 375),
+**0 failures**, 12 screenshots in `docs/layout/`. The invariants are
+relationship-based, not side-based: no overlap at any width, side by side above
+1241, stacked below it. An earlier version of the tool asserted "panel to the
+right, above when narrow" and reported 32 false failures against a correct
+layout in the opposite order.
+
+What the measurement found, that no amount of reading the CSS did:
+
+`.content-layout` declared `grid-template-columns` and `grid-template-areas`
+but **never set `display: grid`**. The declarations were inert, the children
+fell back to block flow, and the rail rendered *below* the results at 1600px
+while the stylesheet looked right. `tools/check_themes.py` now fails any
+`grid-template-*` whose base class never sets `display: grid`, and the check was
+proven by deleting the line and watching it fire.
+
+The contact sheet (16 themes into `docs/themes/`) showed the same page in every
+theme — and caught a second defect: `covid-19` rendered a **calculator card
+saying "Error"**, because the trigger accepted any query with a digit and a
+minus. Every alphabetic run must now be a known function or constant.

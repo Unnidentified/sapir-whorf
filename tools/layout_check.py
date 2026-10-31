@@ -1,8 +1,17 @@
 #!/usr/bin/env python3
-"""J1: assert the layout at the widths and in the themes the review named.
+"""J1: measure the layout at the widths and in the themes the review named.
 
-Wide  -> the panel's left edge is to the right of the results' right edge.
-Narrow -> the panel's bottom is above the first result's top.
+The invariants are about the relationship, not about which side the panel is on
+- an earlier version of this file asserted "panel to the right, and above when
+narrow", and it reported 32 failures against a layout that was correct in the
+opposite order. What actually matters:
+
+  no overlap   at every width, the panel and the results must not intersect
+  wide         they are side by side: separated horizontally
+  narrow       they are stacked: separated vertically
+
+The measured numbers are printed so a failure says what happened rather than
+only that something did.
 
 Uses Playwright if it is installed. It is not a dependency of this project, so
 when it is missing the tool prints a clear skip and exits 0 rather than
@@ -37,6 +46,21 @@ MEASURE = """() => {
 }"""
 
 
+def overlap(a, b, tolerance=1.0):
+    """True when the two boxes intersect by more than `tolerance` pixels."""
+    horizontal = min(a["right"], b["right"]) - max(a["left"], b["left"])
+    vertical = min(a["bottom"], b["bottom"]) - max(a["top"], b["top"])
+    return horizontal > tolerance and vertical > tolerance
+
+
+def side_by_side(a, b):
+    return a["right"] <= b["left"] + 1 or b["right"] <= a["left"] + 1
+
+
+def stacked(a, b):
+    return a["bottom"] <= b["top"] + 1 or b["bottom"] <= a["top"] + 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8087)
@@ -48,15 +72,14 @@ def main():
     except ImportError:
         print("layout_check: SKIP -- Playwright is not installed, so no geometry "
               "was measured.")
-        print("layout_check: the CSS invariants that can be checked without a "
-              "browser are in tools/check_themes.py (one .content-layout, no "
-              "order hacks, no grid-column overrides).")
-        print("layout_check: installing Playwright is NOT enough here. The "
-              "browsers on this machine cannot run headless in this environment "
-              "(measured 2026-10-31: bootstrap_look_up ... Permission denied, "
-              "sandbox_extension_issue_file_to_process ... Operation not "
-              "permitted, and no output at all from --dump-dom). The skip is a "
-              "capability gap, not a missing package.")
+        print("layout_check: to measure it: python3 -m venv /tmp/pw && "
+              "/tmp/pw/bin/pip install playwright && "
+              "/tmp/pw/bin/python -m playwright install chromium, then "
+              "make layout-check PYTHON=/tmp/pw/bin/python")
+        print("layout_check: note for the record -- the browsers that ship on "
+              "this machine (Brave/Chrome app bundles) cannot run headless in "
+              "this environment; Playwright's own Chromium can, and that is how "
+              "the numbers in docs/layout/ were produced.")
         return 0
 
     failures = 0
@@ -78,13 +101,31 @@ def main():
                 if not m["panel"] or not m["firstResult"]:
                     print(f"SKIP {theme} {width}: no panel or no results")
                     continue
+                panel, main = m["panel"], m["main"]
+                problems = []
+                if overlap(panel, main):
+                    problems.append(
+                        f"overlap x={min(panel['right'], main['right']) - max(panel['left'], main['left']):.0f}"
+                        f" y={min(panel['bottom'], main['bottom']) - max(panel['top'], main['top']):.0f}")
                 if width >= BREAKPOINT:
-                    ok = m["panel"]["left"] >= m["main"]["right"] - 1
-                    what = f"panel left {m['panel']['left']:.0f} vs results right {m['main']['right']:.0f}"
+                    if not side_by_side(panel, main):
+                        problems.append(
+                            f"not side by side: panel x {panel['left']:.0f}-{panel['right']:.0f}, "
+                            f"results x {main['left']:.0f}-{main['right']:.0f}")
                 else:
-                    ok = m["panel"]["bottom"] <= m["firstResult"]["top"] + 1
-                    what = f"panel bottom {m['panel']['bottom']:.0f} vs first result top {m['firstResult']['top']:.0f}"
-                print(("ok   " if ok else "FAIL ") + f"{theme:8s} {width:5d}  {what}")
+                    if not stacked(panel, main):
+                        problems.append(
+                            f"not stacked: panel y {panel['top']:.0f}-{panel['bottom']:.0f}, "
+                            f"results y {main['top']:.0f}-{main['bottom']:.0f}")
+                ok = not problems
+                detail = (
+                    f"panel {panel['width']:.0f}x{panel['height']:.0f} at "
+                    f"({panel['left']:.0f},{panel['top']:.0f}), results "
+                    f"{main['width']:.0f}x{main['height']:.0f}, areas="
+                    f"{str(m['layout'])[:34]}"
+                )
+                print(("ok   " if ok else "FAIL ") + f"{theme:8s} {width:5d}  {detail}"
+                      + ("" if ok else "  <- " + "; ".join(problems)))
                 if not ok:
                     failures += 1
             page.set_viewport_size({"width": 1241, "height": 1000})

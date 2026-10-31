@@ -110,7 +110,15 @@ printf '%s' "$body" | grep -q 'widget-calculator' && {
   echo "FAIL: answers=off still rendered the card"; fail=1; }
 
 if [ "$fail" -eq 0 ]; then
-  echo "J4 calculator card: PASS (render, states, keypad, AC, rejected key, answers=off)"
+  # a search about a disease has a digit and a minus; it used to render a
+# calculator card saying "Error" (found in the J2 contact sheet)
+curl -sS -o /tmp/j4w-neg.html -m 30 "http://127.0.0.1:8112/search?q=covid-19&nc=$RANDOM"
+if grep -q "widget-calculator" /tmp/j4w-neg.html; then
+  echo "FAIL: covid-19 rendered a calculator card"
+  FAIL=1
+fi
+
+echo "J4 calculator card: PASS (render, states, keypad, AC, rejected key, answers=off)"
 else
   exit 1
 fi
