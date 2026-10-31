@@ -66,6 +66,7 @@ Defaults in `src/Config.h`.
 |---|---|---|---|
 | server | host / port | 0.0.0.0 / 5000 | listen address (this install: 8087) |
 | server | locale | en_gb | default UI + result language |
+| server | answers | local | `all` \| `local` \| `off`. `local` skips the engine fan-out when a local answerer is certain |
 | proxy | proxy / list_file | empty | outbound proxy or proxy pool |
 | proxy | max_retries | 3 | retries when a proxy is configured |
 | cache | dir | /tmp/omnisearch_cache | cache root (this install: ~/.omnisearch/cache) |
