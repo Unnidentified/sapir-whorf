@@ -68,6 +68,7 @@ Defaults in `src/Config.h`.
 | server | locale | en_gb | default UI + result language |
 | server | answers | local | `all` \| `local` \| `off`. `local` answers from this server (arithmetic, units, colours, dates); `all` also asks Wikipedia and the lookups; `off` shows no answer box |
 | engines | allow_files | off | `on` \| `off`. The server-side half of the opt-in gate for file indexes, torrent indexes and shadow libraries (J5.5 tier 3). With `off` the switch does not appear on `/settings` at all and a crafted request cannot enable it; with `on` each browser must still opt in for itself. Both keys are required. No such provider is registered in this build |
+| `/search` | `cat` | none | query parameter only: `news`, `code`, `academic`, `media` or `entity`. Narrows the fan-out to engines that declare that vertical, and is carried through the pager. An unknown value is ignored. A category with no enabled engine answers "nothing was asked" rather than falling back to web results |
 | server | answers_fanout | always | `always` \| `auto` \| `never`. What happens to the engine fan-out when a local answer is certain. `always` shows results under every answer, as Google does; `never` is the previous behaviour (no search at all); `auto` skips only when the answer is certain and the query has no words in it (`2+2`). Per-user override: the Answers section of `/settings` stores it in a cookie |
 | proxy | proxy / list_file | empty | outbound proxy or proxy pool |
 | proxy | max_retries | 3 | retries when a proxy is configured |
@@ -78,6 +79,8 @@ Defaults in `src/Config.h`.
 | engines | google_cse_key / google_cse_cx | empty | Google JSON API. Existing keys only: Google stopped issuing new ones in 2026-01 and the service ends 2027-01-01 |
 | engines | google_cse_cx / google_cse_tok | empty | `google_cse_element`, clean-room and **disabled by default**. Only `cx` is needed: the token is fetched and cached for an hour. `tok` is an override. See docs/G3-google-cse.md |
 | engines | searxng_url / searxng_engines | empty / google | enables SearXNG bridge |
+| engines | definitions_dir | `static/engines.d` | where `*.json` engine definitions are loaded from at startup. A missing directory is normal. Each file names a URL template and four XPaths; a bad file is logged and skipped, never fatal. See `static/engines.d/README.md` |
+| engines | allow_files | off | the server half of the opt-in gate for tier-3 providers (file indexes, torrent indexes, shadow libraries). Off means the switch is not even rendered on `/settings`. See `docs/J5-opt-in.md` |
 | rate_limit | search_requests / search_interval | 0 / 0 | inbound limit per client; 0 disables |
 | rate_limit | trusted_proxies | empty | addresses whose X-Forwarded-For may be believed (`loopback`, `lan`, or a list); empty trusts nobody |
 | rate_limit | images_requests / images_interval | 0 / 0 | same for images |
