@@ -21,7 +21,7 @@ int home_handler(UrlParams *params) {
   context_set(&ctx, "page_scale_css", get_page_scale_css());
   CustomTheme custom_theme;
   get_custom_theme(&custom_theme);
-  context_set_custom_theme(&ctx, &custom_theme);
+  context_set_custom_palette(&ctx, &custom_theme);
   context_set(&ctx, "version", VERSION);
   context_set(&ctx, "git_remote", GIT_REMOTE);
   beaker_set_locale(&ctx, locale);

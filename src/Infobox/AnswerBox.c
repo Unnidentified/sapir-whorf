@@ -204,16 +204,19 @@ static const Answerer answerers[] = {
     /* H4: the local kinds that need neither network nor a new dependency.
        time and dates come before arithmetic because "10 days until
        2025-12-25" also looks like an expression to the matcher. */
-    {"time", 1, NULL, answer_time_zone},
-    {"days", 1, NULL, answer_days_between},
-    {"random", 1, NULL, answer_random},
-    {"arithmetic", 1, is_calculator_query, answer_arithmetic},
-    {"units", 1, is_unit_conv_query, answer_units},
-    {"colour", 1, is_colour_code_query, answer_colour},
+    {"time", 1, NULL, answer_time_zone, NULL},
+    {"days", 1, NULL, answer_days_between, NULL},
+    {"random", 1, NULL, answer_random, NULL},
+    /* J4.0: arithmetic is the first kind with a card. Units and colour keep
+       the text answer for now; each gets a widget by adding a template and
+       naming it here, not by adding a second table. */
+    {"arithmetic", 1, is_calculator_query, answer_arithmetic, "calculator"},
+    {"units", 1, is_unit_conv_query, answer_units, NULL},
+    {"colour", 1, is_colour_code_query, answer_colour, NULL},
     /* then the network, cheapest first */
-    {"currency", 0, is_currency_query, answer_currency},
-    {"dictionary", 0, is_dictionary_query, answer_dictionary},
-    {"wikipedia", 0, any_query, answer_wikipedia},
+    {"currency", 0, is_currency_query, answer_currency, NULL},
+    {"dictionary", 0, is_dictionary_query, answer_dictionary, NULL},
+    {"wikipedia", 0, any_query, answer_wikipedia, NULL},
 };
 
 const Answerer *answer_box_answerers(size_t *count) {
@@ -307,4 +310,105 @@ int answer_box_resolve(const char *query, AnswerBoxResult *out) {
     }
   }
   return 0;
+}
+
+/* ---- J4.0: the widget layer ------------------------------------------ */
+
+/* The calculator card. This is deliberately a thin mapper: it evaluates with
+   the same engine the answer box uses and hands the pieces to the template.
+   Nothing here builds HTML, which is what made the old cards impossible to
+   theme (see J2). */
+int answer_box_widget(const char *query, const char *lang, const char *append,
+                      WidgetData *out) {
+  char work[320];
+  char expression[256];
+  double value;
+
+  if (!query || !out)
+    return 0;
+  memset(out, 0, sizeof(*out));
+  snprintf(work, sizeof(work), "%s", query);
+  if (append && append[0]) {
+    size_t used = strlen(work);
+    /* one keypad character per request: that is the whole no-JS protocol */
+    if (used + strlen(append) + 1 < sizeof(work))
+      snprintf(work + used, sizeof(work) - used, "%s", append);
+  }
+  if (!is_calculator_query(work))
+    return 0;
+  return answer_box_widget_forced("calculator", work, lang, out);
+}
+
+int answer_box_widget_forced(const char *kind, const char *query,
+                             const char *lang, WidgetData *out) {
+  char expression[256];
+  double value;
+  if (!out || !kind)
+    return 0;
+  memset(out, 0, sizeof(*out));
+  if (strcmp(kind, "calculator") != 0)
+    return 0;
+  if (!query)
+    query = "";
+  answer_normalise_locale_numbers(query, lang && lang[0] ? lang : "en",
+                                  expression, sizeof(expression));
+  snprintf(out->kind, sizeof(out->kind), "calculator");
+  snprintf(out->title, sizeof(out->title), "Calculation");
+  snprintf(out->expression, sizeof(out->expression), "%s", expression);
+  if (!expression[0])
+    return 1;
+
+  /* Mid-entry is not an error. Typing "5+" and seeing "Error" is what a
+     calculator looks like when it is broken, so an expression that ends on an
+     operator (or on the "=" the keypad just sent) simply has no value yet. */
+  {
+    size_t len = strlen(expression);
+    while (len > 0 && expression[len - 1] == ' ')
+      len--;
+    if (len > 0 && expression[len - 1] == '=') {
+      expression[len - 1] = '\0';
+      len--;
+      while (len > 0 && expression[len - 1] == ' ')
+        len--;
+    }
+    snprintf(out->expression, sizeof(out->expression), "%s", expression);
+    if (len == 0)
+      return 1;
+    switch (expression[len - 1]) {
+    case '+': case '-': case '*': case '/': case '^': case '(':
+    case '\xc3': /* the first byte of ÷, × and −: also incomplete */
+      return 1;
+    default:
+      break;
+    }
+  }
+
+  value = evaluate(expression);
+  if (value != value) {
+    snprintf(out->note, sizeof(out->note), "Error");
+    return 1;
+  }
+  if (value == (double)INFINITY || value == -(double)INFINITY) {
+    snprintf(out->result, sizeof(out->result), "%s",
+             value < 0 ? "-Infinity" : "Infinity");
+    out->ok = 1;
+    return 1;
+  }
+  if (value == (long long)value && value < 1e15 && value > -1e15)
+    snprintf(out->result, sizeof(out->result), "%lld", (long long)value);
+  else
+    snprintf(out->result, sizeof(out->result), "%.12g", value);
+  out->ok = 1;
+  return 1;
+}
+
+/* the widget name for an answerer id, so the page can ask without a second
+   list of kind names */
+const char *answer_box_widget_for(const char *answerer_id) {
+  size_t count = 0;
+  const Answerer *table = answer_box_answerers(&count);
+  for (size_t i = 0; i < count; i++)
+    if (table[i].id && answerer_id && strcmp(table[i].id, answerer_id) == 0)
+      return table[i].widget;
+  return NULL;
 }

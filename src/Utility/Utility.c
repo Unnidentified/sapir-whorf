@@ -283,6 +283,34 @@ void get_custom_theme(CustomTheme *out) {
   free(cookie);
 }
 
+/* One palette, as CSS declarations, for pages that only inject it. This is the
+   one to call unless the colour pickers are on the page: each per-colour key
+   costs a context slot, and the context holds thirty-two. */
+void context_set_custom_palette(TemplateContext *ctx, const CustomTheme *theme) {
+  static const char *KEYS[CUSTOM_COLOUR_COUNT + 1] = {
+      "custom_bg_main", "custom_bg_card", "custom_border",
+      "custom_text_primary", "custom_text_secondary", "custom_text_muted",
+      "custom_accent", "custom_text_dim", "custom_accent_glow"};
+  static __thread char values[CUSTOM_COLOUR_COUNT + 1][16];
+  static __thread char palette[512];
+  size_t used = 0;
+  if (!ctx || !theme)
+    return;
+  for (int i = 0; i < CUSTOM_COLOUR_COUNT; i++)
+    snprintf(values[i], sizeof(values[i]), "#%s", custom_slot((CustomTheme *)theme, i));
+  snprintf(values[CUSTOM_COLOUR_COUNT], sizeof(values[0]), "#%s1a", theme->accent);
+  palette[0] = '\0';
+  for (int i = 0; i < CUSTOM_COLOUR_COUNT + 1; i++) {
+    int wrote = snprintf(palette + used, sizeof(palette) - used, "%s%s: %s;",
+                         used ? " " : "", KEYS[i] + 7, values[i]);
+    if (wrote > 0)
+      used += (size_t)wrote;
+    if (used + 1 >= sizeof(palette))
+      break;
+  }
+  context_set(ctx, "custom_palette", palette);
+}
+
 void context_set_custom_theme(TemplateContext *ctx, const CustomTheme *theme) {
   if (!ctx || !theme)
     return;
@@ -304,6 +332,8 @@ void context_set_custom_theme(TemplateContext *ctx, const CustomTheme *theme) {
 
   for (int i = 0; i < CUSTOM_COLOUR_COUNT + 1; i++)
     context_set(ctx, KEYS[i], values[i]);
+
+
 }
 
 const char *get_title_font(void) {

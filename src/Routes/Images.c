@@ -80,7 +80,7 @@ int images_handler(UrlParams *params) {
   context_set(&ctx, "page_scale_css", get_page_scale_css());
   CustomTheme custom_theme;
   get_custom_theme(&custom_theme);
-  context_set_custom_theme(&ctx, &custom_theme);
+  context_set_custom_palette(&ctx, &custom_theme);
   free(theme);
 
   char *locale = get_locale(NULL);

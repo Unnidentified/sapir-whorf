@@ -62,10 +62,12 @@ fi
 
 # answers=local must answer, and must not ask an engine
 curl -sS -o /tmp/h4-local.html -m 30 "http://localhost:8089/search?q=2%2B2"
-if ! grep -q "answer-box-text" /tmp/h4-local.html; then
+if ! grep -q "answer-box-text" /tmp/h4-local.html &&
+   ! grep -q "widget-calc-result" /tmp/h4-local.html; then
   echo "FAIL: answers=local did not render the answer"; fail=1
 fi
-if ! grep -q ">4<" /tmp/h4-local.html; then
+if ! grep -q ">4<" /tmp/h4-local.html &&
+   ! grep -q 'widget-calc-result">4<' /tmp/h4-local.html; then
   echo "FAIL: answers=local did not answer 2+2 with 4"; fail=1
 fi
 if grep -q "\[ENGINE\]" /tmp/h4-answers-local.log; then

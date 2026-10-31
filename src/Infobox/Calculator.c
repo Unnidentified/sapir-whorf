@@ -20,7 +20,6 @@ typedef struct {
 
 static double parse_expression(Parser *p);
 static double parse_power(Parser *p);
-static double parse_unary(Parser *p);
 
 static void skip_ws(Parser *p) {
   while (p->buffer[p->pos] == ' ')
@@ -40,8 +39,57 @@ static double parse_unary(Parser *p) {
   return parse_power(p);
 }
 
+/* J4a: the keypad offers ln, log, sqrt and ^, so the parser has to understand
+   them, or the buttons lie. sin/cos/tan are deliberately absent: without a
+   Deg/Rad switch they would be ambiguous, and Google's calculator is DEG while
+   a mathematician expects radians. Better a smaller keypad that is right. */
+static double parse_unary(Parser *p);
+
+typedef struct {
+  const char *name;
+  double (*fn)(double);
+} CalcFunc;
+
+static double fn_ln(double x) { return log(x); }
+static double fn_log10(double x) { return log10(x); }
+static double fn_sqrt(double x) { return sqrt(x); }
+static double fn_abs(double x) { return fabs(x); }
+
+static const CalcFunc CALC_FUNCS[] = {
+    {"ln", fn_ln}, {"log", fn_log10}, {"sqrt", fn_sqrt}, {"abs", fn_abs}};
+
 static double parse_factor(Parser *p) {
   skip_ws(p);
+  /* a function name or a constant */
+  for (size_t i = 0; i < sizeof(CALC_FUNCS) / sizeof(CALC_FUNCS[0]); i++) {
+    size_t len = strlen(CALC_FUNCS[i].name);
+    if (strncmp(&p->buffer[p->pos], CALC_FUNCS[i].name, len) == 0) {
+      p->pos += (int)len;
+      skip_ws(p);
+      if (p->buffer[p->pos] != '(') {
+        p->error = 1; /* "ln 2" is not accepted; "ln(2)" is */
+        return 0.0;
+      }
+      p->pos++;
+      double arg = parse_expression(p);
+      skip_ws(p);
+      if (p->buffer[p->pos] != ')') {
+        p->error = 1;
+        return 0.0;
+      }
+      p->pos++;
+      return CALC_FUNCS[i].fn(arg);
+    }
+  }
+  if (p->buffer[p->pos] == '\xcf' && p->buffer[p->pos + 1] == '\x80') {
+    p->pos += 2; /* π */
+    return 3.14159265358979323846;
+  }
+  if ((p->buffer[p->pos] == 'e' || p->buffer[p->pos] == 'E') &&
+      !isdigit((unsigned char)p->buffer[p->pos + 1])) {
+    p->pos++;
+    return 2.71828182845904523536;
+  }
   if (p->buffer[p->pos] == '(') {
     p->pos++;
     double res = parse_expression(p);

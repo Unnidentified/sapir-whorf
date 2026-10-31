@@ -327,6 +327,12 @@ int main(void) {
         {"2+3", 0, 5},       {"2 * (3+4)", 0, 14}, {"2^10", 0, 1024},
         {"2^3^2", 0, 512},   {"-2^2", 0, -4},     {"10 - 3", 0, 7},
         {"0.1 + 0.2", 0, 0.30000000000000004},
+        /* J4a: the keypad offers ln, log, sqrt, abs, pi and e, so these have to
+           work or the buttons lie */
+        {"ln(1)", 0, 0},       {"log(1000)", 0, 3},
+        {"sqrt(16)", 0, 4},    {"abs(-3)", 0, 3},
+        {"ln 2", 1, 0},        {"sqrt(16", 1, 0},
+        {"sin(1)", 1, 0},      {"sqrt(16)+ln(1)", 0, 4},
     };
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
       double got = evaluate(cases[i].expr);

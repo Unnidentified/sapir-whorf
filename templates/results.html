@@ -11,17 +11,7 @@
         <link rel="stylesheet" href="static/themes/{{theme}}.css">
         {{if theme == "custom"}}
         <style>
-            :root {
-                --bg-main: {{custom_bg_main}};
-                --bg-card: {{custom_bg_card}};
-                --border: {{custom_border}};
-                --text-primary: {{custom_text_primary}};
-                --text-secondary: {{custom_text_secondary}};
-                --text-muted: {{custom_text_muted}};
-                --accent: {{custom_accent}};
-                --accent-glow: {{custom_accent_glow}};
-                --text-dim: {{custom_text_dim}};
-            }
+            :root { {{custom_palette}} }
         </style>
         {{endif}}
         <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -35,7 +25,9 @@
         {{include "_chrome.html"}}
         <div class="content-layout{{if exists infoboxes}} with-rail{{endif}}">
             <main class="results-container">
+                {{include "widget_calculator.html"}}
                 {{if exists answer_text}}
+                {{if show_answer_strip}}
                 <section class="answer-box" aria-label="{{l("answer_box_label")}}">
                     <p class="answer-box-text">{{answer_text}}</p>
                     {{if exists answer_detail}}
@@ -43,6 +35,7 @@
                     {{endif}}
                     <p class="answer-box-source">{{answer_source_note}}{{if show_web_link}} — <a href="{{web_href}}">{{l("answer_search_web")}}</a>{{endif}}</p>
                 </section>
+                {{endif}}
                 {{endif}}
 
                 {{for result in results}}

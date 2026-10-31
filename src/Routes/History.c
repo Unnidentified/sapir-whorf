@@ -24,7 +24,7 @@ int history_handler(UrlParams *params) {
   context_set(&ctx, "page_scale_css", get_page_scale_css());
   CustomTheme custom_theme;
   get_custom_theme(&custom_theme);
-  context_set_custom_theme(&ctx, &custom_theme);
+  context_set_custom_palette(&ctx, &custom_theme);
   context_set(&ctx, "query", query);
   context_set(&ctx, "chrome_action", "/search");
   context_set(&ctx, "chrome_active", "");

@@ -2033,3 +2033,77 @@ input[type="color"]:focus-visible {
 .settings-legal-text p {
     margin: 0.6rem 0 0;
 }
+
+/* ================================================================
+   answer widgets (J4.0)
+   The primary widget is the first element of the main column at every width,
+   above the results. It is a GET form, so the keypad works with JavaScript
+   off; static/widgets.js only keeps it from round-tripping.
+   ================================================================ */
+.widget {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    padding: 1rem 1.2rem 1.2rem;
+    margin: 0 0 1.6rem 0;
+}
+
+.widget-calc-form {
+    margin: 0;
+}
+
+.widget-calc-expr {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    min-height: 1.2em;
+    word-break: break-all;
+}
+
+.widget-calc-result {
+    color: var(--text-primary);
+    font-size: 2.4rem;
+    font-weight: 600;
+    line-height: 1.15;
+    margin: 0.2rem 0 1rem;
+    word-break: break-all;
+}
+
+.widget-calc-keypad {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    max-width: 320px;
+}
+
+.widget-calc-keypad .key {
+    font: inherit;
+    padding: 0.55rem 0.4rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: 0;
+}
+
+.widget-calc-keypad .key:hover {
+    border-color: var(--accent);
+}
+
+.widget-calc-keypad .key:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.widget-calc-keypad .key-fn {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.widget-calc-keypad .key-op {
+    color: var(--accent);
+}
+
+.widget-calc-keypad .key-eq {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+}

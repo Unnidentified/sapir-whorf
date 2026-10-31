@@ -798,6 +798,14 @@ int results_handler(UrlParams *params) {
   clock_gettime(CLOCK_MONOTONIC, &perf_start);
   TemplateContext ctx = new_context();
   char *raw_query = "";
+  /* J4.0: one keypad character per request, so the calculator card works with
+     JavaScript off. This has to happen before the query is analysed or cached.
+     raw_query initially points into the request params, which must not be
+     written to, so an appended query is built in this buffer and raw_query is
+     re-pointed at it. */
+  char key_pressed[16];
+  char keyed_buffer[512];
+  char widget_mode[32];
   char selected_engine_id[32];
   char *default_engine = get_default_search_engine();
   snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
@@ -824,7 +832,41 @@ int results_handler(UrlParams *params) {
                  params->params[i].value);
       } else if (strcmp(params->params[i].key, "btnI") == 0) {
         btnI = atoi(params->params[i].value);
+      } else if (strcmp(params->params[i].key, "w") == 0) {
+        snprintf(widget_mode, sizeof(widget_mode), "%s",
+                 params->params[i].value);
+      } else if (strcmp(params->params[i].key, "key") == 0) {
+        /* the calculator keypad: append one character, capped at 24, and only
+           from the set the keypad actually offers. Anything else is dropped
+           rather than appended, because this value becomes the query. */
+        snprintf(key_pressed, sizeof(key_pressed), "%s",
+                 params->params[i].value);
       }
+    }
+  }
+
+  if (key_pressed[0] && raw_query[0]) {
+    static const char *const ALLOWED[] = {
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".",
+        "+", "-", "*", "/", "(", ")", "^",
+        "Ã·", /* ÷ */
+        "Ã", /* × */
+        "â", /* − */
+        "Ï", /* π */
+        "e", "AC", "ln(", "log(", "sqrt(", "abs(", "="};
+    int allowed = 0;
+    size_t used = strlen(raw_query);
+    for (size_t a = 0; a < sizeof(ALLOWED) / sizeof(ALLOWED[0]); a++)
+      if (strcmp(key_pressed, ALLOWED[a]) == 0)
+        allowed = 1;
+    if (strcmp(key_pressed, "AC") == 0) {
+      /* a calculator shows 0 after AC. An empty q would redirect to the home
+         page and take the card with it. */
+      raw_query = "0";
+    } else if (allowed && strcmp(key_pressed, "=") != 0 && used < 480) {
+      snprintf(keyed_buffer, sizeof(keyed_buffer), "%s%s", raw_query,
+               key_pressed);
+      raw_query = keyed_buffer;
     }
   }
 
@@ -838,7 +880,7 @@ int results_handler(UrlParams *params) {
   context_set(&ctx, "page_scale_css", get_page_scale_css());
   CustomTheme custom_theme;
   get_custom_theme(&custom_theme);
-  context_set_custom_theme(&ctx, &custom_theme);
+  context_set_custom_palette(&ctx, &custom_theme);
   free(theme);
 
   char *locale = get_locale(NULL);
@@ -1135,6 +1177,41 @@ int results_handler(UrlParams *params) {
     url_encode(raw_query, enc, sizeof(enc));
     snprintf(href, sizeof(href), "/search?q=%s&web=1", enc);
     context_set(&ctx, "web_href", href);
+  }
+
+  /* G4 + J4.0: the local answer and its card. These are pure computation, so
+     they are resolved before the fan-out and set before the results are known.
+     They used to be set inside "if (total_results > 0)", so when every engine
+     was rate-limited the page showed an error instead of the arithmetic it had
+     already worked out - which is a measured case, not a hypothetical one. */
+  if (page == 1) {
+    if (have_local_answer) {
+      context_set(&ctx, "answer_text", local_answer.answer);
+      if (local_answer.detail[0])
+        context_set(&ctx, "answer_detail", local_answer.detail);
+      context_set(&ctx, "answer_source_note",
+                  beaker_get_locale_value(
+                      locale, web_explicit ? "answer_showing_web"
+                                           : "answer_local"));
+      context_set(&ctx, "show_answer_strip", "1");
+    }
+    if (!answers_off) {
+      WidgetData widget;
+      int wres = widget_mode[0]
+                     ? answer_box_widget_forced(widget_mode, raw_query, lang,
+                                                &widget)
+                     : answer_box_widget(raw_query, lang, NULL, &widget);
+      if (wres) {
+        /* two keys, not four: the context is a fixed 32 slots. The expression
+           is what the user typed, and the result slot doubles as the error
+           slot because a card shows one big value either way. */
+        context_set(&ctx, "show_answer_strip", "");
+        context_set(&ctx, "widget_kind", widget.kind);
+        context_set(&ctx, "widget_result",
+                    widget.ok && widget.result[0] ? widget.result
+                                                  : widget.note);
+      }
+    }
   }
 
   /* the answer box and the patient link both need it, on both branches */
@@ -1502,7 +1579,6 @@ int results_handler(UrlParams *params) {
       context_set(&ctx, "answer_detail", infobox_data[idx].result.extract);
       context_set(&ctx, "answer_source_note",
                   beaker_get_locale_value(locale, "answer_from_web"));
-      context_set(&ctx, "answer_is_web", "1");
       break;
     }
   }
@@ -1933,7 +2009,10 @@ int results_handler(UrlParams *params) {
     }
 
     context_set(&ctx, "results_state",
-                results_matrix.count > 0 ? "ok" : "empty");
+                results_matrix.count > 0
+                    ? "ok"
+                    : ((have_local_answer || widget_mode[0]) ? "answered"
+                                                            : "empty"));
 
     /* Why is the page empty? "The engines may be busy" is wrong when they
        answered fine and every hit was judged irrelevant - that is what Bing
@@ -1964,7 +2043,6 @@ int results_handler(UrlParams *params) {
         else if (any_failed)
           reason = "unavailable";
       }
-      context_set(&ctx, "empty_reason", reason);
       context_set(&ctx, "empty_hint",
                   strcmp(reason, "filtered") == 0
                       ? "The sources answered, but none of what came back was "
@@ -1983,23 +2061,6 @@ int results_handler(UrlParams *params) {
                         "moment.");
     }
 
-    /* G4: the answer box. Local answerers only, resolved on the request path -
-       they are pure computation, so this costs nothing measurable. If nothing
-       local answers, the infobox card carries the network answer instead. */
-    if (have_local_answer) {
-      context_set(&ctx, "answer_text", local_answer.answer);
-      if (local_answer.detail[0])
-        context_set(&ctx, "answer_detail", local_answer.detail);
-      context_set(&ctx, "answer_source", local_answer.source);
-      context_set(&ctx, "answer_source_note",
-                  beaker_get_locale_value(
-                      locale, web_explicit ? "answer_showing_web"
-                                           : "answer_local"));
-      /* "2+2" answered 4: telling the user nothing was found on top of that
-         would be silly. "answered" is not a state the empty block matches. */
-      if (results_matrix.count == 0)
-        context_set(&ctx, "results_state", "answered");
-    }
 
     /* H1: if every result came from one index, say so. It is the difference
        between "this is what the web says" and "this is what one index says". */
@@ -2177,7 +2238,6 @@ int results_handler(UrlParams *params) {
         reason = "blocked";
       else if (any_failed)
         reason = "unavailable";
-      context_set(&ctx, "empty_reason", reason);
       char pn[320];
       int paused_now = build_paused_note(pn, sizeof pn);
       if (paused_now > 0) {

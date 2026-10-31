@@ -1,0 +1,42 @@
+{{if widget_kind}}
+<section class="widget widget-calculator" aria-label="{{l("answer_box_label")}}">
+    <form method="GET" action="/search" class="widget-calc-form">
+        <!-- J4.0: the keypad is a plain GET form. Each key submits the same
+             expression plus one character, so the card works with JavaScript
+             off; static/widgets.js otherwise keeps it local. -->
+        <input type="hidden" name="q" value="{{query}}">
+        <input type="hidden" name="w" value="calculator">
+        <div class="widget-calc-expr">{{query}}</div>
+        <div class="widget-calc-result">{{widget_result}}</div>
+
+        <div class="widget-calc-keypad">
+            <button type="submit" name="key" value="AC" class="key key-fn">AC</button>
+            <button type="submit" name="key" value="(" class="key key-fn">(</button>
+            <button type="submit" name="key" value=")" class="key key-fn">)</button>
+            <button type="submit" name="key" value="ln(" class="key key-fn">ln</button>
+            <button type="submit" name="key" value="log(" class="key key-fn">log</button>
+            <button type="submit" name="key" value="abs(" class="key key-fn">abs</button>
+            <button type="submit" name="key" value="sqrt(" class="key key-fn">√</button>
+            <button type="submit" name="key" value="^" class="key key-fn">xʸ</button>
+            <button type="submit" name="key" value="7" class="key">7</button>
+            <button type="submit" name="key" value="8" class="key">8</button>
+            <button type="submit" name="key" value="9" class="key">9</button>
+            <button type="submit" name="key" value="÷" class="key key-op">÷</button>
+            <button type="submit" name="key" value="4" class="key">4</button>
+            <button type="submit" name="key" value="5" class="key">5</button>
+            <button type="submit" name="key" value="6" class="key">6</button>
+            <button type="submit" name="key" value="×" class="key key-op">×</button>
+            <button type="submit" name="key" value="1" class="key">1</button>
+            <button type="submit" name="key" value="2" class="key">2</button>
+            <button type="submit" name="key" value="3" class="key">3</button>
+            <button type="submit" name="key" value="−" class="key key-op">−</button>
+            <button type="submit" name="key" value="0" class="key">0</button>
+            <button type="submit" name="key" value="." class="key">.</button>
+            <button type="submit" name="key" value="e" class="key">e</button>
+            <button type="submit" name="key" value="+" class="key key-op">+</button>
+            <button type="submit" name="key" value="π" class="key">π</button>
+            <button type="submit" name="key" value="=" class="key key-eq">=</button>
+        </div>
+    </form>
+</section>
+{{endif}}

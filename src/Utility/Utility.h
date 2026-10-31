@@ -54,6 +54,8 @@ typedef struct {
 
 void get_custom_theme(CustomTheme *out);
 void context_set_custom_theme(TemplateContext *ctx, const CustomTheme *theme);
+/* the palette as one CSS string: use this unless the page has colour pickers */
+void context_set_custom_palette(TemplateContext *ctx, const CustomTheme *theme);
 int parse_custom_theme_cookie(const char *value, CustomTheme *out);
 void init_themes(const char *static_path);
 void get_available_themes(char ***out_themes, int *out_count);

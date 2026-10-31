@@ -41,9 +41,11 @@ sleep 4
 
 # 1. always (the new default): the answer AND results, one upstream engine
 curl -sS -o /tmp/j3b-always.html -m 60 "http://localhost:8096/search?q=2%2B2"
-grep -q "answer-box-text" /tmp/j3b-always.html || {
+{ grep -q "answer-box-text" /tmp/j3b-always.html ||
+  grep -q "widget-calc-result" /tmp/j3b-always.html; } || {
   echo "FAIL: answers_fanout=always dropped the answer"; fail=1; }
-grep -q ">4<" /tmp/j3b-always.html || {
+{ grep -q ">4<" /tmp/j3b-always.html ||
+  grep -q 'widget-calc-result">4<' /tmp/j3b-always.html; } || {
   echo "FAIL: answers_fanout=always did not answer 2+2 with 4"; fail=1; }
 grep -q 'class="result"' /tmp/j3b-always.html || {
   echo "FAIL: answers_fanout=always rendered no results under the answer"; fail=1; }
@@ -52,7 +54,8 @@ grep -q "\[ENGINE\]" /tmp/j3b-always.log || {
 
 # 2. never: the H4 behaviour, kept as an option
 curl -sS -o /tmp/j3b-never.html -m 40 "http://localhost:8097/search?q=2%2B2"
-grep -q "answer-box-text" /tmp/j3b-never.html || {
+{ grep -q "answer-box-text" /tmp/j3b-never.html ||
+  grep -q "widget-calc-result" /tmp/j3b-never.html; } || {
   echo "FAIL: answers_fanout=never dropped the answer"; fail=1; }
 grep -q 'class="result"' /tmp/j3b-never.html && {
   echo "FAIL: answers_fanout=never still searched the web"; fail=1; }
