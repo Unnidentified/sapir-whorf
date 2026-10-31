@@ -94,3 +94,44 @@ Two smaller things are ready and land with this note: `SearchResult` now carries
 `docs/J4-widgets.md` neighbour commit), which is the output side of rich
 results; and the SearXNG bridge already fills those fields from a real
 instance.
+
+
+## What shipped from this plan: definitions as data
+
+`static/engines.d/*.json` is loaded at startup by
+`engines_load_definitions()` (`src/Scraping/EngineDefs.c`), before
+`apply_engines_config`, so a definition can be switched off by id in `[engines]`
+like any compiled-in engine. `[engines] definitions_dir` says where to look;
+empty means `static/engines.d`, and a missing directory is the normal case.
+
+One shared parser runs four XPaths per definition, so the C side is written
+once. Every file is validated and a bad one is logged and skipped, never fatal:
+
+| refusal | why it is refused |
+|---|---|
+| `search_url` without `%s` | would fetch the same page for every query |
+| no `xpath_result` or `xpath_link` | could only ever return nothing |
+| duplicate `id` | `[engines]` selection would be ambiguous |
+| duplicate `name` | the shared parser looks engines up by display name, so the second would read the first one's selectors |
+| malformed JSON | |
+
+Relative hrefs are resolved against `base_url` and selector text is
+whitespace-collapsed, because both of those are the norm on real search pages
+rather than the exception - Open Library links `/works/OL5739563W` and renders
+its author span as `"\n          \nby Daniel P. Bovet\n\n        "`.
+
+`openlibrary` is the worked example:
+
+```
+loaded 1 engine definition
+url fits: https://openlibrary.org/search?q=linux+kernel
+parsed 5
+  [0] url=https://openlibrary.org/works/OL5739563W/Linux_Kernel_Development?...
+      title=Linux Kernel Development
+      snippet=by Robert Love
+```
+
+and it appears in a live search with 10 results parsed from a 117 KB page.
+
+**What this does not do:** a JSON API still needs a body parser in C. That half
+of J5.1 is the 114-call-site migration described above and is still open.

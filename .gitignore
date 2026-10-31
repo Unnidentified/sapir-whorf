@@ -21,3 +21,4 @@ tests/test_g4_answerbox
 tests/test_h1_ua
 tests/test_j3_terms
 tests/test_j5_searxng
+tests/test_j5_defs

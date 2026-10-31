@@ -381,6 +381,14 @@ tests/test_j5_searxng: tests/test_j5_searxng.c src/Scraping/ApiEngines.c \
 searxng-check: tests/test_j5_searxng
 	@./tests/test_j5_searxng
 
+# J5.1: an engine defined by a file, and a bad file refused at load time
+tests/test_j5_defs: tests/test_j5_defs.c src/Scraping/EngineDefs.c $(LINT_SRCS)
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -I/usr/include/libxml2 -o $@ $^ \
+		$(LINT_LIBS)
+
+defs-check: tests/test_j5_defs
+	@./tests/test_j5_defs
+
 # J4.0/J4a: the calculator card, its keypad, and its states
 widget-check:
 	@./tests/test_j4_widget.sh

@@ -91,6 +91,17 @@ typedef struct {
      permits it. Zero for every engine today; the field exists so the gate has
      somewhere to read from instead of a list in the request path. */
   int opt_in;
+  /* J5.1: a definition loaded from static/engines.d/ names its selectors
+     instead of pointing at a C parser, so adding an engine is a JSON file and
+     no recompile. NULL on every compiled-in engine, and parse_definition is
+     only reachable through these four fields being set. */
+  const char *xpath_result;
+  const char *xpath_title;
+  const char *xpath_link;
+  const char *xpath_snippet;
+  /* the "%s is the encoded query" template a definition supplies; the generic
+     url builder uses it instead of base_url + query_param */
+  const char *search_url_fmt;
 } SearchEngine;
 
 typedef struct {
@@ -159,6 +170,10 @@ typedef struct {
 extern SearchEngine ENGINE_REGISTRY[];
 /* appends one definition; returns its index, or -1 when full */
 int engine_registry_add(const SearchEngine *engine);
+/* J5.1: load every *.json in dir as an engine definition. Returns how many
+   were accepted; rejects are logged per file and never fatal, because one bad
+   file in a directory must not stop the server from starting. */
+int engines_load_definitions(const char *dir);
 extern int ENGINE_COUNT;
 void apply_engines_config(const char *engines_str);
 void engine_set_enabled(const char *engine_id, int enabled);

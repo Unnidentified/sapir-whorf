@@ -191,6 +191,15 @@ int main(int argc, char **argv) {
                     "omnisearch directory)\n");
   }
 
+  /* J5.1: definitions load before the config is applied, so a definition can
+     be switched off by id in [engines] like any compiled-in engine. A missing
+     directory is the normal case and is not reported. */
+  int defined = engines_load_definitions(cfg.definitions_dir[0]
+                                             ? cfg.definitions_dir
+                                             : "static/engines.d");
+  if (defined > 0)
+    fprintf(stderr, "[INFO] Loaded %d engine definitions\n", defined);
+
   apply_engines_config(cfg.engines);
 
   /* Google and SearXNG stay off until they are actually configured: a

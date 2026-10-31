@@ -81,6 +81,10 @@ typedef struct {
      Supplying one is an explicit opt-in, and the engine stays off without it. */
   char google_cse_tok[512];
   char searxng_url[256];
+  /* J5.1: where a definition file becomes an engine. Relative to the working
+     directory, which is what a source install expects; empty means
+     "static/engines.d". */
+  char definitions_dir[512];
   /* J5.6: the owner's list is 20+ names; 128 bytes truncated it
      silently. */
   char searxng_engines[1024];

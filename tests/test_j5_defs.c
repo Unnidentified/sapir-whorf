@@ -1,0 +1,177 @@
+/* J5.1: an engine is a data file.
+
+   The claim being tested is not "a JSON file parses" - it is that the file
+   actually produces results through the shared parser, and that a file which
+   could only ever produce nothing is refused at load time. */
+
+#include "../src/Scraping/Scraping.h"
+#include "../src/Utility/XmlHelper.h"
+#include <libxml/HTMLparser.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+static int failures = 0;
+static void check(int ok, const char *what) {
+  if (!ok) {
+    printf("FAIL: %s\n", what);
+    failures++;
+  }
+}
+
+static void write_file(const char *dir, const char *name, const char *body) {
+  char path[512];
+  snprintf(path, sizeof(path), "%s/%s", dir, name);
+  FILE *f = fopen(path, "w");
+  if (!f)
+    return;
+  fputs(body, f);
+  fclose(f);
+}
+
+static const SearchEngine *find(const char *id) {
+  for (int i = 0; i < ENGINE_COUNT; i++)
+    if (strcmp(ENGINE_REGISTRY[i].id, id) == 0)
+      return &ENGINE_REGISTRY[i];
+  return NULL;
+}
+
+static const char *GOOD =
+    "{\"id\":\"tdef\",\"name\":\"Test Definitions\","
+    "\"search_url\":\"https://example.test/search?q=%s\","
+    "\"index_group\":\"testindex\",\"verticals\":[\"academic\"],"
+    "\"weight\":0.5,\"pace_per_minute\":7,"
+    "\"xpath_result\":\"//li[@class='hit']\","
+    "\"xpath_link\":\".//a[@class='t']\","
+    "\"xpath_title\":\".//a[@class='t']\","
+    "\"xpath_snippet\":\".//p[@class='s']\"}";
+
+static const char *HTML =
+    "<html><body><ul>"
+    "<li class='hit'><a class='t' href='https://example.test/1'>First</a>"
+    "<p class='s'>one</p></li>"
+    "<li class='hit'><a class='t' href='https://example.test/2'>Second</a>"
+    "<p class='s'>two</p></li>"
+    "<li class='hit'><span>no link here</span></li>"
+    "</ul></body></html>";
+
+int main(void) {
+  char dir[] = "/tmp/omnidefsXXXXXX";
+  if (!mkdtemp(dir)) {
+    printf("FAIL: cannot make a temp dir\n");
+    return 1;
+  }
+
+  int before = ENGINE_COUNT;
+  write_file(dir, "good.json", GOOD);
+  /* every one of these is a real mistake someone will make in a definition */
+  write_file(dir, "no-format.json",
+             "{\"id\":\"tbad1\",\"name\":\"No Format\","
+             "\"search_url\":\"https://example.test/search\","
+             "\"xpath_result\":\"//li\",\"xpath_link\":\".//a\"}");
+  write_file(dir, "no-link.json",
+             "{\"id\":\"tbad2\",\"name\":\"No Link\","
+             "\"search_url\":\"https://example.test/s?q=%s\","
+             "\"xpath_result\":\"//li\"}");
+  write_file(dir, "no-name.json",
+             "{\"id\":\"tbad3\",\"search_url\":\"https://e.test/?q=%s\","
+             "\"xpath_result\":\"//li\",\"xpath_link\":\".//a\"}");
+  write_file(dir, "broken.json", "{ not json at all ");
+  write_file(dir, "notjson.txt",
+             "{\"id\":\"tbad4\",\"name\":\"Wrong Extension\","
+             "\"search_url\":\"https://e.test/?q=%s\","
+             "\"xpath_result\":\"//li\",\"xpath_link\":\".//a\"}");
+
+  int loaded = engines_load_definitions(dir);
+  printf("loaded %d of 1 valid definition\n", loaded);
+  check(loaded == 1, "only the valid definition is accepted");
+  check(ENGINE_COUNT == before + 1, "the registry grew by exactly one");
+
+  const SearchEngine *engine = find("tdef");
+  check(engine != NULL, "the engine is in the registry");
+  if (engine) {
+    check(strcmp(engine->name, "Test Definitions") == 0, "name is carried");
+    check(strcmp(engine->index_group, "testindex") == 0, "index_group is carried");
+    check(engine->verticals == V_ACADEMIC, "verticals are mapped");
+    check(engine->weight == 0.5, "weight is carried");
+    check(engine->pace_per_minute == 7, "pace is carried");
+    check(engine->opt_in == 0, "opt_in is off unless the file says so");
+    check(engine->parser != NULL, "the definition has a parser");
+    check(engine->enabled == 1, "a definition starts enabled");
+  }
+
+  /* the point of the exercise: the file produces results */
+  if (engine) {
+    htmlDocPtr doc = htmlReadMemory(HTML, (int)strlen(HTML), NULL, NULL,
+                                    HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    check(doc != NULL, "fixture parses as HTML");
+    if (doc) {
+      SearchResult *results = NULL;
+      int n = engine->parser(engine->name, doc, &results, 10);
+      printf("parser returned %d results\n", n);
+      check(n == 2, "two of three blocks have a usable link");
+      if (n == 2) {
+        check(results[0].url && strcmp(results[0].url, "https://example.test/1") == 0,
+              "first url comes from the href");
+        check(results[0].title && strcmp(results[0].title, "First") == 0,
+              "first title comes from the title xpath");
+        check(results[0].snippet && strcmp(results[0].snippet, "one") == 0,
+              "first snippet comes from the snippet xpath");
+        check(results[1].url && strcmp(results[1].url, "https://example.test/2") == 0,
+              "second url");
+      }
+      if (results)
+        xml_result_free(results, n);
+      xmlFreeDoc(doc);
+    }
+  }
+
+  /* One file per directory, so the refusal is attributable to that file rather
+     than to every other file in the directory also being refused. */
+  char dir3[] = "/tmp/omnidefs3XXXXXX";
+  if (mkdtemp(dir3)) {
+    write_file(dir3, "dupe.json",
+               "{\"id\":\"tdef\",\"name\":\"Another Name\","
+               "\"search_url\":\"https://e.test/?q=%s\","
+               "\"xpath_result\":\"//li\",\"xpath_link\":\".//a\"}");
+    check(engines_load_definitions(dir3) == 0, "a duplicate id is refused");
+  }
+
+  /* the same display name: the shared parser looks engines up by name, so a
+     second engine with this name would read the first one's selectors */
+  char dir4[] = "/tmp/omnidefs4XXXXXX";
+  if (mkdtemp(dir4)) {
+    write_file(dir4, "dupe2.json",
+               "{\"id\":\"tdef2\",\"name\":\"Test Definitions\","
+               "\"search_url\":\"https://e.test/?q=%s\","
+               "\"xpath_result\":\"//li\",\"xpath_link\":\".//a\"}");
+    check(engines_load_definitions(dir4) == 0,
+          "a duplicate display name is refused");
+  }
+
+  /* reloading the same directory is a no-op, not a second copy */
+  check(engines_load_definitions(dir) == 0, "a reload adds nothing");
+  check(find("tdef") != NULL, "the first definition still works after a reload");
+
+  /* a missing directory is not an error, and loads nothing */
+  check(engines_load_definitions("/tmp/definitely-not-here-omnidefs") == 0,
+        "a missing directory loads nothing and does not crash");
+  check(engines_load_definitions(NULL) == 0, "a NULL directory is not a crash");
+
+  /* tier 3 stays opt-in only when the file asks for it */
+  char dir2[] = "/tmp/omnidefs2XXXXXX";
+  if (mkdtemp(dir2)) {
+    write_file(dir2, "tier3.json",
+               "{\"id\":\"ttier3\",\"name\":\"Tier Three Test\","
+               "\"search_url\":\"https://e.test/?q=%s\","
+               "\"xpath_result\":\"//li\",\"xpath_link\":\".//a\","
+               "\"opt_in\":true}");
+    check(engines_load_definitions(dir2) == 1, "an opt-in definition loads");
+    const SearchEngine *t3 = find("ttier3");
+    check(t3 != NULL && t3->opt_in == 1, "opt_in is carried from the file");
+  }
+
+  printf("J5 engine definitions: %s\n", failures == 0 ? "PASS" : "FAIL");
+  return failures == 0 ? 0 : 1;
+}

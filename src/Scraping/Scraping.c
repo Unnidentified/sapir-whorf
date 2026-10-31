@@ -190,6 +190,10 @@ static void classify_job_response(ScrapeJob *job, const char *response,
 
   job->results_count = job->engine->parser(job->engine->name, doc,
                                            job->out_results, job->max_results);
+  if (getenv("OMNI_PERF"))
+    fprintf(stderr, "[PARSE] %s bytes=%zu http=%ld parsed=%d\n",
+            job->engine->id, response_size, job->http_status,
+            job->results_count);
   xmlFreeDoc(doc);
 
   if (job->results_count > 0) {
@@ -609,7 +613,17 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
   }
   *write = '\0';
 
-  char *full_url = job->engine->build_url
+  /* J5.1: a definition's template wins over base_url + query_param and over a
+     compiled-in builder - it is the whole reason the definition exists. */
+  char *full_url = NULL;
+  if (job->engine->search_url_fmt) {
+    size_t needed = strlen(job->engine->search_url_fmt) + strlen(encoded_query) + 32;
+    full_url = malloc(needed);
+    if (full_url)
+      snprintf(full_url, needed, job->engine->search_url_fmt, encoded_query);
+  }
+  if (!full_url)
+    full_url = job->engine->build_url
                        ? job->engine->build_url(encoded_query, job->page,
                                                 job->lang)
                        : build_search_url(job->engine->base_url,
