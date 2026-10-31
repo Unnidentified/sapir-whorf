@@ -1,0 +1,23 @@
+# H2 A/B set: queries observed to be junk-prone vs observed good on Bing from
+# this host (docs/G1-engines.md), plus a spread of shapes.
+# group	query
+junk	mechanical keyboard
+junk	python asyncio tutorial
+junk	best budget mechanical keyboard
+junk	how to tie a tie
+junk	best noise cancelling headphones
+junk	cheap flights to lisbon
+junk	running shoes for flat feet
+junk	how to lose weight fast
+junk	best credit card for travel
+junk	learn spanish fast
+good	linux kernel
+good	weather madrid
+good	rust programming language
+good	wikipedia
+good	github
+good	python documentation
+good	carbonara recipe
+good	world war 2 summary
+good	euclidean algorithm
+good	periodic table
