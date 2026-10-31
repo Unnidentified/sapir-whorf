@@ -102,7 +102,7 @@ static void extract_wiki_info(xmlNode *node, InfoBox *info) {
 }
 
 InfoBox fetch_wiki_data(char *api_url) {
-  InfoBox info = {NULL, NULL, NULL, NULL};
+  InfoBox info = {NULL, NULL, NULL, NULL, 0};
 
   if (!api_url) {
     return info;

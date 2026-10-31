@@ -550,8 +550,20 @@ static void *infobox_thread_func(void *arg) {
 
 static int add_infobox_to_collection(InfoBox *infobox,
                                      StringMatrix *collection) {
+  /* J6.2: the template emits the body through {{ … |safe}}, because the local
+     generators produce HTML. A body that is NOT HTML has to be escaped here,
+     and this is the only place that knows which is which: Wikipedia's
+     explaintext extract is plain text containing & and <, and the Cambridge
+     scrape is worse. Measured: {{ }} does escape by default, so |safe is what
+     makes this necessary rather than optional. */
+  char escaped[8192];
+  const char *body = infobox->extract;
+  if (body && !infobox->is_html) {
+    html_escape(body, escaped, sizeof(escaped));
+    body = escaped;
+  }
   const char *values[INFOBOX_FIELD_COUNT] = {
-      infobox->title, infobox->thumbnail_url, infobox->extract,
+      infobox->title, infobox->thumbnail_url, body,
       infobox->url,   infobox->url,
   };
   return string_matrix_append(collection, values, INFOBOX_FIELD_COUNT);

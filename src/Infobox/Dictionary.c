@@ -212,7 +212,7 @@ char *construct_dictionary_url(const char *query) {
 }
 
 InfoBox fetch_dictionary_data(const char *query) {
-  InfoBox info = {NULL, NULL, NULL, NULL};
+  InfoBox info = {NULL, NULL, NULL, NULL, 0};
 
   char *url = construct_dictionary_url(query);
   if (!url)
@@ -240,6 +240,8 @@ InfoBox fetch_dictionary_data(const char *query) {
         if (word && def) {
           info.title = strdup("Dictionary");
           info.extract = build_html(word, pron, pos, def, ex);
+        info.is_html = 1;
+          info.is_html = 1;
           info.thumbnail_url = strdup("");
           info.url = strdup(url);
         }

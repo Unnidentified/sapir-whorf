@@ -149,7 +149,7 @@ double evaluate(const char *expr) {
 }
 
 InfoBox fetch_calc_data(char *math_input) {
-  InfoBox info = {NULL, NULL, NULL, NULL};
+  InfoBox info = {NULL, NULL, NULL, NULL, 0};
   if (!math_input)
     return info;
 
@@ -183,6 +183,7 @@ InfoBox fetch_calc_data(char *math_input) {
 
   info.title = strdup("Calculation");
   info.extract = strdup(html_output);
+  info.is_html = 1;
   /* J2: no image tile. It was a hard-coded #3498db glyph on white and an
      <img> cannot take currentColor, so it was wrong on every dark palette. */
   info.thumbnail_url = strdup("");

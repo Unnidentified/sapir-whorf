@@ -4,6 +4,7 @@
 #include "../src/Infobox/AnswerBox.h"
 #include "../src/Infobox/Calculator.h"
 #include "../src/Infobox/AnswerLocal.h"
+#include "../src/Utility/Unescape.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -338,6 +339,39 @@ int main(void) {
     double inf = evaluate("1/0");
     if (!isinf(inf) || inf < 0) {
       printf("FAIL: 1/0 should be Infinity, got %g\n", inf);
+      failures++;
+    }
+  }
+
+  /* J6.2: panel bodies reach the page through {{ … |safe}}, so anything that
+     is not HTML must be escaped in C. Wikipedia's extract is plain text and
+     really does contain & and <. */
+  {
+    struct {
+      const char *in;
+      const char *want;
+    } cases[] = {
+        {"AT&T", "AT&amp;T"},
+        {"<b>x</b>", "&lt;b&gt;x&lt;/b&gt;"},
+        {"predecessor's", "predecessor&#39;s"},
+        {"a \"quote\"", "a &quot;quote&quot;"},
+        {"plain", "plain"},
+        {"", ""},
+    };
+    char out[128];
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      html_escape(cases[i].in, out, sizeof out);
+      if (strcmp(out, cases[i].want) != 0) {
+        printf("FAIL: html_escape(\"%s\") = \"%s\", wanted \"%s\"\n",
+               cases[i].in, out, cases[i].want);
+        failures++;
+      }
+    }
+    /* a buffer that is too small must still be terminated */
+    char small[8];
+    html_escape("<<<<<<<<", small, sizeof small);
+    if (strlen(small) >= sizeof small) {
+      printf("FAIL: html_escape did not respect its size\n");
       failures++;
     }
   }

@@ -128,7 +128,7 @@ int is_colour_code_query(const char *query) {
 }
 
 InfoBox fetch_colour_data(char *query) {
-  InfoBox info = {NULL, NULL, NULL, NULL};
+  InfoBox info = {NULL, NULL, NULL, NULL, 0};
   if (!query)
     return info;
 
@@ -171,6 +171,7 @@ InfoBox fetch_colour_data(char *query) {
              r, g, b, r, g, b, r, g, b, h, s2, l, hh, ss, v, c, m, y, k);
     info.title = strdup("Colour");
     info.extract = strdup(html);
+    info.is_html = 1;
     info.url = strdup("#");
     return info;
   }
@@ -220,6 +221,7 @@ InfoBox fetch_colour_data(char *query) {
 
   info.title = strdup("Colour");
   info.extract = strdup(html);
+  info.is_html = 1;
   info.thumbnail_url = NULL;
   info.url = strdup("#");
 

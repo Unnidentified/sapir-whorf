@@ -589,7 +589,7 @@ int unit_conv_answer(const char *query, char *out, size_t size) {
 }
 
 InfoBox fetch_unit_conv_data(const char *query) {
-  InfoBox info = {NULL, NULL, NULL, NULL};
+  InfoBox info = {NULL, NULL, NULL, NULL, 0};
   if (!query)
     return info;
 
@@ -610,6 +610,7 @@ InfoBox fetch_unit_conv_data(const char *query) {
 
   info.title = strdup("Unit Conversion");
   info.extract = strdup(build_html(value, from, result, to));
+  info.is_html = 1;
   info.thumbnail_url = strdup("");
   info.url = strdup("#");
 

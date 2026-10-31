@@ -372,7 +372,7 @@ static char *build_html(double value, const CurrencyDef *from,
 }
 
 InfoBox fetch_currency_data(const char *query) {
-  InfoBox info = {NULL, NULL, NULL, NULL};
+  InfoBox info = {NULL, NULL, NULL, NULL, 0};
   if (!query)
     return info;
 
@@ -449,6 +449,7 @@ InfoBox fetch_currency_data(const char *query) {
 
   info.title = strdup("Currency Conversion");
   info.extract = strdup(build_html(value, from_curr, to_curr, result));
+  info.is_html = 1;
   /* J2: no image tile - a hard-coded blue glyph on white cannot follow the
      theme, and an <img> cannot take currentColor. */
   info.thumbnail_url = strdup("");

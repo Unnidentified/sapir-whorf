@@ -83,3 +83,38 @@ char *url_decode_query(const char *src) {
   *p = '\0';
   return res;
 }
+
+/* J6.2: the panel body reaches the page through {{ … |safe}}, because the local
+   generators emit HTML. Anything that is NOT HTML must therefore be escaped
+   here, where the code knows which is which - Wikipedia's explaintext extract
+   contains & and < as plain text, and marking it safe is how a page breaks or
+   a script gets in. */
+void html_escape(const char *in, char *out, size_t size) {
+  size_t used = 0;
+  if (!out || size == 0)
+    return;
+  out[0] = '\0';
+  for (const char *p = in ? in : ""; *p; p++) {
+    const char *rep = NULL;
+    switch (*p) {
+    case '&': rep = "&amp;"; break;
+    case '<': rep = "&lt;"; break;
+    case '>': rep = "&gt;"; break;
+    case '"': rep = "&quot;"; break;
+    case '\'': rep = "&#39;"; break;
+    default: break;
+    }
+    if (!rep) {
+      if (used + 1 < size)
+        out[used++] = *p;
+      continue;
+    }
+    for (const char *r = rep; *r; r++) {
+      if (used + 1 < size)
+        out[used++] = *r;
+    }
+    if (used + 1 >= size)
+      break;
+  }
+  out[used] = '\0';
+}
