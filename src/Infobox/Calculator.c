@@ -86,6 +86,15 @@ static double parse_factor(Parser *p) {
     p->pos += 2; /* π */
     return 3.14159265358979323846;
   }
+  /* "pi" is what people type on a keyboard without a π key. The keypad sends
+     the glyph, so both spellings have to work or the same value has two
+     behaviours depending on how it was entered. */
+  if ((p->buffer[p->pos] == 'p' || p->buffer[p->pos] == 'P') &&
+      (p->buffer[p->pos + 1] == 'i' || p->buffer[p->pos + 1] == 'I') &&
+      !isalpha((unsigned char)p->buffer[p->pos + 2])) {
+    p->pos += 2;
+    return 3.14159265358979323846;
+  }
   if ((p->buffer[p->pos] == 'e' || p->buffer[p->pos] == 'E') &&
       !isdigit((unsigned char)p->buffer[p->pos + 1])) {
     p->pos++;
@@ -180,6 +189,18 @@ static double parse_expression(Parser *p) {
       break;
   }
   return left;
+}
+
+/* J6.3: one formatter. The strip said 4.4 and the card said 4.4000000000001
+   for the same expression, because each formatted its own way - %.10g in one
+   place and %.12g in another. Every caller that shows a number uses this. */
+void format_number(double value, char *out, size_t size) {
+  if (!out || size == 0)
+    return;
+  if (value == (long long)value && value < 1e15 && value > -1e15)
+    snprintf(out, size, "%lld", (long long)value);
+  else
+    snprintf(out, size, "%.12g", value);
 }
 
 double evaluate(const char *expr) {

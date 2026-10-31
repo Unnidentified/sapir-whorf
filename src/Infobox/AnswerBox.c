@@ -88,10 +88,7 @@ static int answer_arithmetic(const char *query, AnswerBoxResult *out) {
     out->confidence = 1.0;
     return 1;
   }
-  if (value == (long long)value && value < 1e15 && value > -1e15)
-    snprintf(out->answer, sizeof(out->answer), "%lld", (long long)value);
-  else
-    snprintf(out->answer, sizeof(out->answer), "%.10g", value);
+  format_number(value, out->answer, sizeof(out->answer));
   snprintf(out->detail, sizeof(out->detail), "%s", expression);
   out->confidence = 1.0; /* an evaluated expression is not a guess */
   return 1;
@@ -448,10 +445,7 @@ int answer_box_widget_forced(const char *kind, const char *query,
     out->ok = 1;
     return 1;
   }
-  if (value == (long long)value && value < 1e15 && value > -1e15)
-    snprintf(out->result, sizeof(out->result), "%lld", (long long)value);
-  else
-    snprintf(out->result, sizeof(out->result), "%.12g", value);
+  format_number(value, out->result, sizeof(out->result));
   out->ok = 1;
   return 1;
 }
