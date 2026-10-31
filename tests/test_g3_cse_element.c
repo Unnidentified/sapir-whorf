@@ -17,14 +17,97 @@ static void expect(int cond, const char *what) {
   }
 }
 
+/* H3: the token is obtainable server-side, which the Round-2 doc wrongly said
+   it was not. The protocol is two requests, and these fixtures are the real
+   responses (docs/probe-log.tsv, tests/fixtures/gcse/). */
+static char *read_file(const char *path, size_t *len) {
+  FILE *f = fopen(path, "rb");
+  if (!f)
+    return NULL;
+  fseek(f, 0, SEEK_END);
+  long size = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  if (size <= 0) {
+    fclose(f);
+    return NULL;
+  }
+  char *buf = malloc((size_t)size + 1);
+  if (!buf) {
+    fclose(f);
+    return NULL;
+  }
+  if (fread(buf, 1, (size_t)size, f) != (size_t)size) {
+    free(buf);
+    fclose(f);
+    return NULL;
+  }
+  buf[size] = '\0';
+  fclose(f);
+  *len = (size_t)size;
+  return buf;
+}
+
+static void test_fixtures(void) {
+  size_t len = 0;
+
+  /* the token page really does carry the three fields */
+  char *token_page = read_file("tests/fixtures/gcse/token-page.js", &len);
+  expect(token_page != NULL, "token-page fixture readable");
+  if (token_page) {
+    expect(api_cse_extract_token_for_test(token_page, len),
+           "token page yields cse_token + cselibVersion");
+    free(token_page);
+  }
+
+  /* a normal result page: 20 results, urls and titles */
+  char *results = read_file("tests/fixtures/gcse/results.jsonp", &len);
+  expect(results != NULL, "results fixture readable");
+  if (results) {
+    SearchResult *out = NULL;
+    int n = api_parse_google_cse_element(results, len, "en", &out, 20);
+    expect(n == 20, "results fixture yields 20");
+    if (n > 0) {
+      expect(out[0].url && strncmp(out[0].url, "http", 4) == 0,
+             "first result has a url");
+      expect(out[0].title && out[0].title[0], "first result has a title");
+    }
+    if (out)
+      xml_result_free(out, n);
+    free(results);
+  }
+
+  /* an empty answer is zero, not an error */
+  char *empty = read_file("tests/fixtures/gcse/empty.jsonp", &len);
+  expect(empty != NULL, "empty fixture readable");
+  if (empty) {
+    SearchResult *out = NULL;
+    expect(api_parse_google_cse_element(empty, len, "en", &out, 20) == 0,
+           "empty fixture yields zero");
+    if (out)
+      xml_result_free(out, 0);
+    free(empty);
+  }
+
+  /* 429 arrives as JSONP with an error envelope: zero results, and the engine
+     should be suspended by the existing status logic, not crash */
+  char *err = read_file("tests/fixtures/gcse/error-429.jsonp", &len);
+  expect(err != NULL, "429 fixture readable");
+  if (err) {
+    SearchResult *out = NULL;
+    expect(api_parse_google_cse_element(err, len, "en", &out, 20) == 0,
+           "429 fixture yields zero");
+    if (out)
+      xml_result_free(out, 0);
+    free(err);
+  }
+}
+
 int main(void) {
   /* availability requires BOTH cx and token: the endpoint 403s without a
      token, so claiming to be available would only produce a fake failure */
   api_google_cse_element_configure("012345678901234567890:abcdefghijk", NULL);
-  expect(!api_google_cse_element_available(),
-         "cx without token must not be available");
-  expect(api_url_google_cse_element("linux", 1, "en") == NULL,
-         "no url without a token");
+  expect(api_google_cse_element_available(),
+         "cx alone is available now that the token is fetched (H3)");
   api_google_cse_element_configure(NULL, "tok");
   expect(!api_google_cse_element_available(),
          "token without cx must not be available");
@@ -80,6 +163,8 @@ int main(void) {
          "html body yields zero");
   if (none)
     xml_result_free(none, 0);
+
+  test_fixtures();
 
   if (failures == 0)
     printf("G3 cse element: PASS\n");

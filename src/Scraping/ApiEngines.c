@@ -1,4 +1,6 @@
 #include "ApiEngines.h"
+#include <pthread.h>
+#include "../Utility/HttpClient.h"
 #include "../Utility/JsonHelper.h"
 #include "../Utility/Unescape.h"
 #include "Config.h"
@@ -420,31 +422,191 @@ int api_parse_arxiv(const char *body, size_t len, const char *lang,
 }
 
 /* ---- Google Programmable Search Element ----------------------------
-   Clean-room, from the endpoint's observed behaviour only - nothing here is
-   derived from SearXNG or any other AGPL code.
+   Clean-room, implemented from the protocol description in the review (H3 /
+   Part 4 G3) and confirmed by probe on 2026-10-31; nothing is copied from
+   SearXNG (AGPL) or translated from it.
 
-   Why a token and not just cx: the element's JSON endpoint answers 403 to any
-   request without a valid cse_tok. The token is minted by Google's obfuscated
-   widget JavaScript at runtime; it is not in the HTML shell (which is a 1 KB
-   "enable JavaScript" page loading /cse.js) and not in cse.js either until a
-   real cx resolves. Rather than fake a working engine, this one refuses to be
-   available without a token and says so - see docs/G3-google-cse.md. */
+   Two steps:
+     1. GET www.google.com/cse/cse.js?cx=<CX>   (301 -> cse.google.com/...)
+        The trailing `({ ... })` object carries cse_token, cselibVersion and
+        exp. Cached for an hour, fetched under a lock so a burst of searches
+        does not each mint one.
+     2. GET cse.google.com/cse/element/v1?...&cse_tok=<token>&callback=_
+        which answers JSONP: `_({ ... "results": [...] })`.
+
+   A pasted token (google_cse_tok) overrides step 1 - useful when the token
+   endpoint changes, and the only mode that worked before this fix. */
+
+#define CSE_TOKEN_TTL_SECS 3600
+#define CSE_TOKEN_URL_FMT                                                      \
+  "https://www.google.com/cse/cse.js?cx=%s"
 
 static char cse_element_cx[128];
-static char cse_element_tok[512];
+static char cse_element_tok[512];   /* optional override */
+static char cse_cached_tok[512];
+static char cse_cached_lib[64];
+static char cse_cached_exp[128];
+static time_t cse_token_fetched = 0;
+static time_t cse_token_failed = 0;
+static pthread_mutex_t cse_token_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void api_google_cse_element_configure(const char *cx, const char *tok) {
+  pthread_mutex_lock(&cse_token_mutex);
   snprintf(cse_element_cx, sizeof(cse_element_cx), "%s", cx ? cx : "");
   snprintf(cse_element_tok, sizeof(cse_element_tok), "%s", tok ? tok : "");
+  cse_token_fetched = 0;
+  cse_token_failed = 0;
+  pthread_mutex_unlock(&cse_token_mutex);
 }
 
 int api_google_cse_element_available(void) {
-  return cse_element_cx[0] != '\0' && cse_element_tok[0] != '\0';
+  return cse_element_cx[0] != '\0';
+}
+
+/* pull "key": "value" out of the JS object at the end of the token page */
+static int json_field_string(const char *body, const char *key, char *out,
+                             size_t size) {
+  char needle[64];
+  snprintf(needle, sizeof(needle), "\"%s\"", key);
+  const char *p = strstr(body, needle);
+  if (!p)
+    return 0;
+  p += strlen(needle);
+  while (*p == ' ' || *p == '\t' || *p == ':')
+    p++;
+  if (*p != '"')
+    return 0;
+  p++;
+  size_t n = 0;
+  while (*p && *p != '"' && n + 1 < size) {
+    if (*p == '\\' && p[1]) {
+      p++;
+      out[n++] = *p++;
+    } else {
+      out[n++] = *p++;
+    }
+  }
+  out[n] = '\0';
+  return n > 0;
+}
+
+/* exp is a JSON array of strings; flatten to "a,b,c" */
+static void json_field_array(const char *body, const char *key, char *out,
+                             size_t size) {
+  char needle[64];
+  snprintf(needle, sizeof(needle), "\"%s\":", key);
+  const char *p = strstr(body, needle);
+  if (!p) {
+    if (size)
+      out[0] = '\0';
+    return;
+  }
+  p += strlen(needle);
+  const char *open = strchr(p, '[');
+  const char *close = open ? strchr(open, ']') : NULL;
+  if (!open || !close || close < open) {
+    if (size)
+      out[0] = '\0';
+    return;
+  }
+  size_t n = 0;
+  for (const char *q = open; q < close && n + 1 < size; q++) {
+    if (*q == '"')
+      continue;
+    if (*q == ',' && n > 0 && out[n - 1] == ',')
+      continue;
+    if (*q == ' ' || *q == '\n')
+      continue;
+    if (*q == '[')
+      continue;
+    if (*q == '"' && n == 0)
+      continue;
+    out[n++] = *q;
+  }
+  /* trim leading/trailing commas */
+  while (n > 0 && (out[n - 1] == ',' || out[n - 1] == ' '))
+    n--;
+  out[n] = '\0';
+}
+
+/* Fetch the token if the cache is cold. Returns 1 on success. Called under the
+   mutex, so concurrent searches wait for one fetch instead of all racing. */
+static int cse_fetch_token_locked(void) {
+  char token_url[512];
+  snprintf(token_url, sizeof(token_url), CSE_TOKEN_URL_FMT, cse_element_cx);
+  HttpResponse resp = http_get(
+      token_url,
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+      "(KHTML, like Gecko) Version/17.2 Safari/605.1.15");
+  if (!resp.memory || resp.size == 0) {
+    http_response_free(&resp);
+    return 0;
+  }
+  int ok = json_field_string(resp.memory, "cse_token", cse_cached_tok,
+                             sizeof(cse_cached_tok)) &&
+           json_field_string(resp.memory, "cselibVersion", cse_cached_lib,
+                             sizeof(cse_cached_lib));
+  json_field_array(resp.memory, "exp", cse_cached_exp, sizeof(cse_cached_exp));
+  http_response_free(&resp);
+  return ok;
+}
+
+/* Test hook: run the token-page extraction over a captured response, without
+   any network. Returns 1 when cse_token and cselibVersion were both found. */
+int api_cse_extract_token_for_test(const char *body, size_t len) {
+  (void)len;
+  char tok[512], lib[64], exp[128];
+  int ok = body && json_field_string(body, "cse_token", tok, sizeof(tok)) &&
+           json_field_string(body, "cselibVersion", lib, sizeof(lib));
+  if (ok && body) {
+    json_field_array(body, "exp", exp, sizeof(exp));
+    if (!exp[0])
+      ok = 0;
+  }
+  return ok;
+}
+
+/* 1 when a token is ready (from the override, the cache, or a fresh fetch) */
+static int cse_ensure_token(void) {
+  if (cse_element_tok[0]) {
+    /* an explicit override wins and needs no fetch */
+    snprintf(cse_cached_tok, sizeof(cse_cached_tok), "%s", cse_element_tok);
+    if (!cse_cached_lib[0])
+      snprintf(cse_cached_lib, sizeof(cse_cached_lib), "dc6f600a0d4404e5");
+    return 1;
+  }
+  pthread_mutex_lock(&cse_token_mutex);
+  time_t now = time(NULL);
+  if (cse_cached_tok[0] && now - cse_token_fetched < CSE_TOKEN_TTL_SECS) {
+    pthread_mutex_unlock(&cse_token_mutex);
+    return 1;
+  }
+  /* do not hammer the token endpoint when it is failing */
+  if (cse_token_failed && now - cse_token_failed < 60) {
+    pthread_mutex_unlock(&cse_token_mutex);
+    return cse_cached_tok[0] != '\0';
+  }
+  if (!cse_fetch_token_locked()) {
+    if (getenv("OMNI_PERF"))
+      fprintf(stderr, "[CSE] token fetch failed\n");
+    cse_token_failed = now;
+    pthread_mutex_unlock(&cse_token_mutex);
+    return cse_cached_tok[0] != '\0';
+  }
+  cse_token_fetched = now;
+  cse_token_failed = 0;
+  if (getenv("OMNI_PERF"))
+    fprintf(stderr, "[CSE] token fetched (cached %dh)\n",
+            CSE_TOKEN_TTL_SECS / 3600);
+  pthread_mutex_unlock(&cse_token_mutex);
+  return 1;
 }
 
 char *api_url_google_cse_element(const char *encoded_query, int page,
                                  const char *lang) {
   if (!api_google_cse_element_available() || !encoded_query)
+    return NULL;
+  if (!cse_ensure_token() || !cse_cached_tok[0] || !cse_cached_lib[0])
     return NULL;
   char *url = malloc(2048);
   if (!url)
@@ -452,36 +614,53 @@ char *api_url_google_cse_element(const char *encoded_query, int page,
   int start = (page > 1 ? page - 1 : 0) * API_PAGE_SIZE;
   snprintf(url, 2048,
            "https://cse.google.com/cse/element/v1?rsz=filtered_cse&num=%d"
-           "&hl=%s&source=gcsc&start=%d&cselibv=9c7b0d0b1f3b0f2e"
-           "&cx=%s&q=%s&safe=off&cse_tok=%s&exp=csqr,cc&callback=cb",
-           API_PAGE_SIZE, (lang && lang[0]) ? lang : "en", start,
-           cse_element_cx, encoded_query, cse_element_tok);
+           "&hl=%s&cselibv=%s&cx=%s&q=%s&safe=off&cse_tok=%s&callback=_"
+           "&rurl=&searchtype=%s&exp=%s&start=%d",
+           API_PAGE_SIZE, (lang && lang[0]) ? lang : "en", cse_cached_lib,
+           cse_element_cx, encoded_query, cse_cached_tok,
+           (page > 0) ? "" : "", cse_cached_exp, start);
   return url;
 }
 
-/* The element wraps its JSON in a callback: cb({...}) - strip that, then read
-   the same field names the widget renders from. */
+/* The reply is JSONP: a `/*O_o*\/` comment, then `_({...})`. */
+static const char *jsonp_payload(const char *body, size_t len) {
+  if (!body || len == 0)
+    return NULL;
+  const char *p = strstr(body, "_(");
+  if (!p)
+    p = strchr(body, '{');
+  else
+    p += 2;
+  if (!p)
+    return NULL;
+  while (*p == ' ' || *p == '\n' || *p == '\r')
+    p++;
+  if (*p != '{')
+    return NULL;
+  return p;
+}
+
 int api_parse_google_cse_element(const char *body, size_t len, const char *lang,
                                  SearchResult **out, int max) {
   (void)lang;
-  if (!body || len == 0)
+  const char *start = jsonp_payload(body, len);
+  if (!start)
     return 0;
-  const char *start = strchr(body, '{');
   const char *end = NULL;
-  for (size_t i = len; i > 0; i--) {
+  for (size_t i = len; i > (size_t)(start - body); i--) {
     if (body[i - 1] == '}') {
       end = body + i;
       break;
     }
   }
-  if (!start || !end || end <= start)
+  if (!end || end <= start)
     return 0;
 
   json_error_t error;
   json_t *root = json_loadb(start, (size_t)(end - start), 0, &error);
   if (!root) {
     if (getenv("OMNI_CSE_DEBUG"))
-      fprintf(stderr, "[G3] json_loadb failed: %s at line %d\n", error.text,
+      fprintf(stderr, "[CSE] json_loadb failed: %s at line %d\n", error.text,
               error.line);
     return 0;
   }
@@ -498,9 +677,9 @@ int api_parse_google_cse_element(const char *body, size_t len, const char *lang,
       char *link = dup_string(item, "unescapedUrl");
       if (!link)
         link = dup_string(item, "url");
-      char *snippet = dup_string(item, "content");
+      char *snippet = dup_string(item, "contentNoFormatting");
       if (!snippet)
-        snippet = dup_string(item, "contentNoFormatting");
+        snippet = dup_string(item, "content");
       if (link && link[0]) {
         html_unescape_inplace(title);
         html_unescape_inplace(snippet);

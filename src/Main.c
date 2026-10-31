@@ -202,21 +202,20 @@ int main(int argc, char **argv) {
     engine_set_enabled("google", 1);
     fprintf(stderr, "[INFO] Google Programmable Search enabled\n");
   }
-  /* G3: the element path is opt-in twice over - a cx AND a token. Without a
-     token the endpoint is a 403, and an engine that can only 403 is worse than
-     no engine: it spends a request slot and reports a failure that is really a
-     missing credential. */
-  if (cfg.google_cse_cx[0] != '\0' && cfg.google_cse_tok[0] != '\0') {
+  /* H3: the element protocol mints its own token from
+     www.google.com/cse/cse.js, so a cx alone is enough. A pasted
+     google_cse_tok is an override for when that endpoint changes. Disabled by
+     default either way: it is an undocumented endpoint and it borrows another
+     site's CX, which is the owner's call. */
+  if (cfg.google_cse_cx[0] != '\0') {
     api_google_cse_element_configure(cfg.google_cse_cx, cfg.google_cse_tok);
     engine_set_enabled("google_cse_element", 1);
+    engine_health_set_engine_pace("google_cse_element", 10);
     fprintf(stderr,
-            "[INFO] Google Programmable Search Element enabled (token "
-            "supplied)\n");
-  } else if (cfg.google_cse_cx[0] != '\0') {
-    fprintf(stderr,
-            "[INFO] google_cse_cx is set but google_cse_tok is not; the "
-            "element endpoint needs both, so google_cse_element stays off "
-            "(see docs/G3-google-cse.md)\n");
+            "[INFO] Google Programmable Search Element enabled for cx=%s%s "
+            "(experimental, 10 req/min)\n",
+            cfg.google_cse_cx,
+            cfg.google_cse_tok[0] ? " using the supplied token" : "");
   }
   if (cfg.searxng_url[0] != '\0') {
     api_searxng_configure(cfg.searxng_url, cfg.searxng_engines);

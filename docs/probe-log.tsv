@@ -1,0 +1,7 @@
+utc	engine	query	http	bytes	verdict	ua	headers	url
+2026-10-31T12:19:25Z	google_cse_token	cx=partner-pub-8993703457585266:4862972284	301	273	redirect to cse.google.com/cse/cse.js	safari	accept:*/*, referer:cse.google.com	https://www.google.com/cse/cse.js?cx=partner-pub-8993703457585266:4862972284
+2026-10-31T12:19:30Z	google_cse_token	cx=partner-pub-8993703457585266:4862972284	200	3324	token object present (cse_token, cselibVersion, exp)	safari	accept:*/*, referer:cse.google.com	https://www.google.com/cse/cse.js?cx=partner-pub-8993703457585266:4862972284 (followed)
+2026-10-31T12:20:10Z	google_cse_element	linux kernel	200	13094	20 results	safari	referer:cse.google.com	https://cse.google.com/cse/element/v1?...&cse_tok=<minted>
+2026-10-31T12:20:40Z	google_cse_element	zzqxjkwvbnmplkjhgfdsa98765	200	432	0 results	safari	referer:cse.google.com	https://cse.google.com/cse/element/v1?...&cse_tok=<minted>
+2026-10-31T11:05:00Z	google_cse_token	Round-2 probe: cse.google.com/cse.js (wrong path)	404	-	no token page; this is the error H3 identified	safari	-	https://cse.google.com/cse.js?cx=...
+2026-10-31T11:05:30Z	google_cse_element	Round-2 probe: element/v1 with empty cse_tok	403	1103	Google bot page	safari	-	https://cse.google.com/cse/element/v1?...&cse_tok=

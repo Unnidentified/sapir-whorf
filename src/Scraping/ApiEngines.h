@@ -41,6 +41,8 @@ int api_parse_google_cse_element(const char *body, size_t len, const char *lang,
                                  SearchResult **out, int max);
 char *api_url_google_cse_element(const char *encoded_query, int page,
                                  const char *lang);
+/* test hook: no network, runs the token-page extraction on a captured body */
+int api_cse_extract_token_for_test(const char *body, size_t len);
 
 /* SearXNG instance acting as a bridge to Google and other engines */
 void api_searxng_configure(const char *base_url, const char *engines);

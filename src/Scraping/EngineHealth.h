@@ -36,6 +36,7 @@ typedef struct {
      and still be returning junk that the coverage floor throws away - that is
      what Bing did for "best podcast app". */
   unsigned long total_cancelled;  /* cut off by our own batch deadline */
+  int pace_override;        /* 0 = use the global rate                  */
   unsigned long quality_samples;
   double quality_ewma;      /* 0..1, share of its results that survived      */
 } EngineHealthEntry;
@@ -59,6 +60,9 @@ const char *engine_health_suspend_name(SuspendReason reason);
    right now, so the caller can skip it instead of piling on. */
 int engine_health_take_token(const char *id);
 void engine_health_set_pacing(int requests_per_minute, int burst);
+/* Per-engine override of the global rate: an engine that borrows someone
+   else's public endpoint (google_cse_element) gets a smaller one. */
+void engine_health_set_engine_pace(const char *id, int requests_per_minute);
 
 EngineHealthEntry *engine_health_get(const char *id);
 const char *engine_health_state_name(BreakerState state);

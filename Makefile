@@ -257,9 +257,13 @@ check-themes:
 	@python3 tools/check_themes.py
 
 # A1: registry lint + parser fixtures. Neither touches the network.
+# ApiEngines now fetches the Google CSE token itself, so the test builds need
+# the HTTP helper and everything it stands on.
 LINT_SRCS = src/Scraping/ScrapingParsers.c src/Scraping/BlockDetection.c \
             src/Scraping/ApiEngines.c src/Utility/Utility.c \
-            src/Utility/XmlHelper.c src/Utility/Unescape.c
+            src/Utility/XmlHelper.c src/Utility/Unescape.c \
+            src/Utility/JsonHelper.c src/Utility/HttpClient.c \
+            src/Proxy/Proxy.c src/Config.c src/Cache/Cache.c
 # beaker has no .pc file; it lives in the brew prefix like the app build expects
 LINT_LIBS = -L$(BREW_PREFIX)/lib -lbeaker $(DEP_LIBS) -lpthread -lm -lssl -lcrypto
 
@@ -281,9 +285,7 @@ tests/test_canonical: tests/test_canonical.c src/Ranking/Ranker.c \
                      src/Query/QueryAnalysis.c src/Utility/Utility.c \
                      src/Utility/Unescape.c src/Utility/XmlHelper.c \
                      src/Utility/Display.c src/Cache/Cache.c \
-                     src/Scraping/BlockDetection.c \
-                     src/Scraping/ScrapingParsers.c src/Scraping/ApiEngines.c \
-                     src/Config.c
+                     $(LINT_SRCS)
 	@$(CC) -Isrc -I$(BREW_PREFIX)/include -I/usr/include/libxml2 -o $@ $^ \
 		$(LINT_LIBS)
 

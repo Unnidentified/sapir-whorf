@@ -1,0 +1,1006 @@
+/*O_o*/
+_({
+  "cursor": {
+    "currentPageIndex": 0,
+    "estimatedResultCount": "29000000",
+    "moreResultsUrl": "http://www.google.com/cse?oe=utf8&ie=utf8&source=uds&q=linux+kernel&safe=off&cx=partner-pub-8993703457585266:4862972284&start=0",
+    "resultCount": "29,000,000",
+    "searchResultTime": "0.21",
+    "pages": [
+      {
+        "label": 1,
+        "start": "0"
+      },
+      {
+        "label": 2,
+        "start": "20"
+      },
+      {
+        "label": 3,
+        "start": "40"
+      },
+      {
+        "label": 4,
+        "start": "60"
+      },
+      {
+        "label": 5,
+        "start": "80"
+      }
+    ]
+  },
+  "results": [
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.kernel.org/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAQQAQ&usg=AOvVaw38VCzOtum3Jx0ObDwc4deq",
+      "content": "The \u003cb\u003eLinux Kernel\u003c/b\u003e Archives ; mainline: 7.3, 2026-10-18, [tarball], [pgp] ; stable: 7.3.1, 2026-10-30, [tarball], [pgp] ; stable: 7.2.14, 2026-10-30, [tarball], [pgp]&nbsp;...",
+      "contentNoFormatting": "The Linux Kernel Archives ; mainline: 7.3, 2026-10-18, [tarball], [pgp] ; stable: 7.3.1, 2026-10-30, [tarball], [pgp] ; stable: 7.2.14, 2026-10-30, [tarball], [pgp] ...",
+      "title": "The \u003cb\u003eLinux Kernel\u003c/b\u003e Archives",
+      "titleNoFormatting": "The Linux Kernel Archives",
+      "formattedUrl": "https://www.\u003cb\u003ekernel\u003c/b\u003e.org/",
+      "unescapedUrl": "https://www.kernel.org/",
+      "url": "https://www.kernel.org/",
+      "visibleUrl": "www.kernel.org",
+      "richSnippet": {
+        "metatags": {
+          "viewport": "width=device-width, initial-scale=1.0"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "www.kernel.org",
+        "crumbs": [
+          ""
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://github.com/torvalds/linux&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAcQAQ&usg=AOvVaw1ck7xgHjewvm5aUTEGnYyx",
+      "content": "Changelog Your source for the latest features, improvements, and fixes across GitHub products, all in one place. ... GitHub Universe The event for developers, by&nbsp;...",
+      "contentNoFormatting": "Changelog Your source for the latest features, improvements, and fixes across GitHub products, all in one place. ... GitHub Universe The event for developers, by ...",
+      "title": "\u003cb\u003eLinux kernel\u003c/b\u003e source tree - torvalds - GitHub",
+      "titleNoFormatting": "Linux kernel source tree - torvalds - GitHub",
+      "formattedUrl": "https://github.com/torvalds/\u003cb\u003elinux\u003c/b\u003e",
+      "unescapedUrl": "https://github.com/torvalds/linux",
+      "url": "https://github.com/torvalds/linux",
+      "visibleUrl": "github.com",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://opengraph.githubassets.com/63d6d1269d6fc9becdb2a12a12c707ab036b0b26213fb5db463185b960c472af/torvalds/linux"
+        },
+        "softwaresourcecode": {
+          "keywords": "C",
+          "name": "linux"
+        },
+        "metatags": {
+          "twitterTitle": "GitHub - torvalds/linux: Linux kernel source tree",
+          "release": "c4e7b7c9213175f5834a5a63f9f19386c10c6df7",
+          "ogTitle": "GitHub - torvalds/linux: Linux kernel source tree",
+          "routeController": "files",
+          "ogType": "object",
+          "hostname": "github.com",
+          "turboCacheControl": "no-preview",
+          "octolyticsDimensionUserId": "1024025",
+          "octolyticsDimensionRepositoryNwo": "torvalds/linux",
+          "githubKeyboardShortcuts": "repository,copilot",
+          "analyticsLocation": "/\u003cuser-name\u003e/\u003crepo-name\u003e",
+          "ogSiteName": "GitHub",
+          "appleItunesApp": "app-id=1477376905, app-argument=https://github.com/torvalds/linux",
+          "fetchNonce": "v2:712b6a83-4612-98f5-1677-2922b7342735",
+          "goImport": "github.com/torvalds/linux git https://github.com/torvalds/linux.git",
+          "octolyticsUrl": "https://collector.github.com/github/collect",
+          "twitterSite": "@github",
+          "twitterImage": "https://opengraph.githubassets.com/63d6d1269d6fc9becdb2a12a12c707ab036b0b26213fb5db463185b960c472af/torvalds/linux",
+          "ogImage": "https://opengraph.githubassets.com/63d6d1269d6fc9becdb2a12a12c707ab036b0b26213fb5db463185b960c472af/torvalds/linux",
+          "expectedHostname": "github.com",
+          "disableTurbo": "false",
+          "twitterDescription": "Linux kernel source tree. Contribute to torvalds/linux development by creating an account on GitHub.",
+          "routeAction": "disambiguate",
+          "ogImageAlt": "Linux kernel source tree. Contribute to torvalds/linux development by creating an account on GitHub.",
+          "reactImportMap": "react,react-dom,react-dom/client,react-dom/profiling,react-is,react-reconciler,react/compiler-runtime,react/jsx-dev-runtime,react/jsx-runtime,scheduler@d5750093facf",
+          "hovercardSubjectTag": "repository:2325298",
+          "ogUrl": "https://github.com/torvalds/linux",
+          "visitorHmac": "8f32ce344eacbe55c8c4fdcd131c72f8d17b3937a82ad01996ada09101af808d",
+          "turboBodyClasses": "logged-out env-production page-responsive",
+          "browserErrorsUrl": "https://api.github.com/_private/browser/errors",
+          "ogImageWidth": "1200",
+          "routePattern": "/:user_id/:repository",
+          "octolyticsDimensionRepositoryNetworkRootId": "2325298",
+          "currentCatalogServiceHash": "f3abb0cc802f3d7b95fc8762b94bdcb13bf39634c40c357301c4aa1d67a256fb",
+          "browserStatsUrl": "https://api.github.com/_private/browser/stats",
+          "twitterCard": "summary_large_image",
+          "ogImageHeight": "600",
+          "octolyticsDimensionUserLogin": "torvalds",
+          "requestId": "D68B:20A574:20767A3:2AFA63C:6AE5BBE6",
+          "octolyticsDimensionRepositoryId": "2325298",
+          "octolyticsDimensionRepositoryIsFork": "false",
+          "htmlSafeNonce": "51b07ec7143ffa6225b29b71560de2ebdd8cdc1a8c43c265eca61f2d46fe26e6",
+          "visitorPayload": "eyJyZWZlcnJlciI6IiIsInJlcXVlc3RfaWQiOiJENjhCOjIwQTU3NDoyMDc2N0EzOjJBRkE2M0M6NkFFNUJCRTYiLCJ2aXNpdG9yX2lkIjoiMjk2OTgxMzcwOTA4MTY1NjI5OCIsInJlZ2lvbl9lZGdlIjoiaWFkIiwicmVnaW9uX3JlbmRlciI6ImlhZCJ9",
+          "octolyticsDimensionRepositoryNetworkRootNwo": "torvalds/linux",
+          "octolyticsDimensionRepositoryPublic": "true",
+          "reactProfiling": "0",
+          "ogDescription": "Linux kernel source tree. Contribute to torvalds/linux development by creating an account on GitHub.",
+          "viewport": "width=device-width",
+          "fbAppId": "1401488693436528"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "github.com",
+        "crumbs": [
+          "torvalds",
+          "linux"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://en.wikipedia.org/wiki/Linux_kernel&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECBUQAQ&usg=AOvVaw1t9aWBvlFDNEOBVAVX4Q8z",
+      "content": "The \u003cb\u003eLinux kernel\u003c/b\u003e is a free and open-source \u003csup\u003e: 4\u003c/sup\u003e Unix-like kernel that is used in many computer systems worldwide. The kernel was created by Linus Torvalds in&nbsp;...",
+      "contentNoFormatting": "The Linux kernel is a free and open-source : 4 Unix-like kernel that is used in many computer systems worldwide. The kernel was created by Linus Torvalds in ...",
+      "title": "\u003cb\u003eLinux kernel\u003c/b\u003e - Wikipedia",
+      "titleNoFormatting": "Linux kernel - Wikipedia",
+      "formattedUrl": "https://en.wikipedia.org/wiki/\u003cb\u003eLinux\u003c/b\u003e_\u003cb\u003ekernel\u003c/b\u003e",
+      "unescapedUrl": "https://en.wikipedia.org/wiki/Linux_kernel",
+      "url": "https://en.wikipedia.org/wiki/Linux_kernel",
+      "visibleUrl": "en.wikipedia.org",
+      "richSnippet": {
+        "metatags": {
+          "referrer": "origin",
+          "ogImageWidth": "1012",
+          "formatDetection": "telephone=no",
+          "themeColor": "#eaecf0",
+          "ogImageHeight": "1200",
+          "viewport": "width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.25, maximum-scale=5.0",
+          "ogTitle": "Linux kernel - Wikipedia",
+          "ogImage": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/35/Tux.svg/1280px-Tux.svg.png?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
+          "ogType": "website"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "en.wikipedia.org",
+        "crumbs": [
+          "wiki",
+          "Linux_kernel"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.redhat.com/en/topics/linux/what-is-the-linux-kernel&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECBYQAQ&usg=AOvVaw1eehXTRobbOYi7V-XhFCmR",
+      "content": "Overview. The \u003cb\u003eLinux\u003c/b\u003e® \u003cb\u003ekernel\u003c/b\u003e is the main component of a \u003cb\u003eLinux\u003c/b\u003e operating system (OS) and is the core interface between a computer&#39;s hardware and its processes. It&nbsp;...",
+      "contentNoFormatting": "Overview. The Linux® kernel is the main component of a Linux operating system (OS) and is the core interface between a computer's hardware and its processes. It ...",
+      "title": "What is the \u003cb\u003eLinux kernel\u003c/b\u003e? - Red Hat",
+      "titleNoFormatting": "What is the Linux kernel? - Red Hat",
+      "formattedUrl": "https://www.redhat.com/en/topics/\u003cb\u003elinux\u003c/b\u003e/what-is-the-\u003cb\u003elinux\u003c/b\u003e-\u003cb\u003ekernel\u003c/b\u003e",
+      "unescapedUrl": "https://www.redhat.com/en/topics/linux/what-is-the-linux-kernel",
+      "url": "https://www.redhat.com/en/topics/linux/what-is-the-linux-kernel",
+      "visibleUrl": "www.redhat.com",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://www.redhat.com/profiles/rh/themes/redhatdotcom/img/logo-rh-og-image.png"
+        },
+        "metatags": {
+          "twitterTitle": "What is the Linux kernel?",
+          "taxonomyArticleType": "Article",
+          "recommendationsGroup": "Article",
+          "taxonomyTopic": "Linux",
+          "dateline": "2026-10-30T00:00:00.00Z",
+          "taxonomyPrimaryTopicTid": "27061",
+          "rhdcKey": "274b9b880993a07b943bee9747baf99f",
+          "ogTitle": "What is the Linux kernel?",
+          "source": "rhdc_drupal",
+          "ogType": "website",
+          "twitterCard": "summary",
+          "lastPublishDate": "Fri, 30 Oct 2026 16:38:13 GMT",
+          "recommendationsId": "824481_rh_en",
+          "taxonomyPrimaryTopic": "Linux",
+          "handheldfriendly": "true",
+          "twitterImage": "https://www.redhat.com/profiles/rh/themes/redhatdotcom/img/logo-rh-og-image.png",
+          "hybridType": "Article",
+          "sourceTitle": "What is the Linux kernel?",
+          "ogDescription": "The Linux kernel is the main component of a Linux operating system (OS) and is the core interface between a computer’s hardware and its processes.",
+          "nodeType": "article",
+          "ogImage": "https://www.redhat.com/profiles/rh/themes/redhatdotcom/img/logo-rh-og-image.png",
+          "referrer": "strict-origin-when-cross-origin",
+          "taxonomyArticleTypeTid": "107921",
+          "viewport": "width=device-width, initial-scale=1.0",
+          "twitterDescription": "The Linux kernel is the main component of a Linux operating system (OS) and is the core interface between a computer’s hardware and its processes.",
+          "mobileoptimized": "width",
+          "taxonomyTopicTid": "27061",
+          "taxonomyTopicSid": "s423",
+          "ogUrl": "https://www.redhat.com/en/topics/linux/what-is-the-linux-kernel"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "www.redhat.com",
+        "crumbs": [
+          "topics",
+          "linux",
+          "what-is-the-linux-kernel"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://thehackernews.com/2026/10/linux-kernel-tcp-flaw-with-98-cvss.html&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECBQQAg&usg=AOvVaw36cZ5VAdCmDwLTH2HTC38h",
+      "content": "2 days ago \u003cb\u003e...\u003c/b\u003e As of October 29, Ubuntu and RHEL have not released a fixed \u003cb\u003ekernel\u003c/b\u003e. Red Hat, Amazon, Oracle, and SUSE score the flaw between 5.9 and 8.1, lower&nbsp;...",
+      "contentNoFormatting": "2 days ago ... As of October 29, Ubuntu and RHEL have not released a fixed kernel. Red Hat, Amazon, Oracle, and SUSE score the flaw between 5.9 and 8.1, lower ...",
+      "title": "\u003cb\u003eLinux Kernel\u003c/b\u003e TCP Flaw With 9.8 CVSS Score Affects Ubuntu, Red ...",
+      "titleNoFormatting": "Linux Kernel TCP Flaw With 9.8 CVSS Score Affects Ubuntu, Red ...",
+      "formattedUrl": "https://thehackernews.com/2026/10/\u003cb\u003elinux\u003c/b\u003e-\u003cb\u003ekernel\u003c/b\u003e-tcp-flaw-with-98-cvss.html",
+      "unescapedUrl": "https://thehackernews.com/2026/10/linux-kernel-tcp-flaw-with-98-cvss.html",
+      "url": "https://thehackernews.com/2026/10/linux-kernel-tcp-flaw-with-98-cvss.html",
+      "visibleUrl": "thehackernews.com",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgfCJ0ttE8v4hkDjJRqbTvxlxFcoNtFJhbYCQ-o8NtaiyFLImEyA8aSO967eeZG9fRebhc8oVA-OloE9X9KVVAxM-H3wKvUlh8XmN6bGlEz2IJwMgcssmA7yIRi7YNOwVQYD6nhQCaWUg6fPy-QXVjfw6rV55LueKlLvZLazjKjTL94KJMMUZ2uZ3R019Km/s1700-nu-rw-lo-l85-e365/linux-flaw.jpg"
+        },
+        "person": {
+          "name": "Swati Khandelwal",
+          "url": "https://twitter.com/thehackersnews"
+        },
+        "organization": {
+          "name": "The Hacker News",
+          "url": "https://thehackernews.com/"
+        },
+        "metatags": {
+          "twitterCreator": "@TheHackersNews",
+          "twitterTitle": "Linux Kernel TCP Flaw With 9.8 CVSS Score Affects Ubuntu, Red Hat and Other Distributions",
+          "msapplicationNavbuttonColor": "#3B35AE",
+          "ogImageWidth": "900",
+          "ogTitle": "Linux Kernel TCP Flaw With 9.8 CVSS Score Affects Ubuntu, Red Hat and Other Distributions",
+          "postid": "7009697052104311878",
+          "ogType": "article",
+          "twitterCard": "summary_large_image",
+          "ogImageHeight": "470",
+          "fbAdmins": "1251386282",
+          "ogSiteName": "The Hacker News",
+          "blogid": "4802841478634147276",
+          "mobileWebAppCapable": "yes",
+          "twitterSite": "@TheHackersNews",
+          "fbPages": "172819872731894",
+          "twitterImage": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgfCJ0ttE8v4hkDjJRqbTvxlxFcoNtFJhbYCQ-o8NtaiyFLImEyA8aSO967eeZG9fRebhc8oVA-OloE9X9KVVAxM-H3wKvUlh8XmN6bGlEz2IJwMgcssmA7yIRi7YNOwVQYD6nhQCaWUg6fPy-QXVjfw6rV55LueKlLvZLazjKjTL94KJMMUZ2uZ3R019Km/s1700-nu-rw-lo-l85-e365/linux-flaw.jpg",
+          "author": "The Hacker News",
+          "twitterDomain": "thehackernews.com",
+          "ogDescription": "Ubuntu and RHEL lack fixes for a Linux TCP use-after-free that Anthropic says it exploited to run commands as root on MPTCP servers.",
+          "ogLocale": "en_US",
+          "ogImage": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgfCJ0ttE8v4hkDjJRqbTvxlxFcoNtFJhbYCQ-o8NtaiyFLImEyA8aSO967eeZG9fRebhc8oVA-OloE9X9KVVAxM-H3wKvUlh8XmN6bGlEz2IJwMgcssmA7yIRi7YNOwVQYD6nhQCaWUg6fPy-QXVjfw6rV55LueKlLvZLazjKjTL94KJMMUZ2uZ3R019Km/s1700-nu-rw-lo-l85-e365/linux-flaw.jpg",
+          "viewport": "width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=6.0",
+          "themeColor": "#3B35AE",
+          "twitterDescription": "Ubuntu and RHEL lack fixes for a Linux TCP use-after-free that Anthropic says it exploited to run commands as root on MPTCP servers.",
+          "ogUrl": "https://thehackernews.com/2026/10/linux-kernel-tcp-flaw-with-98-cvss.html",
+          "appleMobileWebAppStatusBarStyle": "#3B35AE",
+          "articleSection": "Article",
+          "appleMobileWebAppCapable": "yes",
+          "fbAppId": "280117418781535",
+          "articleAuthor": "https://www.facebook.com/thehackernews"
+        },
+        "newsarticle": {
+          "inlanguage": "en-US",
+          "datemodified": "2026-10-30T08:38:27Z",
+          "keywords": "artificial intelligence, linux, network security, Vulnerability",
+          "articlesection": "artificial intelligence",
+          "headline": "Linux Kernel TCP Flaw With 9.8 CVSS Score Affects Ubuntu, Red Hat and Other Distributions",
+          "url": "https://thehackernews.com/2026/10/linux-kernel-tcp-flaw-with-98-cvss.html",
+          "datepublished": "2026-10-29T21:27:00+05:30",
+          "mainentityofpage": "https://thehackernews.com/2026/10/linux-kernel-tcp-flaw-with-98-cvss.html"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQH_UCvjjzpVLab_ZnsslKf7gJoXCm2YdMNGOLkez0k_E8gEuibFgRDFCve&s",
+          "width": "311",
+          "height": "162"
+        },
+        "imageobject": [
+          {
+            "width": "728",
+            "url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgfCJ0ttE8v4hkDjJRqbTvxlxFcoNtFJhbYCQ-o8NtaiyFLImEyA8aSO967eeZG9fRebhc8oVA-OloE9X9KVVAxM-H3wKvUlh8XmN6bGlEz2IJwMgcssmA7yIRi7YNOwVQYD6nhQCaWUg6fPy-QXVjfw6rV55LueKlLvZLazjKjTL94KJMMUZ2uZ3R019Km/s1700-nu-rw-lo-l85-e365/linux-flaw.jpg",
+            "height": "380"
+          },
+          {
+            "width": "460",
+            "url": "https://thehackernews.com/images/-lr1jzOJlY3g/Wzjug8yO0UI/AAAAAAAAxSk/pVpxFhgIHRcIbASdYo3YSDZLB8p3ytjqACLcBGAs/s460-rw-e365/the-hacker-news.jpg",
+            "height": "60"
+          }
+        ]
+      },
+      "breadcrumbUrl": {
+        "host": "thehackernews.com",
+        "crumbs": [
+          "2026/10",
+          "linux-kernel-tcp-flaw-with-98-cvss"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://docs.kernel.org/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECBMQAQ&usg=AOvVaw1LwH2K7wHi6sRUFFCb3TFV",
+      "content": "\u003cb\u003eKernel\u003c/b\u003e documentation, like the \u003cb\u003ekernel\u003c/b\u003e itself, is very much a work in progress; that is especially true as we work to integrate our many scattered documents into&nbsp;...",
+      "contentNoFormatting": "Kernel documentation, like the kernel itself, is very much a work in progress; that is especially true as we work to integrate our many scattered documents into ...",
+      "title": "The \u003cb\u003eLinux Kernel\u003c/b\u003e documentation",
+      "titleNoFormatting": "The Linux Kernel documentation",
+      "formattedUrl": "https://docs.\u003cb\u003ekernel\u003c/b\u003e.org/",
+      "unescapedUrl": "https://docs.kernel.org/",
+      "url": "https://docs.kernel.org/",
+      "visibleUrl": "docs.kernel.org",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://docs.kernel.org/_static/logo.svg"
+        },
+        "metatags": {
+          "viewport": "width=device-width, initial-scale=1.0"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTgFNsEIGq8QbgRVqYpkdw3uVevHbuCqbRtNi05hlYv6bIOLSEQ68X3-mg&s",
+          "width": "203",
+          "height": "248"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "docs.kernel.org",
+        "crumbs": [
+          ""
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.sysdig.com/learn-cloud-native/understanding-linux-kernel&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECBIQAg&usg=AOvVaw2Ya-km7iCt1knQj6l9NtdI",
+      "content": "31 Mar 2026 \u003cb\u003e...\u003c/b\u003e \u003cb\u003eLinux Kernel\u003c/b\u003e Architecture. Like most modern kernels, the \u003cb\u003eLinux kernel\u003c/b\u003e uses what&#39;s known as a monolithic kernel architecture. This means that the&nbsp;...",
+      "contentNoFormatting": "31 Mar 2026 ... Linux Kernel Architecture. Like most modern kernels, the Linux kernel uses what's known as a monolithic kernel architecture. This means that the ...",
+      "title": "Understanding the \u003cb\u003eLinux Kernel\u003c/b\u003e | Sysdig",
+      "titleNoFormatting": "Understanding the Linux Kernel | Sysdig",
+      "formattedUrl": "https://www.sysdig.com/learn-cloud-native/understanding-\u003cb\u003elinux\u003c/b\u003e-\u003cb\u003ekernel\u003c/b\u003e",
+      "unescapedUrl": "https://www.sysdig.com/learn-cloud-native/understanding-linux-kernel",
+      "url": "https://www.sysdig.com/learn-cloud-native/understanding-linux-kernel",
+      "visibleUrl": "www.sysdig.com",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://cdn.prod.website-files.com/681e366f54a6e3ce87159ca4/687d79e7cac4f0ef51bb2bb9_sysdig-lcn-default-meta.png"
+        },
+        "metatags": {
+          "twitterTitle": "Understanding the Linux Kernel | Sysdig",
+          "twitterCard": "summary_large_image",
+          "twitterDescription": "The Linux kernel is the kernel used by Linux-based operating systems and the interface between the hardware and the computer processes.",
+          "twitterImage": "https://cdn.prod.website-files.com/681e366f54a6e3ce87159ca4/687d79e7cac4f0ef51bb2bb9_sysdig-lcn-default-meta.png",
+          "viewport": "width=device-width, initial-scale=1",
+          "ogTitle": "Understanding the Linux Kernel | Sysdig",
+          "ogDescription": "The Linux kernel is the kernel used by Linux-based operating systems and the interface between the hardware and the computer processes.",
+          "ogImage": "https://cdn.prod.website-files.com/681e366f54a6e3ce87159ca4/687d79e7cac4f0ef51bb2bb9_sysdig-lcn-default-meta.png",
+          "ogType": "website",
+          "algoliaSiteVerification": "4A5C2E96E651B3BC"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQwDZ93AKgjAK-Hq-fQHPof2Vsv9IvotDhQ5IQjjGzgfz7BevWEwAGuWYs&s",
+          "width": "311",
+          "height": "162"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "www.sysdig.com",
+        "crumbs": [
+          "learn-cloud-native",
+          "understanding-linux-kernel"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.ibm.com/think/topics/linux-kernel&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECA8QAQ&usg=AOvVaw1MT465XcG_u18_uKFEN9WP",
+      "content": "A \u003cb\u003ekernel\u003c/b\u003e is a computer program that functions as the beating heart of the OS, the system that allows users to interact with the computer&#39;s hardware and software&nbsp;...",
+      "contentNoFormatting": "A kernel is a computer program that functions as the beating heart of the OS, the system that allows users to interact with the computer's hardware and software ...",
+      "title": "What is the \u003cb\u003eLinux Kernel\u003c/b\u003e? - IBM",
+      "titleNoFormatting": "What is the Linux Kernel? - IBM",
+      "formattedUrl": "https://www.ibm.com/think/topics/\u003cb\u003elinux\u003c/b\u003e-\u003cb\u003ekernel\u003c/b\u003e",
+      "unescapedUrl": "https://www.ibm.com/think/topics/linux-kernel",
+      "url": "https://www.ibm.com/think/topics/linux-kernel",
+      "visibleUrl": "www.ibm.com",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://www.ibm.com/content/dam/connectedassets-adobe-cms/worldwide-content/stock-assets/getty/image/photography/fd/66/pi-1837373.jpg/_jcr_content/renditions/cq5dam.web.1280.1280.jpeg"
+        },
+        "metatags": {
+          "pagetype": "Learn - Topics - Definition",
+          "template": "article",
+          "countrycode": "us",
+          "ibmSearchFacetFieldKeyword09": "https://prod-cloud-publish.aem.ibm.net/content/dam/connectedassets-adobe-cms/worldwide-content/stock-assets/getty/image/photography/fd/66/pi-1837373.component.crop-thumbnail-16-by-9-retina.ts=0.jpg/content/adobe-cms/us/en/think/topics/linux-kernel/jcr:content/root/leadspace_container/leadspace_article",
+          "utCodes": "10C00 \u003e 15MHW \u003e 17APH \u003e 20C7W",
+          "ogTitle": "What is the Linux Kernel? | IBM",
+          "contentPageRef": "eROxip4tByGTXXkYPHZou-BiuGJ9_RYmtHfVzsWttQP4nzxuGszF-AMu4NmTO_sdACogn76z8k2d6-FfNzcZEIWtLQNg0bj30v-bOHUAb50",
+          "ibmComSearchAppid": "thinkhub",
+          "searchtitle": "What is the Linux Kernel?",
+          "ogType": "website",
+          "primarytopic": "Linux kernels",
+          "languagecode": "en",
+          "sitesection": "think",
+          "primarytaxonomyen": "Linux kernels",
+          "ibmSearchFacetFieldKeyword01": "Linux kernels",
+          "ibmAjoSurfaces": "think-journey-card",
+          "ibmSearchFacetFieldText01": "23 October 2024",
+          "articlePublishedTime": "2024-10-28",
+          "author": "Mesh Flinders, Ian Smalley",
+          "ibmSearchFacetFieldText03": "Explainer",
+          "dctermsDate": "2024-10-23T00:00:00.000",
+          "utCodesId": "10C00 - IBM Infrastructure \u003e 15MHW - Z HW \u003e 17APH - PaaS  Virtualization and Linux Foundation \u003e 20C7W - Virtualization and Operating System",
+          "ibmComSearchScopes": "thinkhub",
+          "ogDescription": "The Linux kernel is a free, open-source kernel that forms a critical interface between the hardware and software layers in a computer's OS.",
+          "ogImage": "https://www.ibm.com/content/dam/connectedassets-adobe-cms/worldwide-content/stock-assets/getty/image/photography/fd/66/pi-1837373.jpg/_jcr_content/renditions/cq5dam.web.1280.1280.jpeg",
+          "ogLocale": "en-US",
+          "viewport": "width=device-width, initial-scale=1",
+          "ibmSearchFacetFieldHierarchy03": "taxonomy : Content Format / Article",
+          "ibmSearchFacetFieldHierarchy04": "taxonomy : Content Type / Explainer",
+          "ibmSearchFacetFieldHierarchy01": "taxonomy : Topics / Compute and servers / Enterprise servers / Linux servers / Linux kernels",
+          "ogUrl": "https://www.ibm.com/think/topics/linux-kernel",
+          "featuredcontent": "false",
+          "focusarea": "Infrastructure SDRs"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSyJbUmMtlQTruZJTddYhbGC7NctFqFvTIUSPkf9Gv4NYLPJla_y3BYLpJP&s",
+          "width": "275",
+          "height": "183"
+        },
+        "listitem": [
+          {
+            "item": "Home",
+            "name": "Home",
+            "position": "1"
+          },
+          {
+            "item": "Think",
+            "name": "Think",
+            "position": "2"
+          },
+          {
+            "item": "Topics",
+            "name": "Topics",
+            "position": "3"
+          },
+          {
+            "name": "Linux kernel",
+            "position": "4"
+          }
+        ]
+      },
+      "breadcrumbUrl": {
+        "host": "www.ibm.com",
+        "crumbs": [
+          "Home",
+          "Think",
+          "Topics"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://sourceforge.net/projects/linux.mirror/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECBEQAg&usg=AOvVaw3v9sZmqNJHwcl7gWdiWJHv",
+      "content": "18 Oct 2026 \u003cb\u003e...\u003c/b\u003e Follow \u003cb\u003eLinux Kernel\u003c/b\u003e ... A low-code dashboard makes monitoring intuitive for any admin, while scripting and custom sensors give experts full&nbsp;...",
+      "contentNoFormatting": "18 Oct 2026 ... Follow Linux Kernel ... A low-code dashboard makes monitoring intuitive for any admin, while scripting and custom sensors give experts full ...",
+      "title": "\u003cb\u003eLinux Kernel\u003c/b\u003e download | SourceForge.net",
+      "titleNoFormatting": "Linux Kernel download | SourceForge.net",
+      "formattedUrl": "https://sourceforge.net/projects/\u003cb\u003elinux\u003c/b\u003e.mirror/",
+      "unescapedUrl": "https://sourceforge.net/projects/linux.mirror/",
+      "url": "https://sourceforge.net/projects/linux.mirror/",
+      "visibleUrl": "sourceforge.net",
+      "richSnippet": {
+        "offer": {
+          "pricecurrency": "USD",
+          "price": "0",
+          "availability": "http://schema.org/InStock"
+        },
+        "xfn": {},
+        "cseImage": {
+          "src": "https://a.fsdn.com/allura/mirror/linux/icon?e890275e4eec19d7ea02dc0a061e26b09aee7359e5ec7d513020c2a1f9f8097f"
+        },
+        "softwareapplication": {
+          "image": "https://a.fsdn.com/allura/mirror/linux/icon?e890275e4eec19d7ea02dc0a061e26b09aee7359e5ec7d513020c2a1f9f8097f?&w=90",
+          "name": "Linux Kernel",
+          "operatingsystem": "Linux",
+          "description": "The Linux Kernel is the core component of the Linux operating system—a free, open-source, monolithic, Unix-like system kernel initiated by Linus Torvalds in 1991 and since evolved into a...",
+          "applicationcategory": "Operating System Kernels",
+          "filesize": "328029314",
+          "fileformat": "application/zip; charset=binary",
+          "screenshot": "https://a.fsdn.com/con/app/proj/linux.mirror/screenshots/1-aab7d71e.PNG/245/183/1",
+          "relatedcategory": "C Operating System Kernels"
+        },
+        "metatags": {
+          "viewport": "width=device-width, initial-scale=1.0, user-scalable=no",
+          "ogTitle": "Linux Kernel",
+          "ogUrl": "https://sourceforge.net/projects/linux.mirror/",
+          "ogSiteName": "SourceForge",
+          "ogDescription": "Download Linux Kernel for free. Linux Kernel source tree. The Linux Kernel is the core component of the Linux operating system—a free, open-source, monolithic, Unix-like system kernel initiated by Linus Torvalds in 1991 and since evolved into a foundational technology powering everything from servers and supercomputers to smartphones and embedded devices. There are various text files in the Documentation/ subdirectory, several of them using the reStructuredText markup notation.",
+          "ogImage": "https://a.fsdn.com/allura/mirror/linux/icon?e890275e4eec19d7ea02dc0a061e26b09aee7359e5ec7d513020c2a1f9f8097f",
+          "ogType": "product"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS6kKAUMAGY_C8MF2meu-iGHcuXMTnRbJZWlP5DJKiPTHbH9f2ayaZb&s",
+          "width": "48",
+          "height": "48"
+        },
+        "listitem": [
+          {
+            "item": "Home",
+            "name": "Home",
+            "position": "1"
+          },
+          {
+            "item": "Open Source Software",
+            "name": "Open Source Software",
+            "position": "2"
+          },
+          {
+            "item": "System",
+            "name": "System",
+            "position": "3"
+          },
+          {
+            "item": "Operating System Kernels",
+            "name": "Operating System Kernels",
+            "position": "4"
+          },
+          {
+            "name": "Linux Kernel",
+            "position": "5"
+          }
+        ]
+      },
+      "breadcrumbUrl": {
+        "host": "sourceforge.net",
+        "crumbs": [
+          "...",
+          "System",
+          "Operating System Kernels"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.reddit.com/r/linux4noobs/comments/v2rd8d/what_is_the_linux_kernel_exactly/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECBAQAg&usg=AOvVaw0YmvVCMslzZPQgjNUP1u3d",
+      "content": "2 Jun 2022 \u003cb\u003e...\u003c/b\u003e The \u003cb\u003eLinux kernel\u003c/b\u003e is, at its base, a set of firmware, low level software (like a terminal and some terminal commands), and a boot Loader, which&nbsp;...",
+      "contentNoFormatting": "2 Jun 2022 ... The Linux kernel is, at its base, a set of firmware, low level software (like a terminal and some terminal commands), and a boot Loader, which ...",
+      "title": "What is the \u003cb\u003eLinux Kernel\u003c/b\u003e exactly? : r/linux4noobs - Reddit",
+      "titleNoFormatting": "What is the Linux Kernel exactly? : r/linux4noobs - Reddit",
+      "formattedUrl": "https://www.reddit.com/r/\u003cb\u003elinux\u003c/b\u003e4noobs/.../what_is_the_\u003cb\u003elinux\u003c/b\u003e_\u003cb\u003ekernel\u003c/b\u003e_exactly...",
+      "unescapedUrl": "https://www.reddit.com/r/linux4noobs/comments/v2rd8d/what_is_the_linux_kernel_exactly/",
+      "url": "https://www.reddit.com/r/linux4noobs/comments/v2rd8d/what_is_the_linux_kernel_exactly/",
+      "visibleUrl": "www.reddit.com",
+      "richSnippet": {
+        "metatags": {
+          "twitterSite": "@reddit",
+          "twitterTitle": "r/linux4noobs on Reddit: What is the Linux Kernel exactly?",
+          "msapplicationNavbuttonColor": "#000000",
+          "ogImageWidth": "1200",
+          "twitterImage": "https://share.redd.it/preview/post/v2rd8d",
+          "ogTitle": "r/linux4noobs on Reddit: What is the Linux Kernel exactly?",
+          "ogDescription": "Posted by u/Jesmilkinson - 30 votes and 26 comments",
+          "ogImage": "https://share.redd.it/preview/post/v2rd8d",
+          "ogType": "website",
+          "twitterCard": "summary_large_image",
+          "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+          "themeColor": "#000000",
+          "ogImageHeight": "630",
+          "ogTtl": "600",
+          "ogImageAlt": "An image containing a preview of the post",
+          "ogUrl": "https://www.reddit.com/r/linux4noobs/comments/v2rd8d/what_is_the_linux_kernel_exactly/",
+          "ogSiteName": "Reddit",
+          "appleMobileWebAppStatusBarStyle": "black",
+          "appleMobileWebAppCapable": "yes"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "www.reddit.com",
+        "crumbs": [
+          "comments",
+          "what_is_the_linux_kernel_exactly"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.kernel.org/category/releases.html&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECA0QAg&usg=AOvVaw1LAM2sfdUIPxu4ix8EClX6",
+      "content": "25 Feb 2026 \u003cb\u003e...\u003c/b\u003e There are usually only a few bugfix \u003cb\u003ekernel\u003c/b\u003e releases until next mainline \u003cb\u003ekernel\u003c/b\u003e becomes available -- unless it is designated a &quot;longterm&nbsp;...",
+      "contentNoFormatting": "25 Feb 2026 ... There are usually only a few bugfix kernel releases until next mainline kernel becomes available -- unless it is designated a \"longterm ...",
+      "title": "Releases - The Linux Kernel Archives",
+      "titleNoFormatting": "Releases - The Linux Kernel Archives",
+      "formattedUrl": "https://www.\u003cb\u003ekernel\u003c/b\u003e.org/category/releases.html",
+      "unescapedUrl": "https://www.kernel.org/category/releases.html",
+      "url": "https://www.kernel.org/category/releases.html",
+      "visibleUrl": "www.kernel.org",
+      "richSnippet": {
+        "metatags": {
+          "viewport": "width=device-width, initial-scale=1.0"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "www.kernel.org",
+        "crumbs": [
+          "category",
+          "releases"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.youtube.com/watch%3Fv%3DE1udCjw8Lyg&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECA4QAg&usg=AOvVaw1lo3ibIiLlwsuFIfGhQLX_",
+      "content": "18 Jun 2025 \u003cb\u003e...\u003c/b\u003e [Dificultad: · · · ] ¿Alguna vez te has preguntado qué es realmente el \u003cb\u003ekernel\u003c/b\u003e de \u003cb\u003eLinux\u003c/b\u003e y por qué es tan importante mantenerlo bajo&nbsp;...",
+      "contentNoFormatting": "18 Jun 2025 ... [Dificultad: · · · ] ¿Alguna vez te has preguntado qué es realmente el kernel de Linux y por qué es tan importante mantenerlo bajo ...",
+      "title": "Introduction to the \u003cb\u003eLinux Kernel\u003c/b\u003e       - YouTube",
+      "titleNoFormatting": "Introduction to the Linux Kernel - YouTube",
+      "formattedUrl": "https://www.youtube.com/watch?v=E1udCjw8Lyg",
+      "unescapedUrl": "https://www.youtube.com/watch?v=E1udCjw8Lyg",
+      "url": "https://www.youtube.com/watch%3Fv%3DE1udCjw8Lyg",
+      "visibleUrl": "www.youtube.com",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://i.ytimg.com/vi/E1udCjw8Lyg/maxresdefault.jpg"
+        },
+        "imageobject": {
+          "width": "1280",
+          "url": "https://i.ytimg.com/vi/E1udCjw8Lyg/maxresdefault.jpg",
+          "height": "720"
+        },
+        "broadcastevent": {
+          "islivebroadcast": "True",
+          "enddate": "2025-06-18T14:45:05+00:00",
+          "startdate": "2025-06-18T14:30:05+00:00"
+        },
+        "person": {
+          "name": "The Wild Transistor",
+          "url": "http://www.youtube.com/@thewildtransistor"
+        },
+        "metatags": {
+          "ogImageWidth": "1280",
+          "ogVideoType": "text/html",
+          "twitterUrl": "https://www.youtube.com/watch?v=E1udCjw8Lyg",
+          "ogTitle": "🖲️Introducción al 🚨💥Kernel💥🚨 de Linux🐧",
+          "alAndroidPackage": "com.google.android.youtube",
+          "ogVideoHeight": "720",
+          "title": "🖲️Introducción al 🚨💥Kernel💥🚨 de Linux🐧",
+          "ogVideoTag": "kernel",
+          "ogType": "video.other",
+          "twitterCard": "player",
+          "ogImageHeight": "720",
+          "alAndroidAppName": "YouTube",
+          "ogSiteName": "YouTube",
+          "ogVideoSecureUrl": "https://www.youtube.com/embed/E1udCjw8Lyg",
+          "twitterSite": "@youtube",
+          "alWebUrl": "http://m.youtube.com/watch?v=E1udCjw8Lyg&feature=applinks",
+          "alIosAppStoreId": "544007664",
+          "ogDescription": "[Dificultad: 🧠🧠  ·    ·    ·  ] 📝¿Alguna vez te has preguntado qué es realmente el kernel de Linux y por qué es tan importante mantenerlo bajo control?\n\nEn este video completo y fácil de seguir, te explico paso a paso todo lo que necesitas saber sobre el kernel de Linux, tanto si eres principiante como si ya tienes algo de experiencia con sistemas GNU/Linux.\n\n🔍 ¿Qué aprenderás en este tutorial?\n\n✅ ¿Qué es el kernel y cuál es su función en el sistema\n✅ Por qué es importante tener el kernel actualizado\n✅ Cómo ver los kernels instalados y cuál estás usando\n✅ Comandos para obtener información completa de tu sistema\n✅ Cómo instalar un kernel manualmente paso a paso\n✅ Cómo eliminar un kernel obsoleto de forma segura\n✅ Cómo evitar que un kernel se elimine automáticamente\n\n🎓 Ideal para usuarios de Debian, Ubuntu, Linux Mint y otras distros derivadas.\n\n📌 ¿Te gusta el contenido? No olvides suscribirte y activar la campanita 🔔 para más tutoriales sobre Linux, e",
+          "ogImage": "https://i.ytimg.com/vi/E1udCjw8Lyg/maxresdefault.jpg",
+          "viewport": "width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no,",
+          "themeColor": "rgba(0, 0, 0, 0)",
+          "ogVideoUrl": "https://www.youtube.com/embed/E1udCjw8Lyg",
+          "alIosAppName": "YouTube",
+          "ogUrl": "https://www.youtube.com/watch?v=E1udCjw8Lyg",
+          "alIosUrl": "vnd.youtube://m.youtube.com/watch?v=E1udCjw8Lyg&feature=applinks",
+          "ogVideoWidth": "1280",
+          "alAndroidUrl": "vnd.youtube://m.youtube.com/watch?v=E1udCjw8Lyg&feature=applinks",
+          "fbAppId": "87741124305"
+        },
+        "videoobject": {
+          "identifier": "E1udCjw8Lyg",
+          "embedurl": "https://www.youtube.com/embed/E1udCjw8Lyg",
+          "playertype": "HTML5 Flash",
+          "isfamilyfriendly": "true",
+          "keywords": "kernel,kernel linux,kernel desde el terminal,kernel desde el terminal de linux,ver los kernel,instala kernel manualmente,elimina kernel manualmente,instala kernel desde terminal,elimina kernel...",
+          "uploaddate": "2025-06-18T07:30:05-07:00",
+          "requiressubscription": "False",
+          "description": "[Dificultad: 🧠🧠 · · · ] 📝¿Alguna vez te has preguntado qué es realmente el kernel de Linux y por qué es tan importante mantenerlo bajo control? En este video completo y fácil...",
+          "url": "https://www.youtube.com/watch?v=E1udCjw8Lyg",
+          "duration": "PT12M37S",
+          "name": "🖲️Introducción al 🚨💥Kernel💥🚨 de Linux🐧",
+          "width": "1280",
+          "regionsallowed": "AD,AE,AF,AG,AI,AL,AM,AO,AQ,AR,AS,AT,AU,AW,AX,AZ,BA,BB,BD,BE,BF,BG,BH,BI,BJ,BL,BM,BN,BO,BQ,BR,BS,BT,BV,BW,BY,BZ,CA,CC,CD,CF,CG,CH,CI,CK,CL,CM,CN,CO,CR,CU,CV,CW,CX,CY,CZ,DE,DJ,DK,DM,DO,DZ,EC,EE,EG,EH...",
+          "genre": "Science & Technology",
+          "datepublished": "2025-06-18T07:30:05-07:00",
+          "thumbnailurl": "https://i.ytimg.com/vi/E1udCjw8Lyg/maxresdefault.jpg",
+          "height": "720"
+        },
+        "thing": {
+          "name": "The Wild Transistor"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRcXgA7giLNsa2R3C30u26kocYOcgXuyihLTXq106OC0QkCP1_HZfKCOXE&s",
+          "width": "300",
+          "height": "168"
+        },
+        "listitem": {
+          "position": "1"
+        },
+        "interactioncounter": [
+          {
+            "userinteractioncount": "9",
+            "interactiontype": "https://schema.org/LikeAction"
+          },
+          {
+            "userinteractioncount": "281",
+            "interactiontype": "https://schema.org/WatchAction"
+          }
+        ]
+      },
+      "breadcrumbUrl": {
+        "host": "www.youtube.com",
+        "crumbs": [
+          "watch"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://wiki.archlinux.org/title/Kernel&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAwQAQ&usg=AOvVaw24HgKo10F-xBm3yvxRLiUm",
+      "content": "Kernel ... According to Wikipedia: ... Arch Linux is based on the \u003cb\u003eLinux kernel\u003c/b\u003e. There are various alternative \u003cb\u003eLinux kernels\u003c/b\u003e available for Arch Linux in addition to&nbsp;...",
+      "contentNoFormatting": "Kernel ... According to Wikipedia: ... Arch Linux is based on the Linux kernel. There are various alternative Linux kernels available for Arch Linux in addition to ...",
+      "title": "\u003cb\u003eKernel\u003c/b\u003e - ArchWiki - Arch Linux",
+      "titleNoFormatting": "Kernel - ArchWiki - Arch Linux",
+      "formattedUrl": "https://wiki.arch\u003cb\u003elinux\u003c/b\u003e.org/title/\u003cb\u003eKernel\u003c/b\u003e",
+      "unescapedUrl": "https://wiki.archlinux.org/title/Kernel",
+      "url": "https://wiki.archlinux.org/title/Kernel",
+      "visibleUrl": "wiki.archlinux.org",
+      "richSnippet": {
+        "metatags": {
+          "referrer": "no-referrer-when-downgrade",
+          "formatDetection": "telephone=no",
+          "viewport": "width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.25, maximum-scale=5.0"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "wiki.archlinux.org",
+        "crumbs": [
+          "title",
+          "Kernel"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://training.linuxfoundation.org/training/a-beginners-guide-to-linux-kernel-development-lfd103/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAkQAQ&usg=AOvVaw1jnNhThLot0PJ9a6IETmdi",
+      "content": "A Beginner&#39;s Guide to \u003cb\u003eLinux Kernel\u003c/b\u003e Development (LFD103). Learn how to become a \u003cb\u003eLinux kernel\u003c/b\u003e developer and contributor with this free training course. ... This&nbsp;...",
+      "contentNoFormatting": "A Beginner's Guide to Linux Kernel Development (LFD103). Learn how to become a Linux kernel developer and contributor with this free training course. ... This ...",
+      "title": "A Beginner&#39;s Guide to \u003cb\u003eLinux Kernel\u003c/b\u003e Development (LFD103)",
+      "titleNoFormatting": "A Beginner's Guide to Linux Kernel Development (LFD103)",
+      "formattedUrl": "https://training.\u003cb\u003elinux\u003c/b\u003efoundation.org/.../a-beginners-guide-to-\u003cb\u003elinux\u003c/b\u003e-\u003cb\u003ekernel\u003c/b\u003e-d...",
+      "unescapedUrl": "https://training.linuxfoundation.org/training/a-beginners-guide-to-linux-kernel-development-lfd103/",
+      "url": "https://training.linuxfoundation.org/training/a-beginners-guide-to-linux-kernel-development-lfd103/",
+      "visibleUrl": "training.linuxfoundation.org",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://training.linuxfoundation.org/wp-content/themes/lf/images/lfeducation_white-abbrev.svg"
+        },
+        "metatags": {
+          "twitterTitle": "A Beginner’s Guide to Linux Kernel Development (LFD103) | Linux Foundation Education",
+          "ogImageWidth": "1200",
+          "twitterImage": "https://training.linuxfoundation.org/wp-content/uploads/2020/09/LFD103_sg-1.png",
+          "ogTitle": "A Beginner’s Guide to Linux Kernel Development (LFD103) | Linux Foundation Education",
+          "ogDescription": "Learn how to become a Linux kernel developer and work with the Linux kernel community in this free beginner's course.",
+          "twitterLabel1": "Est. reading time",
+          "ogLocale": "en_US",
+          "ogImage": "https://training.linuxfoundation.org/wp-content/uploads/2020/09/LFD103_sg-1.png",
+          "ogImageType": "image/png",
+          "ogType": "product",
+          "twitterCard": "summary_large_image",
+          "msapplicationTileimage": "https://training.linuxfoundation.org/wp-content/uploads/2018/07/cropped-unnamed-270x270.png",
+          "viewport": "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
+          "ogImageHeight": "628",
+          "twitterDescription": "Learn how to become a Linux kernel developer and work with the Linux kernel community in this free beginner's course.",
+          "twitterData1": "1 minute",
+          "ogUrl": "https://training.linuxfoundation.org/training/a-beginners-guide-to-linux-kernel-development-lfd103/",
+          "ogSiteName": "Linux Foundation - Education",
+          "articleModifiedTime": "2026-05-28T17:51:48+00:00"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSTEOIb3JzMrDdrFVTfUeYLew9C8Zq3z9ZGMpOc-ji632QrR6GNiZkFrbY&s",
+          "width": "410",
+          "height": "123"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "training.linuxfoundation.org",
+        "crumbs": [
+          "Development"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.kernel.org/pub/linux/kernel/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAgQAQ&usg=AOvVaw39ZOSruBHDlDkAf-o9bCrB",
+      "content": "Index of /pub/\u003cb\u003elinux\u003c/b\u003e/\u003cb\u003ekernel\u003c/b\u003e/ ../ Historic/ - SillySounds/ - crypto/ - firmware/ - next/ - people/ - ports/ - projects/ - shallow-tar/ - testing/ - tools&nbsp;...",
+      "contentNoFormatting": "Index of /pub/linux/kernel/ ../ Historic/ - SillySounds/ - crypto/ - firmware/ - next/ - people/ - ports/ - projects/ - shallow-tar/ - testing/ - tools ...",
+      "title": "Index of /pub/\u003cb\u003elinux\u003c/b\u003e/\u003cb\u003ekernel\u003c/b\u003e/",
+      "titleNoFormatting": "Index of /pub/linux/kernel/",
+      "formattedUrl": "https://www.\u003cb\u003ekernel\u003c/b\u003e.org/pub/\u003cb\u003elinux\u003c/b\u003e/\u003cb\u003ekernel\u003c/b\u003e/",
+      "unescapedUrl": "https://www.kernel.org/pub/linux/kernel/",
+      "url": "https://www.kernel.org/pub/linux/kernel/",
+      "visibleUrl": "www.kernel.org",
+      "breadcrumbUrl": {
+        "host": "www.kernel.org",
+        "crumbs": [
+          "pub",
+          "linux",
+          "kernel"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=http://www.kroah.com/lkn/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAsQAQ&usg=AOvVaw20QPbCKZx5TCWjd6BoB3KU",
+      "content": "This book is intended to cover everything that is needed to know in order to properly build, customize, and install the \u003cb\u003eLinux kernel\u003c/b\u003e. No programming experience&nbsp;...",
+      "contentNoFormatting": "This book is intended to cover everything that is needed to know in order to properly build, customize, and install the Linux kernel. No programming experience ...",
+      "title": "\u003cb\u003eLinux Kernel\u003c/b\u003e in a Nutshell - k r o a h . c o m",
+      "titleNoFormatting": "Linux Kernel in a Nutshell - k r o a h . c o m",
+      "formattedUrl": "http://www.kroah.com/lkn/",
+      "unescapedUrl": "http://www.kroah.com/lkn/",
+      "url": "http://www.kroah.com/lkn/",
+      "visibleUrl": "www.kroah.com",
+      "richSnippet": {
+        "cseImage": {
+          "src": "http://files.kroah.com/lkn/linux_kernel_in_a_nutshell_small.jpg"
+        },
+        "metatags": {
+          "author": "Greg Kroah-Hartman"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQVn-0YQPH2z7itgfGy1wh1HzUDGslETowtr_E8uB3_kJ2mCzwpda5XhJ4&s",
+          "width": "183",
+          "height": "275"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "www.kroah.com",
+        "crumbs": [
+          "lkn"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://www.geeksforgeeks.org/linux-unix/the-linux-kernel/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAYQAg&usg=AOvVaw20v8KXWRKs6TtThrEk_Elr",
+      "content": "7 May 2026 \u003cb\u003e...\u003c/b\u003e \u003cb\u003eLinux Kernel\u003c/b\u003e ... The \u003cb\u003eLinux Kernel\u003c/b\u003e is the core part of the Linux operating system that connects software with hardware. It manages system resources&nbsp;...",
+      "contentNoFormatting": "7 May 2026 ... Linux Kernel ... The Linux Kernel is the core part of the Linux operating system that connects software with hardware. It manages system resources ...",
+      "title": "\u003cb\u003eLinux Kernel\u003c/b\u003e - GeeksforGeeks",
+      "titleNoFormatting": "Linux Kernel - GeeksforGeeks",
+      "formattedUrl": "https://www.geeksforgeeks.org/\u003cb\u003elinux\u003c/b\u003e-unix/the-\u003cb\u003elinux\u003c/b\u003e-\u003cb\u003ekernel\u003c/b\u003e/",
+      "unescapedUrl": "https://www.geeksforgeeks.org/linux-unix/the-linux-kernel/",
+      "url": "https://www.geeksforgeeks.org/linux-unix/the-linux-kernel/",
+      "visibleUrl": "www.geeksforgeeks.org",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://media.geeksforgeeks.org/wp-content/uploads/20260206161736404826/process_1.webp"
+        },
+        "metatags": {
+          "image": "https://media.geeksforgeeks.org/wp-content/cdn-uploads/gfg_200x200-min.png",
+          "ogImageWidth": "200",
+          "articlePublishedTime": "2019-02-21 06:49:58+00:00",
+          "nextHeadCount": "38",
+          "ogTitle": "Linux Kernel - GeeksforGeeks",
+          "ogUpdatedTime": "2026-05-07 11:21:27+00:00",
+          "ogDescription": "Your All-in-One Learning Portal: GeeksforGeeks is a comprehensive educational platform that empowers learners across domains-spanning computer science and programming, school education, upskilling, commerce, software tools, competitive exams, and more.",
+          "ogImageType": "image/png",
+          "ogImage": "https://media.geeksforgeeks.org/wp-content/uploads/20260206161736404826/process_1.webp",
+          "ogLocale": "en_US",
+          "ogType": "article",
+          "msapplicationTileimage": "https://www.geeksforgeeks.org/wp-content/uploads/gfg_200X200.png",
+          "viewport": "width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3.0",
+          "themeColor": "#308D46",
+          "ogImageHeight": "200",
+          "facebookDomainVerification": "xo7t4ve2wn3ywfkjdvwbrk01pvdond",
+          "ogUrl": "https://www.geeksforgeeks.org/linux-unix/the-linux-kernel/",
+          "ogSiteName": "GeeksforGeeks",
+          "articleSection": "Technical Scripter",
+          "articleModifiedTime": "2026-05-07 11:21:27+00:00",
+          "ogImageSecureUrl": "https://media.geeksforgeeks.org/wp-content/uploads/20260206161736404826/process_1.webp"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBzTrfZygdMd3DKiYsMkDqizbJ4l1vAv93hT2ReRToNaXeQNXzSCktNOb9&s",
+          "width": "247",
+          "height": "204"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "www.geeksforgeeks.org",
+        "crumbs": [
+          "linux-unix",
+          "the-linux-kernel"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://es.wikipedia.org/wiki/N%25C3%25BAcleo_Linux&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAoQAQ&usg=AOvVaw3cly7LgMpK7PIo-aM2WBfC",
+      "content": "\u003cb\u003eLinux\u003c/b\u003e es software libre y de código abierto. ... Fue originalmente escrito en 1991 por Linus Torvalds para su PC basada en i386, y pronto fue adoptado como el&nbsp;...",
+      "contentNoFormatting": "Linux es software libre y de código abierto. ... Fue originalmente escrito en 1991 por Linus Torvalds para su PC basada en i386, y pronto fue adoptado como el ...",
+      "title": "Núcleo \u003cb\u003eLinux\u003c/b\u003e - Wikipedia, la enciclopedia libre",
+      "titleNoFormatting": "Núcleo Linux - Wikipedia, la enciclopedia libre",
+      "formattedUrl": "https://es.wikipedia.org/wiki/Núcleo_\u003cb\u003eLinux\u003c/b\u003e",
+      "unescapedUrl": "https://es.wikipedia.org/wiki/N%C3%BAcleo_Linux",
+      "url": "https://es.wikipedia.org/wiki/N%25C3%25BAcleo_Linux",
+      "visibleUrl": "es.wikipedia.org",
+      "richSnippet": {
+        "metatags": {
+          "referrer": "origin",
+          "ogImageWidth": "1012",
+          "formatDetection": "telephone=no",
+          "themeColor": "#eaecf0",
+          "ogImageHeight": "1200",
+          "viewport": "width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.25, maximum-scale=5.0",
+          "ogTitle": "Núcleo Linux - Wikipedia, la enciclopedia libre",
+          "ogImage": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/35/Tux.svg/1280px-Tux.svg.png?utm_source=es.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
+          "ogType": "website"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "es.wikipedia.org",
+        "crumbs": [
+          "wiki",
+          "Núcleo_Linux"
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://kernelci.org/&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAMQAQ&usg=AOvVaw08ga6RBtejzWfrWufHmF5u",
+      "content": "The \u003cb\u003eLinux kernel\u003c/b\u003e is developed by a large, collaborative open source community working together to continuously improve the software. Conversely, \u003cb\u003eLinux kernel\u003c/b\u003e&nbsp;...",
+      "contentNoFormatting": "The Linux kernel is developed by a large, collaborative open source community working together to continuously improve the software. Conversely, Linux kernel ...",
+      "title": "KernelCI Foundation",
+      "titleNoFormatting": "KernelCI Foundation",
+      "formattedUrl": "https://\u003cb\u003ekernel\u003c/b\u003eci.org/",
+      "unescapedUrl": "https://kernelci.org/",
+      "url": "https://kernelci.org/",
+      "visibleUrl": "kernelci.org",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://kernelci.org/wp-content/uploads/sites/36/2019/10/cip-stacked-color-1-1.svg"
+        },
+        "metatags": {
+          "twitterCard": "summary_large_image",
+          "twitterTitle": "KernelCI Foundation",
+          "msapplicationTileimage": "https://kernelci.org/wp-content/uploads/sites/36/2020/07/cropped-kernelci_fav-1-1-300x300.png",
+          "viewport": "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
+          "twitterDescription": "Ensuring the quality, stability and long-term maintenance of the Linux kernel",
+          "ogTitle": "KernelCI Foundation",
+          "ogUrl": "https://kernelci.org/",
+          "ogSiteName": "KernelCI Foundation",
+          "ogDescription": "Ensuring the quality, stability and long-term maintenance of the Linux kernel",
+          "ogLocale": "en_US",
+          "ogType": "article"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSvRworOpGOTqszWtwPVXHdrwdurKf2JMalTXLxJdwKOQy_x_fnj_zM9mY&s",
+          "width": "225",
+          "height": "225"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "kernelci.org",
+        "crumbs": [
+          ""
+        ]
+      }
+    },
+    {
+      "clicktrackUrl": "https://www.google.com/url?client=internal-element-cse&cx=partner-pub-8993703457585266:4862972284&opi=88066884&q=https://endoflife.date/linux&sa=U&ved=2ahUKEwjqsZfonuSXAxWkUqQEHaWFOLoQFnoECAUQAg&usg=AOvVaw0g_ZZm_EPyJYhUF7DyMw_E",
+      "content": "5 days ago \u003cb\u003e...\u003c/b\u003e The “projected EOL” dates are not set in stone. Each new long-term \u003cb\u003ekernel\u003c/b\u003e usually starts with only a 2-year projected EOL (as opposed to the 4&nbsp;...",
+      "contentNoFormatting": "5 days ago ... The “projected EOL” dates are not set in stone. Each new long-term kernel usually starts with only a 2-year projected EOL (as opposed to the 4 ...",
+      "title": "\u003cb\u003eLinux Kernel\u003c/b\u003e | endoflife.date",
+      "titleNoFormatting": "Linux Kernel | endoflife.date",
+      "formattedUrl": "https://endoflife.date/\u003cb\u003elinux\u003c/b\u003e",
+      "unescapedUrl": "https://endoflife.date/linux",
+      "url": "https://endoflife.date/linux",
+      "visibleUrl": "endoflife.date",
+      "richSnippet": {
+        "cseImage": {
+          "src": "https://endoflife.date/assets/logo-512x512.png"
+        },
+        "metatags": {
+          "twitterTitle": "Linux Kernel",
+          "twitterImage": "https://endoflife.date/assets/logo-512x512.png",
+          "ogTitle": "Linux Kernel",
+          "ogLocale": "en_US",
+          "ogImage": "https://endoflife.date/assets/logo-512x512.png",
+          "ogType": "website",
+          "twitterCard": "summary_large_image",
+          "viewport": "width=device-width, initial-scale=1",
+          "twitterDescription": "Check end-of-life, release policy and support schedule for Linux Kernel.",
+          "themeColor": "#ffffff",
+          "msapplicationTilecolor": "#da532c",
+          "ogUrl": "https://endoflife.date/linux",
+          "msapplicationConfig": "/browserconfig.xml",
+          "ogSiteName": "endoflife.date"
+        },
+        "cseThumbnail": {
+          "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTONdjPswA1U4zKdVqcUbwCROxRowGXa1lRlz5plDR1c8P1QwWslu_29EBz&s",
+          "width": "225",
+          "height": "225"
+        }
+      },
+      "breadcrumbUrl": {
+        "host": "endoflife.date",
+        "crumbs": [
+          "linux"
+        ]
+      }
+    }
+  ],
+  "findMoreOnGoogle": {
+    "url": "https://www.google.com/search?client=ms-google-coop&q=linux+kernel&cx=partner-pub-8993703457585266:4862972284"
+  }
+});

@@ -29,6 +29,40 @@ case "$ENGINE" in
   *) echo "unknown engine: $ENGINE" >&2; exit 2 ;;
 esac
 
+# H1/H5: never burst live engines. One probe per engine per 60s, at most three
+# per engine per hour, enforced with a lock so parallel runs cannot slip through.
+LOCK=/tmp/omnisearch-probe.lock
+STATE_DIR=/tmp/omnisearch-probe-state
+mkdir -p "$STATE_DIR"
+exec 9>"$LOCK"
+if command -v flock >/dev/null 2>&1; then
+  flock -w 120 9 || { echo "probe: another probe is running" >&2; exit 3; }
+fi
+STAMP="$STATE_DIR/$ENGINE.stamp"
+HOUR_LOG="$STATE_DIR/$ENGINE.hour"
+now=$(date +%s)
+if [ -f "$STAMP" ]; then
+  last=$(cat "$STAMP" 2>/dev/null || echo 0)
+  wait_for=$((60 - (now - last)))
+  if [ "$wait_for" -gt 0 ]; then
+    echo "probe: pacing $ENGINE, sleeping ${wait_for}s (H1)" >&2
+    sleep "$wait_for"
+    now=$(date +%s)
+  fi
+fi
+if [ -f "$HOUR_LOG" ]; then
+  # keep only stamps from the last hour
+  awk -v cut=$((now - 3600)) '$1 >= cut' "$HOUR_LOG" > "$HOUR_LOG.tmp" 2>/dev/null
+  mv "$HOUR_LOG.tmp" "$HOUR_LOG" 2>/dev/null || true
+  count=$(wc -l < "$HOUR_LOG" | tr -d ' ')
+  if [ "${count:-0}" -ge 3 ]; then
+    echo "probe: $ENGINE already probed 3 times this hour; refusing (H1)" >&2
+    exit 4
+  fi
+fi
+echo "$now" > "$STAMP"
+echo "$now" >> "$HOUR_LOG"
+
 OUT=/tmp/probe-${ENGINE}-${HTTPV}-${HDRMODE}-${COOKIEMODE}
 JAR="$OUT.cookies"
 rm -f "$OUT.body" "$OUT.hdr" "$JAR"
@@ -83,3 +117,14 @@ contains "captcha\|unusual traffic\|are you a robot\|turnstile" && VERDICT="$VER
 printf '%-10s %-7s %-7s %-9s http=%-4s bytes=%-7s %s\n' \
   "$ENGINE" "$HTTPV" "$HDRMODE" "$COOKIEMODE" "$CODE" "$SIZE" "$VERDICT"
 printf '  body=%s hdr=%s\n' "$OUT.body" "$OUT.hdr"
+
+# H5: every measurement claim in docs/ names the exact request. Append one row
+# per probe so the evidence exists before the claim does.
+LOG="$(dirname "$0")/../docs/probe-log.tsv"
+if [ ! -f "$LOG" ]; then
+  printf 'utc	engine	query	http	bytes	verdict	ua	headers	url\n' > "$LOG"
+fi
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ENGINE" "$QUERY" "$CODE" "$SIZE" \
+  "$VERDICT" "$([ "$HDRMODE" = browser ] && echo chrome || echo safari)" \
+  "$HDRMODE" "$URL" >> "$LOG"

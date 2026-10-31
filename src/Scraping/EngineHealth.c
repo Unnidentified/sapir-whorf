@@ -160,17 +160,32 @@ int engine_health_take_token(const char *id) {
   }
   double now = (double)time(NULL);
   double elapsed = now - last_refill[slot];
+  int rate = entries[slot].pace_override > 0 ? entries[slot].pace_override
+                                             : pace_per_minute;
+  int cap = rate < pace_burst ? rate : pace_burst;
   if (elapsed > 0) {
-    tokens[slot] += elapsed * ((double)pace_per_minute / 60.0);
-    if (tokens[slot] > pace_burst)
-      tokens[slot] = pace_burst;
+    tokens[slot] += elapsed * ((double)rate / 60.0);
+    if (tokens[slot] > cap)
+      tokens[slot] = cap;
     last_refill[slot] = now;
   }
+  if (tokens[slot] > cap)
+    tokens[slot] = cap;
   int allowed = tokens[slot] >= 1.0;
   if (allowed)
     tokens[slot] -= 1.0;
   pthread_mutex_unlock(&health_mutex);
   return allowed;
+}
+
+void engine_health_set_engine_pace(const char *id, int requests_per_minute) {
+  if (!id || !id[0] || requests_per_minute <= 0)
+    return;
+  pthread_mutex_lock(&health_mutex);
+  EngineHealthEntry *entry = find_or_create(id);
+  if (entry)
+    entry->pace_override = requests_per_minute;
+  pthread_mutex_unlock(&health_mutex);
 }
 
 void engine_health_set_limits(int threshold, int cooldown) {

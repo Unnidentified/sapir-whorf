@@ -1,0 +1,22 @@
+/*O_o*/
+_({
+  "cursor": {
+    "currentPageIndex": 0,
+    "moreResultsUrl": "http://www.google.com/cse?oe=utf8&ie=utf8&source=uds&q=zzqxjkwvbnmplkjhgfdsa98765&safe=off&cx=partner-pub-8993703457585266:4862972284&start=0",
+    "searchResultTime": "0.12"
+  },
+  "spelling": {
+    "type": "SPELL_CORRECTED_RESULTS",
+    "correctedAnchor": "\u003cb\u003e\u003ci\u003ezzqxjk vbnm lkjhgfdsa 98765\u003c/i\u003e\u003c/b\u003e",
+    "correctedParamName": "spell",
+    "correctedParamValue": "1",
+    "correctedQuery": "zzqxjk vbnm lkjhgfdsa 98765",
+    "originalAnchor": "\u003cb\u003e\u003ci\u003ezzqxjkwvbnmplkjhgfdsa98765\u003c/i\u003e\u003c/b\u003e",
+    "originalParamName": "nfpr",
+    "originalParamValue": "1",
+    "originalQuery": "zzqxjkwvbnmplkjhgfdsa98765"
+  },
+  "findMoreOnGoogle": {
+    "url": "https://www.google.com/search?client=ms-google-coop&q=zzqxjkwvbnmplkjhgfdsa98765&cx=partner-pub-8993703457585266:4862972284"
+  }
+});

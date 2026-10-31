@@ -64,6 +64,8 @@ typedef struct {
   /* send the Sec-Fetch-* navigation headers a browser sends. Measured need:
      DDG's html. endpoint answers a shell without them and results with them. */
   int browser_headers;
+  /* per-engine outbound rate limit, 0 = the global [health] setting */
+  int pace_per_minute;
   /* cookies to seed the jar with on first use (locale selectors and the like) */
   const char *init_cookies;
 } SearchEngine;

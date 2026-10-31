@@ -768,7 +768,10 @@ SearchEngine ENGINE_REGISTRY[] = {
      .timeout_secs = 8,
      .supports_site = 1,
      .verticals = V_WEB,
-     .weight = 1.3, .index_group = "google" },
+     .weight = 1.3, .index_group = "google",
+     /* it borrows another site's public CX through an undocumented endpoint,
+        so it gets a small allowance of its own (H3) */
+     .pace_per_minute = 10 },
     {.id = "searxng",
      .name = "SearXNG",
      .base_url = "",

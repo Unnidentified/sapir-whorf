@@ -1,73 +1,93 @@
-# G3 — Google, after the JSON API closed
+# G3 / H3 — the Google CSE element, implemented properly
 
-## What actually happened to the API
+**Round 2 got this wrong and said so in writing.** The first version of this
+document claimed the `cse_tok` "can only be minted by Google's obfuscated widget
+JavaScript" and therefore had to be pasted by hand. That was not true. The
+Round-2 probe requested `cse.google.com/cse.js` — missing the `/cse/` path
+segment — got a 404, and the conclusion was drawn from a request that never
+reached the endpoint.
 
-The Programmable Search JSON API (`www.googleapis.com/customsearch/v1`) still
-answers for existing keys, but Google stopped issuing new ones in 2026-01 and
-the service ends 2027-01-01. Any setup instructions that call it "free, 100
-queries a day" are describing a product nobody starting today can buy. That
-line is gone from `config.ini`.
+Round 3 (H3) named the real protocol. This document now records what that
+protocol actually returns.
 
-## What the Element endpoint does, measured
+## The exact requests, and what they return
 
-The review asked for a clean-room `google_cse_element` that uses the widget's
-own endpoint. I probed it on 2026-10-31; the results are the reason this engine
-ships disabled and why it insists on a token.
+One request each; see `docs/probe-log.tsv`.
 
-| Request | Result |
-|---|---|
-| `GET cse.google.com/cse?cx=…&q=…` | 200, **1063 bytes**, a shell that loads `/cse.js` and says "enable JavaScript". No results in the HTML. |
-| `GET cse.google.com/cse.js?cx=…` | 404 for the cx I could construct. |
-| `GET cse.google.com/cse/element/v1?…&cse_tok=` (empty) | **403**, Google's "Sorry…" bot page. |
-| `GET programmablesearchengine.google.com/iframe/search?…` | 404. |
+**Step 1 — the token page.**
 
-So: the results are not in the HTML, and the JSON endpoint refuses any request
-without a valid `cse_tok`. That token is minted by Google's obfuscated widget
-JavaScript at runtime — it is not in the shell page, and it is not in `cse.js`
-until a real `cx` resolves. Minting it server-side would mean reimplementing an
-anti-abuse token generator, which is both fragile and exactly the kind of thing
-that breaks silently.
+```
+GET https://www.google.com/cse/cse.js?cx=partner-pub-8993703457585266:4862972284
+  UA:     Safari/17.2 macOS
+  Accept: */*
+  Referer: https://cse.google.com/
+→ 301, 273 bytes, Location: https://cse.google.com/cse/cse.js?cx=…
+→ 200, 3324 bytes gzip (9053 inflated)
+```
+
+The response ends in a JS object that carries the token:
+
+```js
+"cse_token": "AHbIdTgr29BfRdqookhwubsNdtaY:1793449170388",
+"exp": ["cc", "sps", "esbfa"],
+"cselibVersion": "dc6f600a0d4404e5",
+```
+
+No JavaScript is executed and none needs to be. The values are strings in the
+response body. The Round-2 claim was simply wrong.
+
+**Step 2 — the results.**
+
+```
+GET https://cse.google.com/cse/element/v1
+     ?rsz=filtered_cse&num=20&hl=en
+     &cselibv=<cselibVersion>&cx=<CX>&q=linux+kernel&safe=off
+     &cse_tok=<cse_token>&callback=_&rurl=&searchtype=&exp=<exp…>
+  Referer: https://cse.google.com/
+→ 200, 13094 bytes, 20 results
+```
+
+The body is JSONP: a `/*O_o*/` line, then `_({ … })`. Results are under
+`results[]` with `unescapedUrl`, `titleNoFormatting`, `contentNoFormatting`.
+
+An empty query answer is a 432-byte JSONP object with no `results` array. A 429
+arrives as `{"error":{"code":429,…}}`. Fixtures for all four shapes are in
+`tests/fixtures/gcse/`; the 429 one is synthetic and labelled as such.
 
 ## What was built
 
-`google_cse_element`:
+`google_cse_element`, clean-room from the protocol above — no SearXNG code
+copied or translated (SearXNG is AGPL-3.0; this project is GPL-2.0).
 
-- clean-room — written from the endpoint's observed request/response shape,
-  nothing copied from SearXNG (which is AGPL) or anywhere else;
-- needs `google_cse_cx` **and** `google_cse_tok`. The token is an operator
-  paste, taken from a browser's devtools once; it is not something this code
-  can invent;
-- **disabled by default**, and cannot be enabled without both values;
-- parsing is covered by `tests/test_g3_cse_element.c`, including the 403 HTML
-  body returning zero rather than a crash or a bogus result.
+- **Automatic token fetch**, cached for one hour, under a mutex so a burst of
+  searches mints one token rather than one per request. A failed fetch is not
+  retried for 60 s, and the last good token keeps being used.
+- **`google_cse_tok` is an optional override**, not a requirement. It exists for
+  the case where the token endpoint changes.
+- **JSONP parser** reading `results[]`, with entity unescaping and entries
+  without a link dropped.
+- **Its own small bucket: 10 requests/min**, separate from the global pacing,
+  because it borrows another site's public CX.
+- **Disabled by default** and enabled only when `google_cse_cx` is set.
+- The token is redacted from the `[URL]` diagnostic log the same way API keys
+  are (`cse_tok=REDACTED`).
 
-The parser reads the `cb({...})`-wrapped JSON, takes `titleNoFormatting` /
-`unescapedUrl` / `content`, falls back to `title` / `url` /
-`contentNoFormatting`, unescapes entities, and drops entries with no link.
+Measured after the change: two searches in one process produced **one** token
+fetch and two results requests; a rendering search returned 10 results.
 
-## What is not verified, and why
+## Licence, terms, fragility
 
-**This has not been run against a live Google element, because no valid `cx`
-exists in this environment** — a `cx` comes from a Google account signup, and
-the ones I constructed return 404 from `cse.js` and 403 from the element
-endpoint. The parser is tested against the endpoint's documented shape, not a
-captured live response. That distinction matters and is stated rather than
-papered over.
+- The endpoint is undocumented and uses a third-party CX, so it can change or be
+  cut without notice and sits outside the Programmable Search terms. That is why
+  it ships disabled and is described as experimental. Enabling it is the
+  owner's call.
+- Whether the endpoint survives the JSON API shutdown on 2027-01-01 is unknown.
+  Still open; check in January.
+- `searxng_url` remains the documented lower-risk route to Google's index.
 
-If you have a `cx`:
+## What is still not verified
 
-```
-[engines]
-google_cse_cx  = <your cx>
-google_cse_tok = <paste the cse_tok from a devtools request>
-```
-
-and the engine turns on with a log line confirming it. Without the token it
-stays off and says so once at startup, instead of spending a request slot per
-query to receive a 403.
-
-## The route that does work
-
-`searxng_url` remains the supported way to reach Google's index: a self-hosted
-SearXNG relays it server-side, its maintainers track markup changes, and
-OmniSearch inherits that for free. That is what `config.ini` recommends.
+- The 429 path was not triggered deliberately (getting rate-limited on someone
+  else's CX is not a good test). The parse path is covered by a synthetic
+  fixture; the suspension is covered by `tests/test_g2_suspension.c`.
+- The endpoint was exercised with one query, twice, not under load.

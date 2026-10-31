@@ -572,7 +572,8 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
        URL log is redacted before it is written. */
     char safe[BUFFER_SIZE_XLARGE];
     snprintf(safe, sizeof(safe), "%s", full_url);
-    const char *secrets[] = {"key=", "apikey=", "api_key=", "token=",
+    const char *secrets[] = {"key=",        "apikey=",    "api_key=",
+                             "token=",      "cse_tok=",   "cse_token=",
                              "access_token=", "secret="};
     for (size_t k = 0; k < sizeof(secrets) / sizeof(secrets[0]); k++) {
       char *hit = strcasestr(safe, secrets[k]);
