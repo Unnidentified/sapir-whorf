@@ -79,6 +79,7 @@ Defaults in `src/Config.h`.
 | rate_limit | trusted_proxies | empty | addresses whose X-Forwarded-For may be believed (`loopback`, `lan`, or a list); empty trusts nobody |
 | rate_limit | images_requests / images_interval | 0 / 0 | same for images |
 | health | breaker_threshold / cooldown_seconds | 5 / 900 | circuit breaker |
+| health | pace_requests_per_minute / pace_burst | 40 / 6 | per-engine outbound token bucket |
 
 Note: `[ranking]` used to exist in `config.ini` but **nothing parsed it** —
 ranking weights are compile-time constants in `src/Ranking/Ranker.c`. It has
@@ -215,14 +216,33 @@ returns nothing".
 
 `EngineHealth.c`: per-engine circuit breaker.
 
-- Opens after `breaker_threshold` (5) failures. A failure is `FETCH_ERROR`,
-  `PARSE_MISMATCH`, `BLOCKED`, or an `EMPTY` behind 4xx/429/202. `CANCELLED`
-  (our own deadline) never counts.
-- Base cooldown 900 s, doubled per consecutive trip (max 4 shifts → ≤6 h),
-  ±20 % jitter, and never shorter than an upstream `Retry-After`.
-- One success closes the breaker and resets the trip counter.
-- `/info` exposes state, request/ok/blocked/error counters per engine.
-- Skipped engines are not queried at all, so they stop generating failure banners.
+- Every pause has a **kind**, and the kind decides the reaction. The first
+  strike is enough for a rate limit or a challenge; transport and parse
+  failures need evidence.
+
+  | Kind | Trigger | First strike | Evidence |
+  |---|---|---|---|
+  | `rate-limited` | 429 / 403 / 202 / 503 | `Retry-After`, clamped to 30 s–1 h (60 s if absent) | 1 |
+  | `challenged` | captcha / interstitial shell | 900 s | 1 |
+  | `unparseable` | `PARSE_MISMATCH` | 300 s | `breaker_threshold` |
+  | `unreachable` | `FETCH_ERROR` | 120 s | 2 × `breaker_threshold` |
+
+- A local outage that fails the whole batch the same way is not charged to any
+  engine (`OMNI_NOBREAKER` also exists for evaluation runs).
+- After the first strike, repeated trips double the wait (max 4 shifts → ≤6 h)
+  with ±20 % jitter, and never less than an upstream `Retry-After`.
+- One success closes the breaker and clears the reason.
+- **Outbound pacing** (`pace_requests_per_minute` 40, `pace_burst` 6): a token
+  bucket per engine, spent before a request leaves and refilled continuously.
+  A cache hit costs no token. An engine out of allowance is `SKIPPED` for that
+  batch — not charged, because the pause is our own doing.
+- `/info` exposes state, the suspend reason, seconds left, and the counters.
+  `/settings` shows the same as a table: state, why, when it retries, and the
+  quality percentage.
+- A paused engine is named on the results page ("1 source paused
+  (rate-limited); earliest retry in 0m 42s."), including on empty pages, where
+  the empty hint defers to the pause instead of blaming the network.
+- `CANCELLED` (our own deadline) never counts.
 
 Inbound limiting (`Limiter/RateLimit.c`) exists but is off by default
 (`research_requests=0`). It is a fixed window per client key.
