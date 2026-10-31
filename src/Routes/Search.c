@@ -1029,14 +1029,35 @@ int results_handler(UrlParams *params) {
 
   /* H4: resolve the local answer BEFORE deciding whether to fan out. A
      confident local answer needs no upstream request at all - "2+2" should not
-     query three search engines to be told it is 4. */
+     query three search engines to be told it is 4.
+
+     J3c reverses that default: the owner wants results under every answer, as
+     Google shows them. The local answer is pure computation, so with
+     answers_fanout=always the engines run as they would on any other query and
+     the page waits no longer than a normal search. */
   AnswerBoxResult local_answer;
   int have_local_answer = 0;
-  int answers_off = strcmp(global_config.answers_mode, "off") == 0;
+  char answers_mode[16];
+  char answers_fanout[16];
+  get_answers_mode(global_config.answers_mode, answers_mode,
+                   sizeof(answers_mode));
+  get_answers_fanout(global_config.answers_fanout, answers_fanout,
+                     sizeof(answers_fanout));
+  int answers_off = strcmp(answers_mode, "off") == 0;
   if (!answers_off)
     have_local_answer =
         answer_box_resolve_local_lang(raw_query, lang, &local_answer);
-  int skip_fanout = have_local_answer && local_answer.confidence >= 0.95;
+  int skip_fanout = 0;
+  if (have_local_answer && local_answer.confidence >= 0.95) {
+    if (strcmp(answers_fanout, "never") == 0) {
+      /* the H4 behaviour, kept as an option */
+      skip_fanout = 1;
+    } else if (strcmp(answers_fanout, "auto") == 0) {
+      /* only when there is nothing to search for: a numeric or symbolic
+         expression with no words in it */
+      skip_fanout = !analysis.has_alpha_term;
+    }
+  }
 
   /* ?web=1 asks for the web explicitly, which is what the "search the web for
      this" link does - a confident answer must not be a dead end. */
@@ -1388,7 +1409,7 @@ int results_handler(UrlParams *params) {
      was done in parallel anyway, and doing it twice would be the only way to
      make this slower than the rail it mirrors. */
   if (!have_local_answer && !answers_off && page == 1 &&
-      strcmp(global_config.answers_mode, "all") == 0) {
+      strcmp(answers_mode, "all") == 0) {
     /* the priority comes from the answer-box table itself, so adding a network
        kind is one edit, not two */
     int net_count = 0;

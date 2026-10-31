@@ -66,7 +66,8 @@ Defaults in `src/Config.h`.
 |---|---|---|---|
 | server | host / port | 0.0.0.0 / 5000 | listen address (this install: 8087) |
 | server | locale | en_gb | default UI + result language |
-| server | answers | local | `all` \| `local` \| `off`. `local` skips the engine fan-out when a local answerer is certain |
+| server | answers | local | `all` \| `local` \| `off`. `local` answers from this server (arithmetic, units, colours, dates); `all` also asks Wikipedia and the lookups; `off` shows no answer box |
+| server | answers_fanout | always | `always` \| `auto` \| `never`. What happens to the engine fan-out when a local answer is certain. `always` shows results under every answer, as Google does; `never` is the previous behaviour (no search at all); `auto` skips only when the answer is certain and the query has no words in it (`2+2`). Per-user override: the Answers section of `/settings` stores it in a cookie |
 | proxy | proxy / list_file | empty | outbound proxy or proxy pool |
 | proxy | max_retries | 3 | retries when a proxy is configured |
 | cache | dir | /tmp/omnisearch_cache | cache root (this install: ~/.omnisearch/cache) |

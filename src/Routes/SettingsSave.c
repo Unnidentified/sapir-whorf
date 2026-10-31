@@ -17,6 +17,9 @@ int settings_save_handler(UrlParams *params) {
   const char *default_engine = "all";
   int default_engine_present = 0;
   int engines_present = 0;
+  int answers_present = 0;
+  const char *answers = NULL;
+  const char *answers_fanout = NULL;
   char selected_ids[ENGINE_COUNT][32];
   int selected_count = 0;
 
@@ -45,6 +48,11 @@ int settings_save_handler(UrlParams *params) {
       } else if (strcmp(params->params[i].key, "default_engine") == 0) {
         default_engine = params->params[i].value;
         default_engine_present = 1;
+      } else if (strcmp(params->params[i].key, "answers") == 0) {
+        answers = params->params[i].value;
+        answers_present = 1;
+      } else if (strcmp(params->params[i].key, "answers_fanout") == 0) {
+        answers_fanout = params->params[i].value;
       } else if (strcmp(params->params[i].key, "engines_present") == 0) {
         engines_present = 1;
       } else if (strncmp(params->params[i].key, "engine_", 7) == 0 &&
@@ -101,6 +109,16 @@ int settings_save_handler(UrlParams *params) {
   }
   if (is_known_locale(locale)) {
     set_cookie("locale", locale, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
+  }
+  /* J3c: what leaves the machine is a per-user choice, so these are cookies.
+     Both values are validated here -- they end up in string comparisons. */
+  if (answers_present && answers_mode_ok(answers)) {
+    set_cookie("answers", answers, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false,
+               false);
+  }
+  if (answers_present && answers_fanout_ok(answers_fanout)) {
+    set_cookie("answers_fanout", answers_fanout,
+               "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
   }
 
   if (engines_present) {

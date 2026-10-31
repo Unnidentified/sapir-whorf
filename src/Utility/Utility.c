@@ -145,6 +145,48 @@ char *get_theme(const char *default_theme) {
                                                            : "amber");
 }
 
+/* J3c: the answer settings are per user, like the theme and the locale, so a
+   cookie wins over the server default. Only known values are accepted: the
+   value reaches a comparison, and an arbitrary cookie must not turn into one. */
+static void user_choice(const char *cookie_name, const char *fallback,
+                        const char *const *allowed, int allowed_count,
+                        char *out, size_t size) {
+  char *cookie = get_cookie(cookie_name);
+  const char *pick = NULL;
+  if (cookie) {
+    for (int i = 0; i < allowed_count; i++) {
+      if (strcmp(cookie, allowed[i]) == 0) {
+        pick = allowed[i];
+        break;
+      }
+    }
+    free(cookie);
+  }
+  if (!pick)
+    pick = (fallback && fallback[0]) ? fallback : allowed[0];
+  snprintf(out, size, "%s", pick);
+}
+
+int answers_mode_ok(const char *value) {
+  return value && (!strcmp(value, "local") || !strcmp(value, "all") ||
+                   !strcmp(value, "off"));
+}
+
+int answers_fanout_ok(const char *value) {
+  return value && (!strcmp(value, "always") || !strcmp(value, "auto") ||
+                   !strcmp(value, "never"));
+}
+
+void get_answers_mode(const char *fallback, char *out, size_t size) {
+  static const char *const ALLOWED[] = {"local", "all", "off"};
+  user_choice("answers", fallback, ALLOWED, 3, out, size);
+}
+
+void get_answers_fanout(const char *fallback, char *out, size_t size) {
+  static const char *const ALLOWED[] = {"always", "auto", "never"};
+  user_choice("answers_fanout", fallback, ALLOWED, 3, out, size);
+}
+
 /* ---------- user-defined palette ---------- */
 
 static const char *CUSTOM_DEFAULTS[CUSTOM_COLOUR_COUNT] = {

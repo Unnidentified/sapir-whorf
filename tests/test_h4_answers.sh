@@ -2,6 +2,10 @@
 # H4: the answer box modes, and the fan-out skip. The important claim is that a
 # confident local answer costs no upstream request - so the assertion is that
 # the engine line is absent, not that the page looks right.
+#
+# J3c reversed the default: a confident local answer now searches the web too,
+# unless answers_fanout = never. This test keeps its assertions by asking for
+# that mode explicitly; the new default is covered by test_j3_answers.sh.
 set -u
 cd "$(dirname "$0")/.." || exit 1
 BIN=./bin/omnisearch
@@ -20,6 +24,7 @@ run_mode() {
 host = 127.0.0.1
 port = $port
 answers = $mode
+answers_fanout = never
 [cache]
 dir = $cache
 [engines]
@@ -39,6 +44,7 @@ cat > /tmp/h4-answers-local.ini <<INI
 host = 127.0.0.1
 port = 8089
 answers = local
+answers_fanout = never
 [cache]
 dir = /tmp/h4-answers-local
 [engines]

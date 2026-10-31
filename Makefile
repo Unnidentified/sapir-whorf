@@ -370,6 +370,10 @@ terms-check: tests/test_j3_terms
 hrefs-check:
 	@./tests/test_j3_hrefs.sh
 
+# J3c: results under the answer, and the three fan-out modes
+answersfanout-check:
+	@./tests/test_j3_answers.sh
+
 # H4: the answer modes and the fan-out skip (starts its own instances)
 answers-check:
 	@./tests/test_h4_answers.sh
@@ -427,6 +431,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check terms-check hrefs-check ua-check answers-check junk-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check terms-check hrefs-check ua-check answers-check junk-check smoke
 
-.PHONY: terms-check hrefs-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: terms-check hrefs-check answersfanout-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

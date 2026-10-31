@@ -21,6 +21,10 @@
 
 #define DEFAULT_BREAKER_THRESHOLD 5
 #define DEFAULT_ANSWERS_MODE "local"
+/* J3c: results belong under the answer, as they do on Google. `never` is the
+   previous behaviour (a confident local answer skipped the fan-out), `auto`
+   skips only for a very confident answer and a query with no words in it. */
+#define DEFAULT_ANSWERS_FANOUT "always"
 #define DEFAULT_PACE_PER_MINUTE 40
 #define DEFAULT_PACE_BURST 6
 #define DEFAULT_BREAKER_COOLDOWN 900
@@ -79,6 +83,7 @@ typedef struct {
   char infobox_mode[16];
   /* H4: all | local | off - what the answer box is allowed to do */
   char answers_mode[16];
+  char answers_fanout[16];
   int rate_limit_search_requests;
   int rate_limit_search_interval;
   int rate_limit_images_requests;

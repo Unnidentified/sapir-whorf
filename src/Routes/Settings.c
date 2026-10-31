@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "../Config.h"
 #include "../Scraping/Scraping.h"
 #include "../Scraping/EngineHealth.h"
 #include "../Utility/Utility.h"
@@ -115,6 +116,15 @@ int settings_handler(UrlParams *params) {
   get_custom_theme(&custom_theme);
   context_set_custom_theme(&ctx, &custom_theme);
   context_set(&ctx, "locale", locale);
+  {
+    extern Config global_config;
+    char mode[16];
+    char fanout[16];
+    get_answers_mode(global_config.answers_mode, mode, sizeof(mode));
+    get_answers_fanout(global_config.answers_fanout, fanout, sizeof(fanout));
+    context_set(&ctx, "answers_mode", mode);
+    context_set(&ctx, "answers_fanout", fanout);
+  }
   context_set(&ctx, "default_engine", default_engine);
   context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count,
                               inner_counts);

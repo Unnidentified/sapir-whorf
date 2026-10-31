@@ -174,6 +174,35 @@
                         </div>
                     </section>
 
+                    <section class="settings-section">
+                        <h3 class="settings-section-title">Answers and the web</h3>
+                        <p class="settings-section-desc">What the page does with a question it can answer itself. Nothing here changes the server, only this browser.</p>
+                        <div class="settings-fields">
+                            <div class="settings-field">
+                                <label class="settings-label" for="answers">Answer box</label>
+                                <span class="select-wrap">
+                                    <select id="answers" name="answers" class="settings-select">
+                                        <option value="local" {{if answers_mode == "local"}}selected{{endif}}>local — answer in this browser's page, engines still queried</option>
+                                        <option value="all" {{if answers_mode == "all"}}selected{{endif}}>all — also ask Wikipedia and the other panels</option>
+                                        <option value="off" {{if answers_mode == "off"}}selected{{endif}}>off — no answer box at all</option>
+                                    </select>
+                                </span>
+                                <p class="settings-section-desc"><strong>local</strong> answers from this server (arithmetic, units, colours, dates): your query leaves the machine only to the search engines. <strong>all</strong> also sends it to Wikipedia and the dictionary and currency lookups. <strong>off</strong> sends it only to the engines.</p>
+                            </div>
+                            <div class="settings-field">
+                                <label class="settings-label" for="answers_fanout">When there is a direct answer</label>
+                                <span class="select-wrap">
+                                    <select id="answers_fanout" name="answers_fanout" class="settings-select">
+                                        <option value="always" {{if answers_fanout == "always"}}selected{{endif}}>always search the web too</option>
+                                        <option value="auto" {{if answers_fanout == "auto"}}selected{{endif}}>auto — skip the search only for a certain, wordless answer</option>
+                                        <option value="never" {{if answers_fanout == "never"}}selected{{endif}}>never — a certain answer is the whole page</option>
+                                    </select>
+                                </span>
+                                <p class="settings-section-desc"><strong>always</strong> shows results under every answer, as Google does, and waits no longer than a normal search. <strong>auto</strong> skips the search only when the answer is certain and the query has no words in it (<code>2+2</code>), and <strong>never</strong> never searches in that case — the fastest, and the most likely to be a dead end.</p>
+                            </div>
+                        </div>
+                    </section>
+
                     {{if has_engine_status}}
                     <section class="settings-section">
                         <h3 class="settings-section-title">Engine status</h3>

@@ -24,6 +24,11 @@ typedef struct {
 int url_encode(const char *in, char *out, size_t size);
 int hex_to_int(char c);
 char *get_theme(const char *default_theme);
+/* per-user answer settings (cookie, falling back to the server config) */
+int answers_mode_ok(const char *value);
+int answers_fanout_ok(const char *value);
+void get_answers_mode(const char *fallback, char *out, size_t size);
+void get_answers_fanout(const char *fallback, char *out, size_t size);
 const char *get_title_font(void);
 const char *get_page_scale(void);
 int page_scale_is_valid(const char *value);
