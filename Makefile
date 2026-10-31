@@ -296,6 +296,10 @@ config-check:
 render-check:
 	@./tests/test_context_capacity.sh
 
+# G1: engines="*" must mean the registry default set, not "everything"
+engines-check:
+	@./tests/test_g1_engines.sh
+
 # A3: offline relevance benchmark. Reranks a recorded replay file with the
 # production ranker - no network, no server, deterministic.
 tests/offline_rank: tests/offline_rank.c src/Ranking/Ranker.c \
@@ -346,6 +350,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check smoke
 
-.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

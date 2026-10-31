@@ -56,7 +56,19 @@
                 {{if results_state == "empty"}}
                 <div class="no-results">
                     <p>No results found for <span class="no-results-query">{{query}}</span>.</p>
+                    {{if empty_reason == "filtered"}}
+                    <p class="no-results-hint">The sources answered, but none of what came back was relevant enough to show. Try rephrasing, or a more specific query.</p>
+                    {{else}}
+                    {{if empty_reason == "blocked"}}
+                    <p class="no-results-hint">Every source we asked refused the request. Waiting a few minutes usually clears it.</p>
+                    {{else}}
+                    {{if empty_reason == "unavailable"}}
+                    <p class="no-results-hint">We could not reach the sources — your network may be down.</p>
+                    {{else}}
                     <p class="no-results-hint">The search engines may be busy — try again in a moment.</p>
+                    {{endif}}
+                    {{endif}}
+                    {{endif}}
                 </div>
                 {{endif}}
 

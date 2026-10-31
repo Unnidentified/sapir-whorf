@@ -53,6 +53,88 @@ void free_xml_node_list(char *title, char *url, char *snippet) {
     xmlFree(snippet);
 }
 
+/* depth-limited subtree search for the first element whose class contains cls */
+typedef struct { const char *cls; char *found; } class_search;
+
+static int class_search_walk(xmlNodePtr node, class_search *cs, int depth);
+
+/* depth-limited subtree search for the first element whose class contains cls */
+static char *find_class_text(xmlNodePtr node, const char *cls) {
+  class_search cs = {cls, NULL};
+  class_search_walk(node, &cs, 0);
+  return cs.found;
+}
+
+static int class_search_walk(xmlNodePtr node, class_search *cs, int depth) {
+  if (!node || cs->found || depth > 6)
+    return 0;
+  for (xmlNodePtr n = node; n; n = n->next) {
+    if (n->type == XML_ELEMENT_NODE) {
+      char *c = (char *)xmlGetProp(n, (const xmlChar *)"class");
+      int hit = c && strstr(c, cs->cls);
+      if (c)
+        xmlFree(c);
+      if (hit) {
+        cs->found = (char *)xmlNodeGetContent(n);
+        return 1;
+      }
+    }
+    if (class_search_walk(n->children, cs, depth + 1))
+      return 1;
+  }
+  return 0;
+}
+
+/* comments.duckduckgo.com/html/ markup: <a class="result__a"> plus a sibling
+   <a class="result__snippet">. This endpoint is what SearXNG uses, and unlike
+   lite. it keeps answering from this machine (docs/G1-engines.md). */
+static int parse_ddg_html(const char *engine_name, xmlDocPtr doc,
+                          SearchResult **out_results, int max_results) {
+  (void)engine_name;
+  xmlXPathContextPtr ctx = create_xpath_context(doc);
+  if (!ctx)
+    return 0;
+
+  xmlXPathObjectPtr obj =
+      xml_xpath_eval(ctx, "//a[contains(@class, 'result__a')]");
+  if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
+    free_xpath_objects(ctx, obj);
+    return 0;
+  }
+
+  int num_links = obj->nodesetval->nodeNr;
+  *out_results = alloc_results_array(num_links, max_results);
+  if (!*out_results) {
+    free_xpath_objects(ctx, obj);
+    return 0;
+  }
+
+  int count = 0;
+  for (int i = 0; i < num_links && count < max_results; i++) {
+    xmlNodePtr link = obj->nodesetval->nodeTab[i];
+    char *href = (char *)xmlGetProp(link, (const xmlChar *)"href");
+    char *title = (char *)xmlNodeGetContent(link);
+    if (!href || !href[0]) {
+      free(href);
+      free(title);
+      continue;
+    }
+
+    /* the snippet is the result__snippet inside the same result block; walk up
+       at most two levels so one result's snippet can't leak into another */
+    char *snippet = NULL;
+    xmlNodePtr scope = link->parent ? link->parent->parent : NULL;
+    for (int up = 0; scope && !snippet && up < 2; up++, scope = scope->parent)
+      snippet = find_class_text(scope, "result__snippet");
+
+    assign_result(&(*out_results)[count], href, title, snippet, 1);
+    count++;
+  }
+
+  free_xpath_objects(ctx, obj);
+  return count;
+}
+
 static int parse_ddg_lite(const char *engine_name, xmlDocPtr doc,
                           SearchResult **out_results, int max_results) {
   (void)engine_name;
@@ -469,7 +551,27 @@ static int parse_brave(const char *engine_name, xmlDocPtr doc,
 
 SearchEngine ENGINE_REGISTRY[] = {
     {.id = "ddg",
-     .name = "DuckDuckGo Lite",
+     .name = "DuckDuckGo",
+     /* html. rather than lite.: lite. answered a region-selector shell to every
+        request after the first, while html. keeps returning results with the
+        navigation headers and locale cookies below (docs/G1-engines.md). */
+     .base_url = "https://html.duckduckgo.com/html/?q=",
+     .host_header = "html.duckduckgo.com",
+     .referer = "https://html.duckduckgo.com/",
+     .page_param = "s",
+     .page_multiplier = 30,
+     .page_base = 0,
+     .parser = parse_ddg_html,
+     .enabled = 1,
+     .timeout_secs = 8,
+     .supports_site = 1, .verticals = V_WEB, .weight = 1.0,
+     .index_group = "bing", .user_agent = "safari",
+     .browser_headers = 1,
+     .init_cookies = "kl=gb-en; df=en-GB; ad=0; ah=0" },
+    /* kept for reference and for anyone who has a good experience with it;
+       disabled because it stopped answering from this host. */
+    {.id = "ddg-lite",
+     .name = "DuckDuckGo Lite (old endpoint)",
      .base_url = "https://lite.duckduckgo.com/lite/?q=",
      .host_header = "lite.duckduckgo.com",
      .referer = "https://lite.duckduckgo.com/",
@@ -477,9 +579,10 @@ SearchEngine ENGINE_REGISTRY[] = {
      .page_multiplier = 30,
      .page_base = 0,
      .parser = parse_ddg_lite,
-     .enabled = 1,
+     .enabled = 0,
      .timeout_secs = 5,
-     .supports_site = 1, .verticals = V_WEB, .weight = 1.0, .index_group = "bing" },
+     .supports_site = 1, .verticals = V_WEB, .weight = 1.0,
+     .index_group = "bing" },
     {.id = "bing",
      .name = "Bing",
      .base_url = "https://www.bing.com/search?q=",
@@ -515,7 +618,8 @@ SearchEngine ENGINE_REGISTRY[] = {
      .parser = parse_brave,
      .enabled = 1,
      .timeout_secs = 5,
-     .supports_site = 1, .verticals = V_WEB, .weight = 1.15, .index_group = "brave" },
+     .supports_site = 1, .verticals = V_WEB, .weight = 1.15,
+     .index_group = "brave", .user_agent = "safari" },
 
     {.id = "openalex",
      .name = "OpenAlex",
@@ -693,13 +797,27 @@ void engine_set_enabled(const char *engine_id, int enabled) {
   }
 }
 
+/* "*" used to mean "enable everything", which silently resurrected engines the
+   registry ships disabled - a disabled engine ran, failed, and spent a request
+   slot on every query. It now means "the engines the registry ships enabled";
+   naming a disabled engine explicitly ("*,yacy") still opts it in, which is
+   what docs/SETUP.md tells people to do. */
+static int shipped_enabled[ENGINE_COUNT];
+static int shipped_enabled_captured = 0;
+
+static void capture_shipped_enabled(void) {
+  if (shipped_enabled_captured)
+    return;
+  for (int i = 0; i < ENGINE_COUNT; i++)
+    shipped_enabled[i] = ENGINE_REGISTRY[i].enabled;
+  shipped_enabled_captured = 1;
+}
+
 void apply_engines_config(const char *engines_str) {
+  capture_shipped_enabled();
   if (!engines_str || engines_str[0] == '\0') {
-    for (int i = 0; i < ENGINE_COUNT; i++) {
-      if (engine_id_compare(ENGINE_REGISTRY[i].id, "yacy"))
-        continue;
-      ENGINE_REGISTRY[i].enabled = 1;
-    }
+    for (int i = 0; i < ENGINE_COUNT; i++)
+      ENGINE_REGISTRY[i].enabled = shipped_enabled[i];
     return;
   }
 
@@ -719,11 +837,8 @@ void apply_engines_config(const char *engines_str) {
       token++;
 
     if (strcmp(token, "*") == 0) {
-      for (int i = 0; i < ENGINE_COUNT; i++) {
-        if (engine_id_compare(ENGINE_REGISTRY[i].id, "yacy"))
-          continue;
-        ENGINE_REGISTRY[i].enabled = 1;
-      }
+      for (int i = 0; i < ENGINE_COUNT; i++)
+        ENGINE_REGISTRY[i].enabled = shipped_enabled[i];
     } else if (token[0] == '-' && token[1] != '\0') {
       char *engine_id = token + 1;
       int found = 0;

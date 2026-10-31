@@ -56,6 +56,16 @@ typedef struct {
      opinions inflates consensus and lets one index's failure look like three
      engines agreeing. Engines sharing a group are one vote. */
   const char *index_group;
+  /* Which User-Agent this engine gets: "chrome" (default), "firefox",
+     "safari", or NULL to keep the old per-id hash. Picking by hash was
+     arbitrary, and Brave refuses every Chrome UA it was being handed while
+     serving Firefox and Safari normally - see docs/G1-engines.md. */
+  const char *user_agent;
+  /* send the Sec-Fetch-* navigation headers a browser sends. Measured need:
+     DDG's html. endpoint answers a shell without them and results with them. */
+  int browser_headers;
+  /* cookies to seed the jar with on first use (locale selectors and the like) */
+  const char *init_cookies;
 } SearchEngine;
 
 typedef struct {
@@ -120,14 +130,18 @@ size_t write_memory_callback(void *contents, size_t size, size_t nmemb,
 const char *get_random_user_agent(void);
 void configure_curl_handle(CURL *curl, const char *full_url,
                            MemoryBuffer *chunk, struct curl_slist *headers,
-                           long timeout_secs, const char *engine_id);
+                           long timeout_secs, const char *engine_id,
+                           const char *ua_profile, int browser_headers);
 const char *get_engine_user_agent(const char *engine_id);
+const char *get_engine_user_agent_profile(const char *profile,
+                                          const char *engine_id);
 char *build_search_url(const char *base_url, const char *page_param,
                        int page_multiplier, int page_base,
                        const char *encoded_query, int page);
 struct curl_slist *build_request_headers(const char *host_header,
                                          const char *referer,
-                                         const char *accept_language);
+                                         const char *accept_language,
+                                         int browser_headers);
 void http_delay(void);
 
 /* set per request: wait for every engine instead of taking the early exit */

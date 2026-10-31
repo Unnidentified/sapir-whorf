@@ -53,37 +53,63 @@ static int response_contains(const char *response, const char *needle) {
 }
 
 /* anti-bot interstitials served instead of a results page */
+/* Dispatch on the registry id, not the display name: the name is prose and
+   changed once already ("DuckDuckGo Lite" -> "DuckDuckGo"), which silently
+   dropped this whole branch. */
 static int response_looks_like_results_page(const ScrapeJob *job,
                                             const char *response) {
   if (!job || !job->engine || !response)
     return 0;
 
-  if (strcmp(job->engine->name, "DuckDuckGo Lite") == 0) {
-    return response_contains(response, "result-link") ||
+  const char *id = job->engine->id;
+
+  if (strcmp(id, "ddg") == 0 || strcmp(id, "ddg-lite") == 0) {
+    return response_contains(response, "result__a") ||
+           response_contains(response, "result-link") ||
+           response_contains(response, "result__snippet") ||
            response_contains(response, "result-snippet");
   }
 
-  if (strcmp(job->engine->name, "Bing") == 0) {
+  if (strcmp(id, "bing") == 0) {
     return response_contains(response, "b_algo") ||
            response_contains(response, "b_results");
   }
 
-  if (strcmp(job->engine->name, "Brave") == 0) {
+  if (strcmp(id, "brave") == 0) {
     return response_contains(response, "search-snippet-title") ||
            response_contains(response, "data-type=\"web\"");
   }
 
-  if (strcmp(job->engine->name, "Yahoo") == 0) {
+  if (strcmp(id, "yahoo") == 0) {
     return response_contains(response, "algo-sr") ||
            response_contains(response, "compTitle") ||
            response_contains(response, "compText");
   }
 
-  if (strcmp(job->engine->name, "YaCy") == 0) {
+  if (strncmp(id, "yacy", 4) == 0) {
     return response_contains(response, "<item") ||
            response_contains(response, "<rss");
   }
 
+  return 0;
+}
+
+/* An engine that answers 200 and says "no matches" has worked correctly and
+   found nothing. Treating that as "we could not parse the results" is a false
+   alarm that hides the real answer from /info and from the operator. */
+static int response_declares_no_results(const ScrapeJob *job,
+                                        const char *response) {
+  if (!job || !job->engine || !response)
+    return 0;
+  const char *id = job->engine->id;
+  if (strcmp(id, "bing") == 0)
+    return response_contains(response, "b_no") ||
+           response_contains(response, "There are no results");
+  if (strcmp(id, "google") == 0 || strcmp(id, "google_cse") == 0)
+    return response_contains(response, "did not match any documents");
+  if (strcmp(id, "ddg") == 0 || strcmp(id, "ddg-lite") == 0)
+    return response_contains(response, "No results found") ||
+           response_contains(response, "No results.");
   return 0;
 }
 
@@ -177,6 +203,11 @@ static void classify_job_response(ScrapeJob *job, const char *response,
      snippets contain. */
   if (response_is_blocked_for_engine(response, job->results_count)) {
     job->status = SCRAPE_STATUS_BLOCKED;
+    return;
+  }
+
+  if (response_declares_no_results(job, response)) {
+    job->status = SCRAPE_STATUS_EMPTY;
     return;
   }
 
@@ -568,11 +599,14 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
 
   struct curl_slist *headers =
       build_request_headers(job->engine->host_header, job->engine->referer,
-                            job->accept_language);
+                            job->accept_language,
+                            job->engine->browser_headers);
 
   configure_curl_handle(job->handle, full_url, &job->response, headers,
                         job->engine ? job->engine->timeout_secs : 0,
-                        job->engine ? job->engine->id : NULL);
+                        job->engine ? job->engine->id : NULL,
+                        job->engine ? job->engine->user_agent : NULL,
+                        job->engine ? job->engine->browser_headers : 0);
 
   /* per-engine cookie jar: some engines only answer after a challenge cookie */
   {
@@ -582,6 +616,11 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
     if (jar_path[0]) {
       curl_easy_setopt(job->handle, CURLOPT_COOKIEFILE, jar_path);
       curl_easy_setopt(job->handle, CURLOPT_COOKIEJAR, jar_path);
+      /* seed locale/shape cookies on the very first request; the jar keeps
+         them from then on */
+      if (job->engine->init_cookies && job->engine->init_cookies[0])
+        curl_easy_setopt(job->handle, CURLOPT_COOKIE,
+                         job->engine->init_cookies);
     }
   }
   curl_easy_setopt(job->handle, CURLOPT_PRIVATE, headers);

@@ -414,8 +414,14 @@ void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
       snprintf(out->engine_core, sizeof(out->engine_core), "%s", rebuilt);
   }
 
+  /* Judge results against the query that was actually asked. Ranking on the
+     raw text while the engines are sent the filler-stripped core makes the
+     floor require a word we never asked for: "best mechanical keyboard" was
+     sent as "mechanical keyboard", then every result failed the floor for not
+     containing "best", and a 10-result page rendered empty. */
+  const char *term_source = out->engine_core[0] ? out->engine_core : clean;
   char lower[512];
-  lower_copy(lower, sizeof(lower), clean);
+  lower_copy(lower, sizeof(lower), term_source);
   char *saveptr = NULL;
   char *token = strtok_r(lower, " ", &saveptr);
   while (token && out->term_count < 8) {

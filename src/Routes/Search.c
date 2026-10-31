@@ -1752,6 +1752,34 @@ int results_handler(UrlParams *params) {
     context_set(&ctx, "results_state",
                 results_matrix.count > 0 ? "ok" : "empty");
 
+    /* Why is the page empty? "The engines may be busy" is wrong when they
+       answered fine and every hit was judged irrelevant - that is what Bing
+       does from this host for some queries (docs/G1-engines.md). Saying which
+       of the three it was is the difference between "retry" and "rephrase". */
+    if (results_matrix.count == 0) {
+      const char *reason = "none";
+      int any_ok = 0;
+      for (int i = 0; i < enabled_engine_count; i++)
+        if (jobs[i].status == SCRAPE_STATUS_OK)
+          any_ok = 1;
+      if (any_ok || funnel_raw > 0)
+        reason = "filtered";
+      else {
+        int any_blocked = 0, any_failed = 0;
+        for (int i = 0; i < enabled_engine_count; i++) {
+          if (jobs[i].status == SCRAPE_STATUS_BLOCKED)
+            any_blocked = 1;
+          if (jobs[i].status == SCRAPE_STATUS_FETCH_ERROR)
+            any_failed = 1;
+        }
+        if (any_blocked)
+          reason = "blocked";
+        else if (any_failed)
+          reason = "unavailable";
+      }
+      context_set(&ctx, "empty_reason", reason);
+    }
+
     /* F1/F2: a thin page must say why it is thin, and offer the patient view.
        Silence here is what made "page 1 is empty but page 2 is fine" look like
        a bug the user could not act on. */
@@ -1864,6 +1892,21 @@ int results_handler(UrlParams *params) {
     string_matrix_free(&results_matrix);
   } else {
     context_set(&ctx, "results_state", "empty");
+    {
+      const char *reason = "none";
+      int any_blocked = 0, any_failed = 0;
+      for (int i = 0; i < engine_idx; i++) {
+        if (jobs[i].status == SCRAPE_STATUS_BLOCKED)
+          any_blocked = 1;
+        if (jobs[i].status == SCRAPE_STATUS_FETCH_ERROR)
+          any_failed = 1;
+      }
+      if (any_blocked)
+        reason = "blocked";
+      else if (any_failed)
+        reason = "unavailable";
+      context_set(&ctx, "empty_reason", reason);
+    }
     char *html = render_template("results.html", &ctx);
     if (html) {
       send_response(html);

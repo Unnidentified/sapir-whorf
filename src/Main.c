@@ -143,6 +143,8 @@ int main(int argc, char **argv) {
   }
 
   if (check_only) {
+    /* report the effective engine set, so resolve the list first */
+    apply_engines_config(cfg.engines);
     printf("config: %s\n", config_path);
     printf("  host=%s port=%d locale=%s\n", cfg.host, cfg.port,
            cfg.default_locale);
@@ -155,6 +157,21 @@ int main(int argc, char **argv) {
            cfg.rate_limit_search_requests, cfg.rate_limit_search_interval,
            cfg.trusted_proxies);
     printf("  engines=\"%s\"\n", cfg.engines);
+    /* the effective set, not just the string: this is where "*" quietly meant
+       "every entry including the disabled ones" */
+    printf("  engines_enabled=");
+    {
+      int printed = 0;
+      for (int i = 0; i < ENGINE_COUNT; i++) {
+        if (!ENGINE_REGISTRY[i].enabled)
+          continue;
+        printf("%s%s", printed ? "," : "", ENGINE_REGISTRY[i].id);
+        printed++;
+      }
+      if (!printed)
+        printf("(none)");
+      printf("\n");
+    }
     printf("config: %s\n",
            config_rc == 0 ? "OK" : "loaded with warnings (see above)");
     return config_rc == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -217,6 +234,15 @@ int main(int argc, char **argv) {
     start_cache_sweeper(cfg.cache_ttl_search);
     engine_health_set_limits(cfg.breaker_threshold, cfg.breaker_cooldown);
     engine_health_init(cfg.cache_dir);
+    if (getenv("OMNI_PERF")) {
+      for (int i = 0; i < ENGINE_COUNT; i++)
+        fprintf(stderr, "[REG] %-12s enabled=%d web=%d site=%d ua=%s\n",
+                ENGINE_REGISTRY[i].id, ENGINE_REGISTRY[i].enabled,
+                !!(ENGINE_REGISTRY[i].verticals & V_WEB),
+                ENGINE_REGISTRY[i].supports_site,
+                ENGINE_REGISTRY[i].user_agent ? ENGINE_REGISTRY[i].user_agent
+                                              : "-");
+    }
   }
 
   set_cache_ttl_search(cfg.cache_ttl_search);

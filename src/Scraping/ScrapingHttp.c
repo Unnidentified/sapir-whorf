@@ -59,6 +59,22 @@ const char *get_random_user_agent(void) {
   return USER_AGENTS[rand_r(&user_agent_seed) % USER_AGENT_COUNT];
 }
 
+/* Pick the UA by explicit profile when the registry names one, and fall back to
+   the per-id hash only when it does not. Measured, not assumed: Brave refuses
+   all three Chrome UAs and serves Firefox and Safari (docs/G1-engines.md). */
+const char *get_engine_user_agent_profile(const char *profile,
+                                          const char *engine_id) {
+  if (profile && profile[0]) {
+    if (strcasecmp(profile, "safari") == 0)
+      return USER_AGENTS[4];
+    if (strcasecmp(profile, "firefox") == 0)
+      return USER_AGENTS[3];
+    if (strcasecmp(profile, "chrome") == 0)
+      return USER_AGENTS[0];
+  }
+  return get_engine_user_agent(engine_id);
+}
+
 /* one stable identity per engine: rotating the UA on every request is a
    fingerprint of its own, and some engines challenge the mismatch */
 const char *get_engine_user_agent(const char *engine_id) {
@@ -70,13 +86,14 @@ const char *get_engine_user_agent(const char *engine_id) {
 
 void configure_curl_handle(CURL *curl, const char *full_url,
                            MemoryBuffer *chunk, struct curl_slist *headers,
-                           long timeout_secs, const char *engine_id) {
+                           long timeout_secs, const char *engine_id,
+                           const char *ua_profile, int browser_headers) {
   curl_easy_setopt(curl, CURLOPT_URL, full_url);
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)chunk);
   curl_easy_setopt(curl, CURLOPT_USERAGENT,
-                   get_engine_user_agent(engine_id));
+                   get_engine_user_agent_profile(ua_profile, engine_id));
 
   /* HTTP/1.1 on purpose: Yahoo (and some other front ends) abort the transfer
      with "Error in the HTTP2 framing layer", which reads as an engine failure */
@@ -108,7 +125,8 @@ char *build_search_url(const char *base_url, const char *page_param,
 
 struct curl_slist *build_request_headers(const char *host_header,
                                          const char *referer,
-                                         const char *accept_language) {
+                                         const char *accept_language,
+                                         int browser_headers) {
   struct curl_slist *headers = NULL;
   char host_buf[BUFFER_SIZE_MEDIUM], ref_buf[BUFFER_SIZE_MEDIUM];
 
@@ -129,7 +147,16 @@ struct curl_slist *build_request_headers(const char *host_header,
            accept_language && accept_language[0] ? accept_language
                                                  : "en-US,en;q=0.5");
   headers = curl_slist_append(headers, accept_buf);
-  headers = curl_slist_append(headers, "DNT: 1");
+  /* DNT: 1 was a reliable automation tell; a browser does not send it unless
+     asked, and dropping it costs nothing. */
+  if (browser_headers) {
+    headers = curl_slist_append(headers, "Sec-Fetch-Dest: document");
+    headers = curl_slist_append(headers, "Sec-Fetch-Mode: navigate");
+    headers = curl_slist_append(headers, "Sec-Fetch-Site: none");
+    headers = curl_slist_append(headers, "Sec-Fetch-User: ?1");
+    headers =
+        curl_slist_append(headers, "Upgrade-Insecure-Requests: 1");
+  }
 
   return headers;
 }
