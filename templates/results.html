@@ -25,6 +25,19 @@
         {{include "_chrome.html"}}
         <div class="content-layout{{if exists infoboxes}} with-rail{{endif}}">
             <main class="results-container">
+    {{if results_state == "empty_category"}}
+    <div class="no-results">
+        <p>{{l("no_engines_in_category")}}</p>
+        <p class="no-results-hint"><a href="{{chrome_all_href}}">{{l("all_tab")}}</a></p>
+    </div>
+    {{endif}}
+    {{if exists category_links}}
+    <nav class="category-tabs" aria-label="{{l("category_label")}}">
+        {{for catlink in category_links}}
+        <a href="{{catlink[0]}}" class="{{catlink[2]}}">{{catlink[1]}}</a>
+        {{endfor}}
+    </nav>
+    {{endif}}
                 {{include "widget_calculator.html"}}
                 {{if exists answer_text}}
                 {{if show_answer_strip}}

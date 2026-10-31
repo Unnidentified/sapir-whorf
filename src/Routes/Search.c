@@ -732,7 +732,7 @@ static int engine_allowed_for_user(const SearchEngine *eng, char **user_ids,
 }
 
 static char *build_search_href(const char *query, const char *engine_id,
-                               int page, int web) {
+                               int page, int web, const char *cat) {
   const char *safe_query = query ? query : "";
   int use_engine =
       engine_id && engine_id[0] != '\0' && !engine_id_matches(engine_id, "all");
@@ -747,6 +747,8 @@ static char *build_search_href(const char *query, const char *engine_id,
     needed += strlen("&p=") + 16;
   if (web)
     needed += strlen("&web=1");
+  if (cat && cat[0])
+    needed += strlen("&cat=") + strlen(cat);
 
   char *href = (char *)malloc(needed);
   if (!href)
@@ -769,6 +771,12 @@ static char *build_search_href(const char *query, const char *engine_id,
      back to being an answer-only page. */
   if (web)
     strcat(href, "&web=1");
+  /* J5.3: the category has to survive the pager, or page 2 fans out to every
+     engine again and the tab was decorative. */
+  if (cat && cat[0]) {
+    strcat(href, "&cat=");
+    strcat(href, cat);
+  }
 
   return href;
 }
@@ -777,11 +785,12 @@ typedef struct {
   const char *query;
   const char *engine_id;
   int web;
+  const char *cat;
 } SearchHrefData;
 
 static char *search_href_builder(int page, void *data) {
   SearchHrefData *d = (SearchHrefData *)data;
-  return build_search_href(d->query, d->engine_id, page, d->web);
+  return build_search_href(d->query, d->engine_id, page, d->web, d->cat);
 }
 
 static char *build_search_request_cache_key(const char *query,
@@ -924,7 +933,7 @@ int results_handler(UrlParams *params) {
     snprintf(selected_engine_id, sizeof(selected_engine_id), "all");
   }
 
-  char *search_href = build_search_href(raw_query, selected_engine_id, 1, 0);
+  char *search_href = build_search_href(raw_query, selected_engine_id, 1, 0, NULL);
   context_set(&ctx, "chrome_action", "/search");
   context_set(&ctx, "chrome_active", "all");
   {
@@ -1021,6 +1030,35 @@ int results_handler(UrlParams *params) {
   }
   int enabled_engine_count = eligible_count;
 
+  /* J5.3: ?cat=<vertical> narrows the fan-out to engines that declare that
+     vertical. It is a routing hint, not a filter on the results: an engine
+     that answers a different vertical is simply not asked. Unknown values are
+     ignored rather than 404ing, because a hand-edited URL should not look like
+     a broken site. */
+  int cat_mask = 0;
+  const char *cat = "";
+  for (int i = 0; i < params->count; i++) {
+    if (strcmp(params->params[i].key, "cat") != 0)
+      continue;
+    const char *value = params->params[i].value;
+    if (strcmp(value, "news") == 0) {
+      cat_mask = V_NEWS;
+      cat = "news";
+    } else if (strcmp(value, "code") == 0) {
+      cat_mask = V_CODE;
+      cat = "code";
+    } else if (strcmp(value, "academic") == 0) {
+      cat_mask = V_ACADEMIC;
+      cat = "academic";
+    } else if (strcmp(value, "media") == 0) {
+      cat_mask = V_MEDIA;
+      cat = "media";
+    } else if (strcmp(value, "entity") == 0) {
+      cat_mask = V_ENTITY;
+      cat = "entity";
+    }
+  }
+
   char lang[8], region[8];
   locale_parts(locale, lang, sizeof(lang), region, sizeof(region));
   if (!lang[0])
@@ -1060,9 +1098,12 @@ int results_handler(UrlParams *params) {
       want = V_NEWS;
       break;
     default:
-      want = V_WEB;
       break;
     }
+    /* J5.3: an explicit category always beats the inferred intent - the visitor
+       clicked the tab, so guessing again would ignore them. */
+    if (cat_mask)
+      want = cat_mask;
 
     /* A site: query is a web query restricted to one host: vertical APIs
        cannot honour it, and neither can engines that drop the operator. */
@@ -1105,6 +1146,11 @@ int results_handler(UrlParams *params) {
       for (int i = 0; i < routed_count; i++)
         eligible[i] = routed[i];
       eligible_count = routed_count;
+    } else if (cat_mask) {
+      /* J5.3: no engine serves this category, so ask none. Falling back to the
+         full web set would answer a News tab with web results and look like it
+         had worked. */
+      eligible_count = 0;
     }
 
     if (getenv("OMNI_PERF")) {
@@ -1170,6 +1216,66 @@ int results_handler(UrlParams *params) {
          override "we already answered that". */
       analysis.force_web = 1;
     }
+  }
+
+  /* J5.3: one key, a loop in the template. A category appears only when an
+     enabled engine actually declares it - a tab that can only ever return
+     nothing is a lie about what the site can do. */
+  {
+    static const struct {
+      const char *id;
+      int mask;
+      const char *label;
+    } categories[] = {{"news", V_NEWS, "news_tab"},
+                      {"code", V_CODE, "code_tab"},
+                      {"academic", V_ACADEMIC, "academic_tab"}};
+    StringMatrix strip;
+    string_matrix_init(&strip);
+
+    /* "All" is a row like any other, so it is active only when no category is
+       selected - the hardcoded link it replaces was active on every page. */
+    {
+      char *href = build_search_href(raw_query, NULL, 1, web_explicit, NULL);
+      if (href) {
+        char *fields[LINK_FIELD_COUNT];
+        fields[0] = href;
+        fields[1] = (char *)beaker_get_locale_value(locale, "all_tab");
+        fields[2] = (char *)(cat[0] ? "" : "active");
+        string_matrix_append(&strip, (const char *const *)fields,
+                             LINK_FIELD_COUNT);
+        free(href);
+      }
+    }
+
+    for (size_t c = 0; c < sizeof(categories) / sizeof(categories[0]); c++) {
+      int available = 0;
+      for (int i = 0; i < ENGINE_COUNT; i++) {
+        if (ENGINE_REGISTRY[i].enabled &&
+            (ENGINE_REGISTRY[i].verticals & categories[c].mask)) {
+          available = 1;
+          break;
+        }
+      }
+      if (!available)
+        continue;
+      char *href = build_search_href(raw_query, NULL, 1, web_explicit,
+                                     categories[c].id);
+      if (!href)
+        continue;
+      char *fields[LINK_FIELD_COUNT];
+      fields[0] = href;
+      fields[1] = (char *)beaker_get_locale_value(locale, categories[c].label);
+      fields[2] = (char *)(strcmp(cat, categories[c].id) == 0 ? "active" : "");
+      string_matrix_append(&strip, (const char *const *)fields,
+                           LINK_FIELD_COUNT);
+      free(href);
+    }
+
+    /* set even when empty: the render check fails on a key the template reads
+       and the context never defines */
+    context_set_array_of_arrays(&ctx, "category_links", strip.rows, strip.count,
+                                strip.count > 0 ? strip.field_counts : NULL);
+    string_matrix_free(&strip);
   }
 
   /* J3b: the card offers a way to ask for the web - unless this request *is*
@@ -2041,7 +2147,8 @@ int results_handler(UrlParams *params) {
     StringMatrix pager_matrix;
     SearchHrefData href_data = {.query = raw_query,
                                 .engine_id = selected_engine_id,
-                                .web = web_explicit};
+                                .web = web_explicit,
+                                .cat = cat};
     int pagination_result = 0;
     if (results_matrix.count > 0)
       pagination_result = string_matrix_build_pagination(
@@ -2273,7 +2380,9 @@ int results_handler(UrlParams *params) {
     string_matrix_free(&pager_matrix);
     string_matrix_free(&results_matrix);
   } else {
-    context_set(&ctx, "results_state", "empty");
+    context_set(&ctx, "results_state",
+                (cat_mask && enabled_engine_count == 0) ? "empty_category"
+                                                        : "empty");
     if (have_local_answer) {
       context_set(&ctx, "answer_text", local_answer.answer);
       if (local_answer.detail[0])

@@ -389,6 +389,11 @@ tests/test_j5_defs: tests/test_j5_defs.c src/Scraping/EngineDefs.c $(LINT_SRCS)
 defs-check: tests/test_j5_defs
 	@./tests/test_j5_defs
 
+# J5.3: category tabs - what they offer, what they route, and what they say
+# when nothing serves the category
+categories-check:
+	@./tests/test_j5_categories.sh
+
 # J4.0/J4a: the calculator card, its keypad, and its states
 widget-check:
 	@./tests/test_j4_widget.sh
