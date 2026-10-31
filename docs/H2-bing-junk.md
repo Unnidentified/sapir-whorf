@@ -146,11 +146,21 @@ all-broken probe, and the vertical routing sort). It demotes; it never reaches
 zero, because removing an engine is the breaker's job and a bad patch must not
 ban a source.
 
-**Not verified:** that the demotion changes an observed allocation end to end.
-The factor is asserted in `tests/test_g2_suspension.c` (no penalty before three
-samples, ~0.5 at quality 0, recovery raises it, never zero), but no test drives
-a junk engine through routing and checks it lost its slot. That is a gap, and
-it is stated rather than papered over.
+**Verified end to end.** With the SearXNG bridge pointed at a fake upstream
+serving junk for every query, and `engines = "ddg,bing,searxng"`:
+
+```
+before three samples   [ROUTE] intent=general engines=searxng,ddg,bing
+after four junk cells  [ROUTE] intent=general engines=ddg,bing,searxng
+
+omnisearch_engine_junk{engine="searxng"} 4
+omnisearch_engine_quality{engine="searxng"} 0.000
+```
+
+The engine with quality 0 lost its first slot to two engines that had answered
+correctly. The factor is also asserted in `tests/test_g2_suspension.c` (no
+penalty before three samples, ~0.5 at quality 0, recovery raises it, never
+zero), so both the arithmetic and the allocation are covered.
 
 ## Still open
 
