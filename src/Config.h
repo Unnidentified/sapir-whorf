@@ -20,6 +20,8 @@
 #define DEFAULT_RATE_LIMIT_IMAGES_INTERVAL 60
 
 #define DEFAULT_BREAKER_THRESHOLD 5
+#define DEFAULT_PACE_PER_MINUTE 40
+#define DEFAULT_PACE_BURST 6
 #define DEFAULT_BREAKER_COOLDOWN 900
 #define DEFAULT_YACY_INSTANCE "http://127.0.0.1:8090"
 
@@ -76,6 +78,10 @@ typedef struct {
   int rate_limit_images_requests;
   int rate_limit_images_interval;
   int breaker_threshold;
+  /* G2: per-engine outbound pacing - the opposite of a cooldown: it stops the
+     burst that earns the challenge in the first place. */
+  int pace_per_minute;
+  int pace_burst;
   int breaker_cooldown;
 } Config;
 

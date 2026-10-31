@@ -95,6 +95,9 @@ typedef enum {
   /* the batch deadline stopped us before the engine could answer: not a
      failure, and it must not count against the engine's health */
   SCRAPE_STATUS_CANCELLED,
+  /* G2: our own pacing left this engine out of the batch. Not a failure of
+     the engine and not a failure of the network - it never got asked. */
+  SCRAPE_STATUS_SKIPPED,
 } ScrapeStatus;
 
 typedef struct {

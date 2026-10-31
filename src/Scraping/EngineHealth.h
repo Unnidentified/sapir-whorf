@@ -9,9 +9,20 @@ typedef enum {
   HEALTH_HALF_OPEN
 } BreakerState;
 
+/* G2: why an engine is paused. A 429 and a captcha are not the same event and
+   must not get the same sentence on the page or the same cooldown. */
+typedef enum {
+  SUSPEND_NONE = 0,
+  SUSPEND_RATE_LIMIT, /* 429 / 202 / 503 with Retry-After: honour the server */
+  SUSPEND_CHALLENGE,  /* captcha or interstitial: it will not clear on retry */
+  SUSPEND_PARSE,      /* answered, but not in a shape we understand        */
+  SUSPEND_TRANSPORT   /* we could not reach it at all                      */
+} SuspendReason;
+
 typedef struct {
   char id[32];
   BreakerState state;
+  SuspendReason suspend_reason;
   int consecutive_failures;
   int trips;              /* times the breaker has opened without a success */
   time_t open_until;
@@ -38,6 +49,16 @@ int engine_health_allow(const char *id);
 /* status: SCRAPE_STATUS_* from Scraping.h (kept as int to avoid a cycle) */
 void engine_health_record(const char *id, int status, long http_status,
                           double latency_ms, int retry_after_secs);
+
+/* G2: the reason this engine is paused and how long is left, both for the
+   page copy and for the /settings panel. Returns SUSPEND_NONE when open. */
+SuspendReason engine_health_suspension(const char *id, int *seconds_left);
+const char *engine_health_suspend_name(SuspendReason reason);
+
+/* G2: per-engine outbound token bucket. 0 when the engine has no allowance
+   right now, so the caller can skip it instead of piling on. */
+int engine_health_take_token(const char *id);
+void engine_health_set_pacing(int requests_per_minute, int burst);
 
 EngineHealthEntry *engine_health_get(const char *id);
 const char *engine_health_state_name(BreakerState state);

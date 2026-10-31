@@ -233,6 +233,7 @@ int main(int argc, char **argv) {
     cache_cleanup(cfg.cache_ttl_search);
     start_cache_sweeper(cfg.cache_ttl_search);
     engine_health_set_limits(cfg.breaker_threshold, cfg.breaker_cooldown);
+    engine_health_set_pacing(cfg.pace_per_minute, cfg.pace_burst);
     engine_health_init(cfg.cache_dir);
     if (getenv("OMNI_PERF")) {
       for (int i = 0; i < ENGINE_COUNT; i++)

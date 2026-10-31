@@ -57,6 +57,9 @@ static const ConfigOption CONFIG_OPTIONS[] = {
     INTEGER_OPTION("rate_limit", "images_interval", rate_limit_images_interval),
     INTEGER_OPTION("health", "breaker_threshold", breaker_threshold),
     INTEGER_OPTION("health", "cooldown_seconds", breaker_cooldown),
+    /* G2: outbound pacing per engine */
+    INTEGER_OPTION("health", "pace_requests_per_minute", pace_per_minute),
+    INTEGER_OPTION("health", "pace_burst", pace_burst),
 };
 
 void config_set_defaults(Config *config) {
@@ -75,6 +78,8 @@ void config_set_defaults(Config *config) {
       .cache_ttl_image = DEFAULT_CACHE_TTL_IMAGE,
       .breaker_threshold = DEFAULT_BREAKER_THRESHOLD,
       .breaker_cooldown = DEFAULT_BREAKER_COOLDOWN,
+      .pace_per_minute = DEFAULT_PACE_PER_MINUTE,
+      .pace_burst = DEFAULT_PACE_BURST,
       .rate_limit_search_requests = DEFAULT_RATE_LIMIT_SEARCH_REQUESTS,
       .rate_limit_search_interval = DEFAULT_RATE_LIMIT_SEARCH_INTERVAL,
       .rate_limit_images_requests = DEFAULT_RATE_LIMIT_IMAGES_REQUESTS,

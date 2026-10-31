@@ -406,7 +406,10 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
   if (replay_enabled_record() && job->out_results && job->out_results[0])
     replay_record_job(job, job->out_results[0], job->results_count);
 
-  if (job->engine) {
+  if (job->engine && job->status == SCRAPE_STATUS_SKIPPED) {
+    /* G2: we never asked. Charging the engine for our own pacing would pause
+       it for the one reason that is entirely our idea. */
+  } else if (job->engine) {
     /* C8: one transport failure among many successes is the engine; many at
        once is our network. The batch-level flag is set by the caller before
        the responses are drained, so this is a cheap local decision. */
@@ -508,6 +511,13 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
 
   if (check_cache_for_job(job))
     return 0;
+
+  /* G2: pacing happens before we spend the request. A cache hit above does not
+     cost a token, because it never leaves the machine. */
+  if (job->engine && !engine_health_take_token(job->engine->id)) {
+    job->status = SCRAPE_STATUS_SKIPPED;
+    return 0;
+  }
 
   cleanup_job_results(job);
 
