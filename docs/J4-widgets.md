@@ -125,3 +125,51 @@ The 13-expression parser table is in `tests/test_g4_answerbox.c`
   the evaluator. A Deg/Rad toggle plus `sin/cos/tan`, `%` as "percent of the
   preceding value" (Google reads `100 + 10%` as 110) and `!` remain J4a work.
 - **No implicit multiplication.** `2(3+4)` and `2π` are not accepted; `2*π` is.
+
+
+## /w/<kind>, and why the card needed a URL
+
+`/w/calculator`, `/w/translate`, `/w/place`, `/w/stock` each return **one card**
+and nothing else - no page chrome, no results. The router this project uses
+matches exact paths, so there is one handler per kind rather than a wildcard,
+and the kind selects a *function*: a request cannot name a host, a URL or a
+template. That is the SSRF argument, and it is structural rather than a filter.
+
+The endpoint goes through the inbound limiter with the same budget as `/search`.
+
+Two things it has in common with the page, and one it does not:
+
+- the keypad's one-character-per-request protocol works here too:
+  `/w/calculator?q=5&key=7` → expression `57`, result `57`
+- `{{l("...")}}` renders strings, not keys — which required copying the locale
+  id instead of holding a pointer into the buffer `get_locale()` returns. The
+  first version freed it and then used it, so every fragment showed
+  `translate_title` instead of `Translation`. That was a use-after-free, not a
+  missing translation.
+- `/w/calculator` is **explicit mode**: it renders the card even mid-entry,
+  because that is what makes a keypad usable. The page is what decides a query
+  is a search, so `covid-19` still has no card there.
+
+## static/widgets.js
+
+Progressive enhancement only. With JavaScript off the keypad is a GET form and
+the translate form is a GET; both round-trip and both work. With JavaScript on,
+the submit is intercepted, `/w/<kind>` is fetched and the card is swapped in
+place.
+
+Measured with Playwright, both ways:
+
+```
+js on : '5' -> '57', url still ?q=5&w=calculator
+js off: url q=5&w=calculator&key=7 | expr: 57
+```
+
+The first version of the script prevented the submit and *then* fetched. When
+the service happened to be running a build without `/w`, every keypad press did
+nothing at all - a dead button is worse than no script. It now falls back to
+`form.submit()` when the fragment cannot be had.
+
+`tests/test_widget_endpoints.sh` (`make widgets-check`) covers the four
+fragments, the keypad protocol, the explicit-mode contract, the 204 for a kind
+that does not match the query, the 404 for an unknown kind, and that the page
+keeps working independently.

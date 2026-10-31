@@ -436,6 +436,10 @@ translate-check: tests/test_j4_translate
 categories-check:
 	@./tests/test_j5_categories.sh
 
+# J4.0: /w/<kind> serves one card, and the keypad protocol works through it
+widgets-check:
+	@./tests/test_widget_endpoints.sh
+
 # J4.0/J4a: the calculator card, its keypad, and its states
 widget-check:
 	@./tests/test_j4_widget.sh

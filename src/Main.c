@@ -17,6 +17,7 @@
 #include "Routes/Home.h"
 #include "Routes/ImageProxy.h"
 #include "Routes/Images.h"
+#include "Routes/Widget.h"
 #include "Routes/Info.h"
 #include "Routes/Metrics.h"
 #include "Routes/Search.h"
@@ -314,6 +315,8 @@ int main(int argc, char **argv) {
   set_handler("/opensearch.xml", handle_opensearch);
   set_handler("/search", results_handler);
   set_handler("/images", images_handler);
+  /* J4.0: a card is a thing with a URL */
+  register_widget_routes();
   set_handler("/proxy", image_proxy_handler);
   set_handler("/info", info_handler);
   set_handler("/metrics", metrics_handler);
