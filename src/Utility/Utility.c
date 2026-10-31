@@ -328,6 +328,23 @@ const char *get_page_scale(void) {
   return value;
 }
 
+/* J1: `zoom` on <html> scales the layout but not the viewport that media
+   queries measure, so at the default 90 % the rail dropped at a 1240 px window
+   that had room for 1378 px of content. The templates now set --page-scale and
+   main.css multiplies the root font size and the layout tokens by it, which
+   the breakpoints agree with. */
+const char *get_page_scale_css(void) {
+  const char *percent = get_page_scale();
+  static const char *const PERCENT[] = {"80",  "85",  "90",
+                                        "95",  "100", "110"};
+  static const char *const DECIMAL[] = {"0.8", "0.85", "0.9",
+                                        "0.95", "1",   "1.1"};
+  for (size_t i = 0; i < sizeof(PERCENT) / sizeof(PERCENT[0]); i++)
+    if (strcmp(percent, PERCENT[i]) == 0)
+      return DECIMAL[i];
+  return "0.9";
+}
+
 char *get_locale(const char *default_locale) {
   char *cookie = get_cookie("locale");
   if (cookie && beaker_get_locale_meta(cookie) != NULL) {

@@ -15,6 +15,199 @@ REQUIRED = ["--bg-main", "--bg-card", "--border", "--text-primary",
             "--text-dim"]
 
 COLOUR = re.compile(r"^#[0-9a-fA-F]{3,8}$|^rgba?\([\d\s.,%]+\)$|^hsla?\([\d\s.,%]+\)$")
+HEX = re.compile(r"#(?:[0-9a-fA-F]{3}){1,2}\b")
+
+# J2: the tokens a component may reference. Everything here is either one of
+# the nine base tokens, a semantic token derived in main.css :root, or a
+# property set at runtime. --surface was used for a year without existing in
+# any theme, and the #fff fallback is what made the answer card white on dark.
+SEMANTIC = ["--surface", "--surface-2", "--on-accent", "--link", "--link-visited",
+            "--pos", "--neg", "--focus", "--map-filter", "--rail-width",
+            "--rail-breakpoint", "--page-gutter", "--page-scale", "--swatch"]
+
+
+def rel_luminance(value, tokens=None):
+    """Resolve a token value and return its relative luminance (WCAG 2.x)."""
+    r, g, b = _resolve(value, tokens)
+    def channel(c):
+        c = c / 255.0
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+
+
+def contrast(a, b, tokens=None):
+    tokens = tokens or {}
+    la, lb = rel_luminance(a, tokens), rel_luminance(b, tokens)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _parse(value):
+    value = value.strip()
+    m = HEX.match(value)
+    if m and m.start() == 0:
+        h = m.group(0)[1:]
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    m = re.match(r"rgba?\(([\d\s.,%]+)\)", value)
+    if m:
+        parts = [p for p in re.split(r"[,\s]+", m.group(1).strip()) if p]
+        if len(parts) >= 3:
+            return tuple(int(float(p.replace("%", ""))) for p in parts[:3])
+    return None
+
+
+def _resolve(value, tokens=None, depth=0):
+    """Resolve a token value to rgb: hex, rgb(), var(--x) or color-mix(),
+    with the mix percentages actually applied, so the contrast number means
+    something. Cycles and unknown names fall back to mid grey."""
+    tokens = tokens or {}
+    value = (value or "").strip()
+    if depth > 6:
+        return (128, 128, 128)
+    m = re.match(r"^var\(\s*(--[a-z0-9-]+)\s*\)$", value)
+    if m:
+        return _resolve(tokens.get(m.group(1), ""), tokens, depth + 1)
+    m = re.match(r"color-mix\(\s*in\s+srgb\s*,\s*(.+?)\s+(\d+(?:\.\d+)?)%\s*,"
+                 r"\s*(.+?)\s*\)$", value)
+    if m:
+        a = _resolve(m.group(1), tokens, depth + 1)
+        b = _resolve(m.group(3), tokens, depth + 1)
+        p = float(m.group(2)) / 100.0
+        return tuple(int(round(a[i] * p + b[i] * (1 - p))) for i in range(3))
+    m = re.match(r"color-mix\(", value)
+    if m:
+        parts = [x for x in re.findall(r"(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))", value)]
+        a = _resolve(parts[0], tokens, depth + 1) if parts else (128, 128, 128)
+        b = _resolve(parts[1], tokens, depth + 1) if len(parts) > 1 else a
+        return tuple((a[i] + b[i]) // 2 for i in range(3))
+    return _parse(value) or (128, 128, 128)
+
+
+def check_tokens_referenced(root):
+    """Lint (a): every var(--x) in main.css and the templates must resolve."""
+    css = (root / "static" / "main.css").read_text(encoding="utf-8")
+    defined = set(re.findall(r"(--[a-z0-9-]+)\s*:", css))
+    themes = sorted((root / "static" / "themes").glob("*.css"))
+    theme_tokens = {}
+    for theme in themes:
+        theme_tokens[theme.name] = set(re.findall(r"(--[a-z0-9-]+)\s*:", theme.read_text(encoding="utf-8")))
+
+    used = set(re.findall(r"var\(\s*(--[a-z0-9-]+)", css))
+    for tpl in (root / "templates").rglob("*.html"):
+        used |= set(re.findall(r"var\(\s*(--[a-z0-9-]+)", tpl.read_text(encoding="utf-8")))
+
+    problems = []
+    known = defined | set(SEMANTIC) | set(REQUIRED)
+    for var in sorted(used):
+        if var in known:
+            continue
+        problems.append(
+            f"{var} is used but not defined in main.css :root and not a base token")
+    # a theme may not reference a token it did not define itself
+    for name, tokens in theme_tokens.items():
+        text = (root / "static" / "themes" / name).read_text(encoding="utf-8")
+        for var in sorted(set(re.findall(r"var\(\s*(--[a-z0-9-]+)", text))):
+            if var not in tokens and var not in known:
+                problems.append(f"{name} references undefined {var}")
+    return problems
+
+
+def strip_comments(text, kind):
+    """Blank out comments but keep the line structure, so reported line
+    numbers still point at the real file."""
+    def blank(m):
+        return "\n" * m.group(0).count("\n")
+    text = re.sub(r"/\*.*?\*/", blank, text, flags=re.S)
+    if kind == "c":
+        text = re.sub(r"//[^\n]*", "", text)
+    return text
+
+
+def check_no_literal_colour(root):
+    """Lint (b): colours live in tokens, not in C or in the middle of a rule."""
+    problems = []
+    for src in sorted((root / "src" / "Infobox").glob("*.c")):
+        text = strip_comments(src.read_text(encoding="utf-8"), "c")
+        # line numbers shift when comments are removed; report the text instead
+        for i, line in enumerate(text.splitlines(), 1):
+            s = line.strip()
+            if not s:
+                continue
+            if "style='" in s and "--swatch" not in s:
+                problems.append(f"{src.name}:{i} inline style: {s[:70]}")
+            for m in HEX.finditer(s):
+                problems.append(f"{src.name}:{i} literal colour {m.group(0)}")
+            # a literal rgb() in C only matters if it reaches the page as a
+            # fixed colour, and anything that does carries style= above.
+            if re.search(r"\brgba?\(", s) and 'style=' in s:
+                problems.append(f"{src.name}:{i} literal rgb() in emitted style")
+
+    css = strip_comments((root / "static" / "main.css").read_text(encoding="utf-8"), "css")
+    for i, line in enumerate(css.splitlines(), 1):
+        s = line.strip()
+        # token definitions are where colours are allowed to be literal
+        if not s or s.startswith("--"):
+            continue
+        if "var(--swatch" in s:
+            continue
+        for m in HEX.finditer(s):
+            problems.append(f"main.css:{i} literal colour {m.group(0)}")
+        if re.search(r"\brgba?\(", s) and "color-mix" not in s:
+            problems.append(f"main.css:{i} literal rgb()")
+    return problems
+
+
+ROOT_TOKENS = {}
+
+
+def check_layout_once(root):
+    """J1: .content-layout must be defined in one place.
+
+    It was in seven, with conflicting grid, padding and ordering. At <=1240px
+    the last one won and put the rail after the pager, which is the reported
+    bug. A second definition is now a test failure, not a judgement call."""
+    css = strip_comments((root / "static" / "main.css").read_text(encoding="utf-8"), "css")
+    problems = []
+    blocks = len(re.findall(r"(?m)^\s*\.content-layout\s*\{", css))
+    if blocks != 1:
+        problems.append(f".content-layout is defined {blocks} times (want exactly 1)")
+    for dead in (r"\.content-layout[^,{]*\{[^}]*grid-column", r"(?<![a-z-])order:\s*-?\d"):
+        for m in re.finditer(dead, css):
+            line = css[:m.start()].count("\n") + 1
+            problems.append(f"main.css:{line} layout still uses {m.group(0)[:40]!r}")
+    return problems
+
+
+def check_contrast(root):
+    """J2 task 5: text on --bg-card >= 4.5, --pos/--neg on --bg-card >= 3.
+    Report the themes that fail; never weaken the check to make them pass."""
+    global ROOT_TOKENS
+    css = (root / "static" / "main.css").read_text(encoding="utf-8")
+    block = css.split(":root {", 1)[1].split("}", 1)[0]
+    ROOT_TOKENS = dict(re.findall(r"(--[a-z-]+)\s*:\s*([^;]+);", block))
+    failures = []
+    for theme in sorted((root / "static" / "themes").glob("*.css")):
+        tokens = dict(re.findall(r"(--[a-z-]+)\s*:\s*([^;]+);", theme.read_text(encoding="utf-8")))
+        card = tokens.get("--bg-card", "").strip()
+        if not card:
+            continue
+        merged = {**ROOT_TOKENS, **tokens}
+        text = tokens.get("--text-primary", "").strip()
+        if text:
+            ratio = contrast(text, card, merged)
+            if ratio < 4.5:
+                failures.append(f"{theme.name}: --text-primary on --bg-card is {ratio:.2f} (< 4.5)")
+        for name, want in (("--pos", 3.0), ("--neg", 3.0)):
+            # derived in main.css :root when the theme does not override it
+            value = tokens.get(name, "").strip() or ROOT_TOKENS.get(name, "")
+            if not value:
+                continue
+            ratio = contrast(value, card, merged)
+            if ratio < want:
+                failures.append(f"{theme.name}: {name} on --bg-card is {ratio:.2f} (< {want})")
+    return failures
 
 def check(path):
     text = path.read_text(encoding="utf-8")
@@ -56,7 +249,24 @@ def main():
             print(f"ok   {theme.name}")
 
     print(f"\n{len(themes) - failed}/{len(themes)} themes valid")
-    return 1 if failed else 0
+
+    lint_failed = 0
+    for name, problems in (
+            ("tokens referenced", check_tokens_referenced(root)),
+            ("no literal colours", check_no_literal_colour(root)),
+            ("one layout", check_layout_once(root)),
+            ("contrast", check_contrast(root))):
+        if problems:
+            lint_failed += 1
+            print(f"\nFAIL {name}")
+            for p in problems[:25]:
+                print(f"     {p}")
+            if len(problems) > 25:
+                print(f"     ... and {len(problems) - 25} more")
+        else:
+            print(f"ok   {name}")
+
+    return 1 if (failed or lint_failed) else 0
 
 if __name__ == "__main__":
     sys.exit(main())

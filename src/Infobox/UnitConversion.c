@@ -555,8 +555,8 @@ static char *build_html(double value, const UnitDef *from, double result,
   pluralize(to->name, result, to_name_buf, sizeof(to_name_buf));
 
   int n = snprintf(html, sizeof(html),
-                   "<div class='unit-conv-container' style='line-height: 1.6;'>"
-                   "<div style='font-size: 1.3em; margin-bottom: 8px;'>"
+                   "<div class='unit-conv-container'>"
+                   "<div class='conv-primary'>"
                    "<b>%s %s</b> = <b>%s %s</b>"
                    "</div>",
                    val_buf, from_name_buf, res_buf, to_name_buf);
@@ -610,7 +610,7 @@ InfoBox fetch_unit_conv_data(const char *query) {
 
   info.title = strdup("Unit Conversion");
   info.extract = strdup(build_html(value, from, result, to));
-  info.thumbnail_url = strdup("/static/calculation.svg");
+  info.thumbnail_url = strdup("");
   info.url = strdup("#");
 
   return info;

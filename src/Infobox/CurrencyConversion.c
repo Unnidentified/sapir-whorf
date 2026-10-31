@@ -359,10 +359,10 @@ static char *build_html(double value, const CurrencyDef *from,
   format_number(result, res_buf, sizeof(res_buf));
 
   snprintf(html, sizeof(html),
-           "<div class='currency-conv-container' style='line-height: 1.6;'>"
-           "<div style='font-size: 1.3em; margin-bottom: 8px;'>"
+           "<div class='currency-conv-container'>"
+           "<div class='conv-primary'>"
            "<b>%s %s</b> = <b>%s %s</b></div>"
-           "<div style='font-size: 0.9em; color: #666;'>"
+           "<div class='conv-rate muted'>"
            "1 %s = %.4f %s</div>"
            "</div>",
            val_buf, from->code, res_buf, to->code, from->code, result / value,
@@ -449,7 +449,9 @@ InfoBox fetch_currency_data(const char *query) {
 
   info.title = strdup("Currency Conversion");
   info.extract = strdup(build_html(value, from_curr, to_curr, result));
-  info.thumbnail_url = strdup("/static/calculation.svg");
+  /* J2: no image tile - a hard-coded blue glyph on white cannot follow the
+     theme, and an <img> cannot take currentColor. */
+  info.thumbnail_url = strdup("");
   info.url = strdup("#");
 
   return info;

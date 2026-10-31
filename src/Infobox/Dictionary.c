@@ -57,30 +57,24 @@ static const char *strcasestr_impl(const char *haystack, const char *needle) {
 static char *build_html(const char *word, const char *pron, const char *pos,
                         const char *def, const char *ex) {
   char html[4096];
-  int n = snprintf(html, sizeof(html),
-                   "<div class='dict-container' style='line-height: 1.6;'>");
+  /* J2: classes only. The old rules carried #666, #888 and #555, which
+     vanish on a dark theme and clash on amber and the custom palettes. */
+  int n = snprintf(html, sizeof(html), "<div class='dict-container'>");
   if (word)
-    n += snprintf(html + n, sizeof(html) - n,
-                  "<div style='font-size: 1.3em; font-weight: bold; "
-                  "margin-bottom: 4px;'>%s</div>",
+    n += snprintf(html + n, sizeof(html) - n, "<div class='dict-word'>%s</div>",
                   word);
   if (pron)
     n += snprintf(html + n, sizeof(html) - n,
-                  "<div style='color: #666; margin-bottom: 8px;'>/%s/</div>",
-                  pron);
+                  "<div class='dict-pron'>/%s/</div>", pron);
   if (pos)
-    n += snprintf(html + n, sizeof(html) - n,
-                  "<div style='font-style: italic; color: #888; margin-bottom: "
-                  "8px;'>%s</div>",
+    n += snprintf(html + n, sizeof(html) - n, "<div class='dict-pos'>%s</div>",
                   pos);
   if (def)
-    n += snprintf(html + n, sizeof(html) - n,
-                  "<div style='margin-bottom: 8px;'>%s</div>", def);
+    n += snprintf(html + n, sizeof(html) - n, "<div class='dict-def'>%s</div>",
+                  def);
   if (ex)
     n += snprintf(html + n, sizeof(html) - n,
-                  "<div style='color: #555; font-style: italic; margin-top: "
-                  "8px;'>\"%s\"</div>",
-                  ex);
+                  "<div class='dict-example'>\"%s\"</div>", ex);
   snprintf(html + n, sizeof(html) - n, "</div>");
   return strdup(html);
 }
@@ -246,7 +240,7 @@ InfoBox fetch_dictionary_data(const char *query) {
         if (word && def) {
           info.title = strdup("Dictionary");
           info.extract = build_html(word, pron, pos, def, ex);
-          info.thumbnail_url = strdup("/static/dictionary.jpg");
+          info.thumbnail_url = strdup("");
           info.url = strdup(url);
         }
 
@@ -289,7 +283,7 @@ InfoBox fetch_dictionary_data(const char *query) {
       if (word && def) {
         info.title = strdup("Dictionary");
         info.extract = build_html(word, pron, pos, def, ex);
-        info.thumbnail_url = strdup("/static/dictionary.jpg");
+        info.thumbnail_url = strdup("");
         info.url = strdup(url);
       }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{__locale_id}}" dir="{{__locale_direction}}" class="title-{{title_font}}" style="zoom: {{page_scale}}%">
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}" class="title-{{title_font}}" style="--page-scale: {{page_scale_css}}">
     
     <head>
         <meta charset="UTF-8">
@@ -34,8 +34,6 @@
     <body class="results-view">
         {{include "_chrome.html"}}
         <div class="content-layout{{if exists infoboxes}} with-rail{{endif}}">
-            <aside class="sidebar-spacer">
-            </aside>
             <main class="results-container">
                 {{if exists answer_text}}
                 <section class="answer-box" aria-label="{{l("answer_box_label")}}">
@@ -112,8 +110,18 @@
                 </nav>
                 {{endif}}
             </main>
-            <aside class="infobox-sidebar">
+            <aside class="infobox-sidebar" aria-label="{{l("panel_label")}}">
             {{if exists infoboxes}}
+              <!-- J1: below the rail breakpoint this becomes a compact card
+                   above the results, two to three lines, with a control that
+                   needs no JavaScript. On the wide layout the summary is
+                   visually hidden and the details are always open. -->
+              <details class="panel-compact" open>
+                <summary class="panel-compact-summary">
+                  <span class="panel-compact-title">{{panel_title}}</span>
+                  <span class="panel-compact-more">{{l("panel_more")}}</span>
+                </summary>
+                <div class="panel-compact-body">
               {{for info in infoboxes}}
                  <section class="infobox">
                      <div class="infobox-header">
@@ -135,10 +143,13 @@
                      </div>
                  </section>
                  {{endfor}}
+                </div>
+              </details>
                {{endif}}
             </aside>
         </div>
         <script src="/static/autocomplete.js" defer></script>
+        <script src="/static/widgets.js" defer></script>
     </body>
 
 </html>

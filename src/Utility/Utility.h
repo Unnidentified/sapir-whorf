@@ -31,6 +31,8 @@ void get_answers_mode(const char *fallback, char *out, size_t size);
 void get_answers_fanout(const char *fallback, char *out, size_t size);
 const char *get_title_font(void);
 const char *get_page_scale(void);
+/* the same value as a multiplier for CSS */
+const char *get_page_scale_css(void);
 int page_scale_is_valid(const char *value);
 
 /* user-defined palette, stored as "rrggbb,rrggbb,..." in a cookie */

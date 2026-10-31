@@ -821,7 +821,9 @@ int results_handler(UrlParams *params) {
   char *theme = get_theme("");
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "title_font", get_title_font());
-  context_set(&ctx, "page_scale", get_page_scale());
+  /* one key: the templates want the multiplier, and nothing else read the
+     percent form (the context has a fixed 32 slots) */
+  context_set(&ctx, "page_scale_css", get_page_scale_css());
   CustomTheme custom_theme;
   get_custom_theme(&custom_theme);
   context_set_custom_theme(&ctx, &custom_theme);
@@ -1121,7 +1123,6 @@ int results_handler(UrlParams *params) {
     url_encode(raw_query, enc, sizeof(enc));
     snprintf(href, sizeof(href), "/search?q=%s&web=1", enc);
     context_set(&ctx, "web_href", href);
-    context_set(&ctx, "web_explicit", web_explicit ? "1" : "");
   }
 
   /* the answer box and the patient link both need it, on both branches */
@@ -1454,6 +1455,9 @@ int results_handler(UrlParams *params) {
     context_set_array_of_arrays(&ctx, "infoboxes", infobox_matrix.rows,
                                 infobox_matrix.count,
                                 infobox_matrix.field_counts);
+    /* J1: the compact summary shows the first panel's title */
+    context_set(&ctx, "panel_title",
+                infobox_matrix.rows[0][0] ? infobox_matrix.rows[0][0] : "");
   }
   string_matrix_free(&infobox_matrix);
 

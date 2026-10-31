@@ -4,6 +4,29 @@
 
 :root {
     --text-dim: #7d7d7b;
+
+    /* J2: semantic tokens, derived from the nine a theme defines, so no theme
+       has to change. Custom properties resolve at computed-value time, so a
+       derived default follows whichever theme loads after this rule. A theme
+       may override any of them. */
+    --surface: var(--bg-card);
+    --surface-2: color-mix(in srgb, var(--bg-card) 70%, var(--bg-main));
+    --on-accent: color-mix(in srgb, var(--accent) 18%, var(--text-primary));
+    --link: var(--accent);
+    --link-visited: color-mix(in srgb, var(--accent) 70%, var(--text-secondary));
+    /* Mixed with the theme's own text colour, so the pair reads on a light
+       card and on a dark one: --text-primary is dark in a light theme (which
+       darkens the green) and light in a dark theme (which brightens it).
+       Measured with tools/check_themes.py across all 16 themes. */
+    --pos: color-mix(in srgb, #4fbf7b 55%, var(--text-primary));
+    --neg: color-mix(in srgb, #e05a5a 55%, var(--text-primary));
+    --focus: color-mix(in srgb, var(--accent) 70%, transparent);
+    --map-filter: none;
+
+    /* one breakpoint token: the rail sits beside the results above it, and
+       above them below it */
+    --rail-breakpoint: 1241px;
+    --rail-width: 360px;
 }
 
 *, *::before, *::after {
@@ -12,6 +35,9 @@
 
 html {
     height: 100%;
+    /* J1: the page scale used to be `zoom` on <html>, which media queries do
+       not see. This is the same visual size and an honest breakpoint. */
+    font-size: calc(100% * var(--page-scale, 1));
 }
 
 body {
@@ -232,7 +258,7 @@ header .logo-link:hover {
 .image-wrapper {
     position: relative;
     aspect-ratio: 4/3;
-    background: #000;
+    background: var(--bg-main);
     overflow: hidden;
 }
 
@@ -247,7 +273,7 @@ header .logo-link:hover {
 .image-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: color-mix(in srgb, var(--bg-main) 60%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -288,10 +314,10 @@ header .logo-link:hover {
 }
 
 .overlay-btn.secondary {
-    background: rgba(255,255,255,0.1);
-    color: white;
+    background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+    color: var(--text-primary);
     backdrop-filter: blur(4px);
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid color-mix(in srgb, var(--text-primary) 22%, transparent);
 }
 
 .image-info {
@@ -317,9 +343,11 @@ header .logo-link:hover {
     text-overflow: ellipsis;
 }
 
-.content-layout {
-    display: grid;
-}
+/* J1: .content-layout is defined exactly once, here, and every other block in
+   this file that used to redeclare it has been folded in. It was in seven
+   places with conflicting grid, padding and ordering; the winner at <=1240px
+   put the rail after the pager, which is the owner's "boxes drop below the
+   results". */
 
 .url {
     color: var(--text-secondary);
@@ -435,11 +463,10 @@ header .logo-link:hover {
 }
 
 @media (max-width:1200px) {
-    .content-layout {
-        grid-template-columns: 1fr;
-        padding-block: 20px;
-        padding-inline: 30px;
-        gap: 20px;
+    :root {
+        --layout-gap: calc(20px * var(--page-scale, 1));
+        --layout-gutter: calc(30px * var(--page-scale, 1));
+        --layout-block: calc(20px * var(--page-scale, 1));
     }
     header {
         gap: 20px;
@@ -454,9 +481,9 @@ header .logo-link:hover {
         display: flex;
         justify-content: center;
     }
-    .infobox-sidebar {
-        order: -1;
-    }
+    /* the rail used to be forced first here with order: -1; placement is
+       grid-template-areas now, and the compact panel above the results is
+       what "first" means below the breakpoint */
     .nav-tabs,.image-results-container {
         padding-inline: 30px;
     }
@@ -503,11 +530,10 @@ header .logo-link:hover {
         padding: 12px 0;
         font-size: 0.95rem;
     }
-    .content-layout {
-        padding-inline-start: 40px;
-        padding-inline-end: 16px;
-        padding-block: 16px;
-        gap: 16px;
+    :root {
+        --layout-gutter: calc(40px * var(--page-scale, 1)) calc(16px * var(--page-scale, 1));
+        --layout-block: calc(16px * var(--page-scale, 1));
+        --layout-gap: calc(16px * var(--page-scale, 1));
     }
     .result {
         margin-bottom: 24px;
@@ -584,10 +610,9 @@ header .logo-link:hover {
 }
 
 @media (max-width:600px) {
-    .content-layout {
-        padding-inline-start: 28px;
-        padding-inline-end: 16px;
-        padding-block: 16px;
+    :root {
+        --layout-gutter: calc(28px * var(--page-scale, 1)) calc(16px * var(--page-scale, 1));
+        --layout-block: calc(16px * var(--page-scale, 1));
     }
     .settings-layout {
         padding: 0;
@@ -712,12 +737,26 @@ header .logo-link:hover {
    off like everything else here. */
 /* G4: the answer box. Shown above the results when an answerer could answer
    without the network, so it costs no latency and needs no JS. */
+/* J2: --surface was defined in no theme, so the #fff fallback always won and
+   the card was white on every dark palette while the text inherited
+   --text-primary. That is the pale "2" in the owner's screenshot. */
 .answer-box {
   margin: 0 0 1.25rem 0;
   padding: 1rem 1.2rem;
-  border: 1px solid var(--border, #d8d8d8);
-  border-radius: 10px;
-  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+.answer-box-source a {
+  color: var(--link);
+  text-decoration: none;
+}
+.answer-box-source a:visited {
+  color: var(--link-visited);
+}
+.answer-box-source a:hover {
+  text-decoration: underline;
 }
 .answer-box-text {
   margin: 0;
@@ -735,7 +774,7 @@ header .logo-link:hover {
 }
 .answer-box-source {
   margin: 0.5rem 0 0 0;
-  color: var(--text-muted, #777);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -752,7 +791,7 @@ header .logo-link:hover {
 .settings-table td {
   text-align: left;
   padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--border, #d8d8d8);
+  border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 .settings-table th {
@@ -1130,25 +1169,9 @@ h1 span {
     color: var(--text-dim);
 }
 
-/* ---------- feed layout (single column feed + infobox rail) ---------- */ .content-layout {
-    grid-template-columns: minmax(0, 1fr) 37%;
-    gap: 5.6%;
-    padding-inline: 16.6% 5.5%;
-    padding-block: 30px;
-}
-
-.sidebar-spacer {
-    display: none;
-}
-
-@media (max-width: 1240px) {
-    .content-layout {
-        padding-inline: 40px;
-    }
-    .content-layout .results-container {
-        grid-column: 1;
-    }
-}
+/* The old feed-layout block redeclared the grid (1fr 37%, 16.6% gutters) and
+   was overridden by the block near the end of this file at equal specificity,
+   so it never applied. Deleted rather than left to mislead. */
 
 /* ---------- history page ---------- */ .history-head {
     display: flex;
@@ -1221,8 +1244,13 @@ h1 span {
 }
 
 /* ================================================================ page grid — aligned container, results left, rail right ================================================================ */ :root {
-    --page-gutter: max(24px, 12vw);
-    --rail-width: 360px;
+    --page-gutter: calc(max(24px, 12vw) * var(--page-scale, 1));
+    --rail-width: calc(360px * var(--page-scale, 1));
+    /* J1: the layout's spacing is a variable so a breakpoint can adjust it
+       without redeclaring .content-layout (which is now declared once). */
+    --layout-gap: calc(32px * var(--page-scale, 1));
+    --layout-gutter: var(--page-gutter);
+    --layout-block: calc(26px * var(--page-scale, 1)) calc(64px * var(--page-scale, 1));
 }
 
 header {
@@ -1247,47 +1275,46 @@ header .search-box {
     padding-inline: var(--page-gutter);
 }
 
+/* J1: one layout, expressed with grid-template-areas instead of `order`
+   and `grid-column` overrides that fought each other. Narrow is the base:
+   the panel sits above the results. Wide moves it into the rail. */
 .content-layout {
-    /* no rail unless an infobox is actually rendered */
     grid-template-columns: minmax(0, 1fr);
-    gap: 64px;
-    padding-inline: var(--page-gutter);
-    padding-block: 26px 64px;
+    grid-template-areas: "rail" "main";
+    gap: var(--layout-gap);
+    padding-inline: var(--layout-gutter);
+    padding-block: var(--layout-block);
     align-items: start;
 }
 
-.content-layout.with-rail {
-    grid-template-columns: minmax(0, 1fr) var(--rail-width);
-}
-
-.content-layout .results-container {
-    grid-column: 1;
+.content-layout > .results-container {
+    grid-area: main;
     max-width: 880px;
 }
 
-/* without a rail there is nothing to wrap around: use the full column */
-.content-layout:not(.with-rail) .results-container {
-    max-width: none;
-}
-
-.content-layout .infobox-sidebar {
-    grid-column: 1;
+/* no rail unless an infobox is actually rendered */
+.content-layout > .infobox-sidebar {
+    grid-area: rail;
     display: none;
 }
 
-.content-layout.with-rail .infobox-sidebar {
-    grid-column: 2;
+.content-layout.with-rail > .infobox-sidebar {
     display: block;
 }
 
-@media (max-width: 1240px) {
+.content-layout:not(.with-rail) > .results-container {
+    max-width: none;
+}
+
+@media (min-width: 1241px) {
     .content-layout.with-rail {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 32px;
+        grid-template-columns: minmax(0, 1fr) var(--rail-width);
+        grid-template-areas: "main rail";
+        gap: 64px;
     }
-    .content-layout .results-container, .content-layout.with-rail .infobox-sidebar {
-        grid-column: 1;
-        max-width: none;
+    /* the panel is always open where there is room for it */
+    .panel-compact > .panel-compact-summary {
+        display: none;
     }
 }
 
@@ -1387,13 +1414,10 @@ header .search-box {
     margin: 0;
 }
 
-/* when the rail stacks under the results, keep the results first */
-@media (max-width: 1240px) {
-    .content-layout .results-container,
-    .content-layout .infobox-sidebar {
-        order: 0;
-    }
-}
+/* The "keep the results first" rule that used to be here set order: 0 on
+   both children, which won on specificity over the earlier order: -1 and is
+   why the rail ended up after the pager. Placement is grid-template-areas
+   now; there is nothing to order. */
 
 /* ---------- keyboard focus ---------- */
 
@@ -1795,4 +1819,156 @@ input[type="color"]:focus-visible {
     margin: 18px 0 0;
     color: var(--text-muted);
     font-size: 0.78rem;
+}
+
+/* ================================================================
+   answer panels (J2)
+   The HTML these style was built in C with fixed greys (#666, #888, #555,
+   #ddd, #eee) and fixed layout, which disappeared or clashed on any theme but
+   the one they were written against. Everything here comes from a token.
+   ================================================================ */
+.calc-container,
+.currency-conv-container,
+.unit-conv-container,
+.colour-container,
+.dict-container {
+    line-height: 1.6;
+}
+
+/* the expression list above the result */
+.calc-container > div:first-child {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.calc-steps {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-size: 1.2em;
+}
+
+.calc-steps b {
+    color: var(--text-primary);
+}
+
+/* a conversion's headline number and the rate under it */
+.conv-primary {
+    font-size: 1.3em;
+    margin-bottom: 8px;
+}
+
+.conv-rate,
+.muted {
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+/* ---------- colour code ---------- */
+.colour-swatch-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.colour-swatch {
+    width: 100px;
+    height: 100px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    /* the one value that must come from the data */
+    background-color: var(--swatch, var(--bg-main));
+}
+
+.colour-hex {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.colour-value {
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+/* ---------- dictionary ---------- */
+.dict-word {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.dict-pron {
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.dict-pos {
+    font-style: italic;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.dict-def {
+    margin-bottom: 8px;
+}
+
+.dict-example {
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 8px;
+}
+
+/* ================================================================
+   compact knowledge panel (J1)
+   Below the rail breakpoint the panel is the first thing in the main column,
+   collapsed to its title and a "more" control. Above it, the summary is
+   hidden and the body is always visible.
+   ================================================================ */
+.panel-compact {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    margin-bottom: 1.5rem;
+}
+
+.panel-compact-summary {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.panel-compact-summary::-webkit-details-marker {
+    display: none;
+}
+
+.panel-compact-title {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.panel-compact-more {
+    color: var(--link);
+    font-size: 0.85rem;
+}
+
+.panel-compact[open] > .panel-compact-summary .panel-compact-more::after {
+    content: " ▲";
+}
+
+.panel-compact:not([open]) > .panel-compact-summary .panel-compact-more::after {
+    content: " ▼";
+}
+
+.panel-compact-body {
+    padding: 0 1rem 1rem;
+}
+
+.panel-compact-body .infobox:first-child {
+    border-top: 1px solid var(--border);
+    padding-top: 0.8rem;
 }

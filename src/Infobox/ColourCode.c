@@ -153,21 +153,20 @@ InfoBox fetch_colour_data(char *query) {
 
     char html[1024];
     snprintf(html, sizeof(html),
-             "<div class='colour-container' style='line-height: 1.6;'>"
-             "<div style='display: flex; align-items: flex-start; gap: 16px;'>"
-             "<div style='width: 100px; height: 100px; border-radius: 12px; "
-             "border: 1px solid #ddd; background-color: rgb(%d,%d,%d); "
-             "flex-shrink: 0;'></div>"
+             /* J2: no colours and no layout in C. The swatch is the one
+                legitimate dynamic value, and it travels as a data attribute
+                that the stylesheet reads - so the page can run under a strict
+                style-src 'self' later. */
+             "<div class='colour-container'>"
+             "<div class='colour-swatch-row'>"
+             "<div class='colour-swatch' style='--swatch:#%02X%02X%02X'>"
+             "</div>"
              "<div>"
-             "<div style='font-size: 1.3em; font-weight: bold; margin-bottom: "
-             "8px;'>#%02X%02X%02X</div>"
-             "<div style='color: #666; margin-bottom: 4px;'>RGB(%d, %d, "
-             "%d)</div>"
-             "<div style='color: #666; margin-bottom: 4px;'>HSL(%d, %d%%, "
-             "%d%%)</div>"
-             "<div style='color: #666; margin-bottom: 4px;'>HSV(%d, %d%%, "
-             "%d%%)</div>"
-             "<div style='color: #666;'>CMYK(%d%%, %d%%, %d%%, %d%%)</div>"
+             "<div class='colour-hex'>#%02X%02X%02X</div>"
+             "<div class='colour-value'>RGB(%d, %d, %d)</div>"
+             "<div class='colour-value'>HSL(%d, %d%%, %d%%)</div>"
+             "<div class='colour-value'>HSV(%d, %d%%, %d%%)</div>"
+             "<div class='colour-value'>CMYK(%d%%, %d%%, %d%%, %d%%)</div>"
              "</div></div></div>",
              r, g, b, r, g, b, r, g, b, h, s2, l, hh, ss, v, c, m, y, k);
     info.title = strdup("Colour");
@@ -201,17 +200,19 @@ InfoBox fetch_colour_data(char *query) {
 
   char html[1024];
   snprintf(html, sizeof(html),
-           "<div class='colour-container' style='line-height: 1.6;'>"
-           "<div style='display: flex; align-items: flex-start; gap: 16px;'>"
-           "<div style='width: 100px; height: 100px; border-radius: 12px; "
-           "border: 1px solid #ddd; background-color: #%.*s; flex-shrink: 0;'></div>"
+           /* J2: layout and text colours come from main.css. The swatch is
+              the one legitimate dynamic value and travels as a custom
+              property, which the stylesheet consumes; a strict
+              style-src 'self' can allow exactly this shape later. */
+           "<div class='colour-container'>"
+           "<div class='colour-swatch-row'>"
+           "<div class='colour-swatch' style='--swatch:#%.*s'></div>"
            "<div>"
-           "<div style='font-size: 1.3em; font-weight: bold; margin-bottom: 8px;'>"
-           "#%.*s</div>"
-           "<div style='color: #666; margin-bottom: 4px;'>RGB(%d, %d, %d)</div>"
-           "<div style='color: #666; margin-bottom: 4px;'>HSL(%d, %d%%, %d%%)</div>"
-           "<div style='color: #666; margin-bottom: 4px;'>HSV(%d, %d%%, %d%%)</div>"
-           "<div style='color: #666;'>CMYK(%d%%, %d%%, %d%%, %d%%)</div>"
+           "<div class='colour-hex'>#%.*s</div>"
+           "<div class='colour-value'>RGB(%d, %d, %d)</div>"
+           "<div class='colour-value'>HSL(%d, %d%%, %d%%)</div>"
+           "<div class='colour-value'>HSV(%d, %d%%, %d%%)</div>"
+           "<div class='colour-value'>CMYK(%d%%, %d%%, %d%%, %d%%)</div>"
            "</div>"
            "</div>"
            "</div>",

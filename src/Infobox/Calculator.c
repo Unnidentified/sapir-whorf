@@ -125,11 +125,10 @@ InfoBox fetch_calc_data(char *math_input) {
 
   char html_output[5120];
   snprintf(html_output, sizeof(html_output),
-           "<div class='calc-container' style='line-height: 1.6;'>"
+           "<div class='calc-container'>"
            "%s"
-           "<div style='margin-top: 8px; border-top: 1px solid #eee; "
-           "padding-top: 8px; font-size: 1.2em;'>"
-           "<b>%g</b>"
+           "<div class='calc-steps'>"
+           "<b>%.12g</b>"
            "</div>"
            "</div>",
            strlen(logic_log) > 0 ? logic_log : "<div>Constant value</div>",
@@ -137,7 +136,9 @@ InfoBox fetch_calc_data(char *math_input) {
 
   info.title = strdup("Calculation");
   info.extract = strdup(html_output);
-  info.thumbnail_url = strdup("/static/calculation.svg");
+  /* J2: no image tile. It was a hard-coded #3498db glyph on white and an
+     <img> cannot take currentColor, so it was wrong on every dark palette. */
+  info.thumbnail_url = strdup("");
   info.url = strdup("#");
 
   return info;
