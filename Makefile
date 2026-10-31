@@ -327,7 +327,7 @@ eval-strict:
 
 # A7: one command that runs everything the project has, including a sanitizer
 # build when asked. This is the substitute for the CI the project does not have.
-verify: build check
+verify: all check
 	@echo "verify: all checks passed"
 
 asan:
