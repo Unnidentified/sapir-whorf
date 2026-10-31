@@ -37,6 +37,13 @@ typedef struct {
      what Bing did for "best podcast app". */
   unsigned long total_cancelled;  /* cut off by our own batch deadline */
   int pace_override;        /* 0 = use the global rate                  */
+  /* H1: when did this engine last succeed, and when did it last fail? A
+     persisted "0/2" cannot be tied to a build or to a moment without these. */
+  time_t last_ok;
+  time_t last_error;
+  /* the UA profile that last worked, so a restart does not go back to a
+     profile the engine has already refused */
+  char ua_profile[16];
   unsigned long quality_samples;
   double quality_ewma;      /* 0..1, share of its results that survived      */
 } EngineHealthEntry;
@@ -63,6 +70,11 @@ void engine_health_set_pacing(int requests_per_minute, int burst);
 /* Per-engine override of the global rate: an engine that borrows someone
    else's public endpoint (google_cse_element) gets a smaller one. */
 void engine_health_set_engine_pace(const char *id, int requests_per_minute);
+
+/* H1: remember which UA profile this engine answered under, so the ladder
+   starts where it last succeeded. Returns the stored profile or NULL. */
+void engine_health_set_ua_profile(const char *id, const char *profile);
+const char *engine_health_ua_profile(const char *id);
 
 EngineHealthEntry *engine_health_get(const char *id);
 const char *engine_health_state_name(BreakerState state);

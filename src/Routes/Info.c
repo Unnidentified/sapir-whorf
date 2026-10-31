@@ -71,7 +71,8 @@ int info_handler(UrlParams *params) {
                     "\"blocked\":%lu,\"errors\":%lu,"
                     "\"quality\":%.2f,\"quality_samples\":%lu,"
                     "\"never_succeeded\":%s,\"cancelled\":%lu,"
-                    "\"suspend_reason\":\"%s\",\"paused_seconds_left\":%d}",
+                    "\"suspend_reason\":\"%s\",\"paused_seconds_left\":%d,"
+                    "\"last_ok\":%ld,\"last_error\":%ld,\"ua_profile\":\"%s\"}",
                     first ? "" : ",", ENGINE_REGISTRY[i].id,
                     ENGINE_REGISTRY[i].name,
                     health ? engine_health_state_name(health->state) : "unknown",
@@ -88,7 +89,11 @@ int info_handler(UrlParams *params) {
                     health ? health->total_cancelled : 0UL,
                     engine_health_suspend_name(
                         health ? health->suspend_reason : SUSPEND_NONE),
-                    paused_left) != 0) {
+                    paused_left,
+                    health ? (long)health->last_ok : 0L,
+                    health ? (long)health->last_error : 0L,
+                    health && health->ua_profile[0] ? health->ua_profile : "-") !=
+        0) {
       send_response("Failed to build instance info");
       return -1;
     }

@@ -333,6 +333,14 @@ tests/test_g4_answerbox: tests/test_g4_answerbox.c $(LINT_SRCS) \
 answer-check: tests/test_g4_answerbox
 	@./tests/test_g4_answerbox
 
+# H1: the UA ladder and the profile that survives a restart
+tests/test_h1_ua: tests/test_h1_ua.c src/Scraping/EngineHealth.c \
+                  src/Scraping/ScrapingHttp.c $(LINT_SRCS)
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto -lm
+
+ua-check: tests/test_h1_ua
+	@./tests/test_h1_ua
+
 # A3: offline relevance benchmark. Reranks a recorded replay file with the
 # production ranker - no network, no server, deterministic.
 tests/offline_rank: tests/offline_rank.c src/Ranking/Ranker.c \
@@ -383,6 +391,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check smoke
 
-.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

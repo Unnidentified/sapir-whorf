@@ -1828,6 +1828,34 @@ int results_handler(UrlParams *params) {
       }
     }
 
+    /* H1: if every result came from one index, say so. It is the difference
+       between "this is what the web says" and "this is what one index says". */
+    {
+      const char *groups[ENGINE_COUNT];
+      int group_count = 0;
+      for (int i = 0; i < enabled_engine_count; i++) {
+        if (jobs[i].results_count <= 0 || !jobs[i].engine)
+          continue;
+        const char *g = jobs[i].engine->index_group;
+        if (!g || !g[0])
+          continue;
+        int seen = 0;
+        for (int k = 0; k < group_count; k++)
+          if (strcmp(groups[k], g) == 0)
+            seen = 1;
+        if (!seen && group_count < ENGINE_COUNT)
+          groups[group_count++] = g;
+      }
+      if (group_count == 1) {
+        char note[192];
+        snprintf(note, sizeof(note),
+                 "Results from one index only (%s). No other independent "
+                 "source answered this search.",
+                 groups[0]);
+        context_set(&ctx, "one_index_note", note);
+      }
+    }
+
     /* G2: a paused engine is not an outage, and it is not invisible either. */
     {
       char note[320];

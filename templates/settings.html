@@ -177,6 +177,10 @@
                     {{if has_engine_status}}
                     <section class="settings-section">
                         <h3 class="settings-section-title">Engine status</h3>
+                        <p class="settings-section-desc">Independent indexes answering now: <strong>{{index_groups}}</strong>.</p>
+                        {{if exists index_groups_warning}}
+                        <p class="cached-note">{{index_groups_warning}}</p>
+                        {{endif}}
                         <p class="settings-section-desc">Live state of each source. An engine that is paused says why and for how long — a pause you cannot see looks like a broken engine.</p>
                         <div class="settings-table-wrap">
                             <table class="settings-table">

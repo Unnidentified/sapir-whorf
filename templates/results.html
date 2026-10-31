@@ -74,6 +74,10 @@
                 <p class="cached-note">Some sources were unavailable; {{results_cached}} answered from cache.</p>
                 {{endif}}
 
+                {{if exists one_index_note}}
+                <p class="cached-note">{{one_index_note}}</p>
+                {{endif}}
+
                 {{if exists paused_note}}
                 <p class="cached-note">{{paused_note}}</p>
                 {{endif}}

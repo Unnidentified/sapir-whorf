@@ -1,6 +1,7 @@
 #ifndef SCRAPING_H
 #define SCRAPING_H
 
+#include "../Config.h"
 #include <curl/curl.h>
 #include <libxml/HTMLparser.h>
 #include <libxml/xpath.h>
@@ -122,6 +123,10 @@ typedef struct {
   double elapsed_ms;
   struct timespec started;
   ScrapeStatus status;
+  /* H1: which UA profile this job actually used, and the URL it used, so a
+     challenge can be retried with the next profile without rebuilding both. */
+  char ua_profile[16];
+  char full_url[BUFFER_SIZE_LARGE];
 } ScrapeJob;
 
 extern SearchEngine ENGINE_REGISTRY[];
@@ -140,6 +145,8 @@ void configure_curl_handle(CURL *curl, const char *full_url,
 const char *get_engine_user_agent(const char *engine_id);
 const char *get_engine_user_agent_profile(const char *profile,
                                           const char *engine_id);
+/* H1: the next profile in the ladder, or NULL when it is exhausted */
+const char *get_engine_user_agent_ladder_next(const char *current);
 char *build_search_url(const char *base_url, const char *page_param,
                        int page_multiplier, int page_base,
                        const char *encoded_query, int page);

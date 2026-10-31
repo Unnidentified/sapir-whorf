@@ -144,6 +144,45 @@ int settings_handler(UrlParams *params) {
     context_set(&ctx, "has_enabled_engines", "1");
   }
 
+  /* H1: how many independent indexes can answer right now. Three engines that
+     resell one index are one source, and a page that only ever hears from one
+     index should say so. */
+  {
+    const char *groups[ENGINE_COUNT];
+    int group_count = 0;
+    for (int i = 0; i < ENGINE_COUNT; i++) {
+      if (!ENGINE_REGISTRY[i].enabled)
+        continue;
+      if (!(ENGINE_REGISTRY[i].verticals & V_WEB))
+        continue;
+      if (!engine_health_allow(ENGINE_REGISTRY[i].id))
+        continue;
+      const char *g = ENGINE_REGISTRY[i].index_group;
+      if (!g || !g[0])
+        continue;
+      int seen = 0;
+      for (int k = 0; k < group_count; k++)
+        if (strcmp(groups[k], g) == 0)
+          seen = 1;
+      if (!seen && group_count < ENGINE_COUNT)
+        groups[group_count++] = g;
+    }
+    char summary[256];
+    int used = snprintf(summary, sizeof(summary), "%d", group_count);
+    for (int k = 0; k < group_count && used < (int)sizeof(summary) - 3; k++)
+      used += snprintf(summary + used, sizeof(summary) - (size_t)used, "%s%s",
+                       k ? ", " : " (", groups[k]);
+    if (group_count > 0 && used < (int)sizeof(summary) - 1)
+      snprintf(summary + used, sizeof(summary) - (size_t)used, ")");
+    context_set(&ctx, "index_groups", summary);
+    if (group_count < 2)
+      context_set(&ctx, "index_groups_warning",
+                  "Only one independent index is answering. Everything you see "
+                  "comes from a single source, and its failures are not covered "
+                  "by anything else. Add an independent engine (see "
+                  "docs/SETUP.md) to change that.");
+  }
+
   /* G2: what the breaker is actually doing, per engine. A pause the user cannot
      see is indistinguishable from a broken search engine - that was the
      complaint behind the rate-limit work. Row: name, state, why, resumes,

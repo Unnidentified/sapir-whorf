@@ -97,6 +97,8 @@ static int strike_threshold(SuspendReason reason) {
   return failure_threshold;
 }
 
+static void engine_health_persist_locked(void);
+
 static int is_failure_status(int status, long http_status) {
   if (status == SCRAPE_STATUS_FETCH_ERROR ||
       status == SCRAPE_STATUS_PARSE_MISMATCH ||
@@ -178,6 +180,31 @@ int engine_health_take_token(const char *id) {
   return allowed;
 }
 
+void engine_health_set_ua_profile(const char *id, const char *profile) {
+  if (!id || !id[0] || !profile)
+    return;
+  pthread_mutex_lock(&health_mutex);
+  EngineHealthEntry *entry = find_or_create(id);
+  if (entry && strcmp(entry->ua_profile, profile) != 0) {
+    snprintf(entry->ua_profile, sizeof(entry->ua_profile), "%s", profile);
+    engine_health_persist_locked();
+  }
+  pthread_mutex_unlock(&health_mutex);
+}
+
+const char *engine_health_ua_profile(const char *id) {
+  static __thread char buf[16];
+  buf[0] = '\0';
+  if (!id)
+    return NULL;
+  pthread_mutex_lock(&health_mutex);
+  EngineHealthEntry *entry = find_or_create(id);
+  if (entry && entry->ua_profile[0])
+    snprintf(buf, sizeof(buf), "%s", entry->ua_profile);
+  pthread_mutex_unlock(&health_mutex);
+  return buf[0] ? buf : NULL;
+}
+
 void engine_health_set_engine_pace(const char *id, int requests_per_minute) {
   if (!id || !id[0] || requests_per_minute <= 0)
     return;
@@ -213,9 +240,13 @@ void engine_health_init(const char *cache_dir) {
       double latency = 0;
       int trips = 0;
       int reason = 0;
-      if (sscanf(line, "%31s %d %d %ld %lu %lu %lu %lu %lf %d %d", id,
+      long last_ok = 0, last_error = 0;
+      char ua[16] = "";
+      if (sscanf(line,
+                 "%31s %d %d %ld %lu %lu %lu %lu %lf %d %d %ld %ld %15s", id,
                  &state, &consecutive, &open_until, &req, &ok, &blocked,
-                 &errors, &latency, &trips, &reason) < 4)
+                 &errors, &latency, &trips, &reason, &last_ok, &last_error,
+                 ua) < 4)
         continue;
       EngineHealthEntry *entry = find_or_create(id);
       if (!entry)
@@ -230,6 +261,10 @@ void engine_health_init(const char *cache_dir) {
       entry->total_latency_ms = latency;
       entry->trips = trips;
       entry->suspend_reason = (SuspendReason)reason;
+      entry->last_ok = (time_t)last_ok;
+      entry->last_error = (time_t)last_error;
+      if (ua[0] && strcmp(ua, "-") != 0)
+        snprintf(entry->ua_profile, sizeof(entry->ua_profile), "%s", ua);
     }
     fclose(file);
   }
@@ -369,6 +404,7 @@ void engine_health_record(const char *id, int status, long http_status,
       SuspendReason kind =
           classify_failure(status, http_status, retry_after_secs);
       entry->total_errors++;
+      entry->last_error = time(NULL);
       if (status == SCRAPE_STATUS_BLOCKED)
         entry->total_blocked++;
       entry->consecutive_failures++;
@@ -389,6 +425,7 @@ void engine_health_record(const char *id, int status, long http_status,
       }
     } else if (status == SCRAPE_STATUS_OK) {
       entry->total_ok++;
+      entry->last_ok = time(NULL);
       entry->consecutive_failures = 0;
       entry->trips = 0;
       entry->state = HEALTH_CLOSED;
@@ -440,24 +477,32 @@ void engine_health_record_cancelled(const char *id) {
   pthread_mutex_unlock(&health_mutex);
 }
 
-void engine_health_persist(void) {
+static void engine_health_persist_locked(void) {
   if (!health_file[0])
     return;
-
-  pthread_mutex_lock(&health_mutex);
   FILE *file = fopen(health_file, "w");
   if (file) {
     for (int i = 0; i < entry_count; i++) {
       fprintf(file,
-              "%s\t%d\t%d\t%ld\t%lu\t%lu\t%lu\t%lu\t%.1f\t%d\t%d\n",
+              "%s\t%d\t%d\t%ld\t%lu\t%lu\t%lu\t%lu\t%.1f\t%d\t%d\t%ld"
+              "\t%ld\t%s\n",
               entries[i].id, entries[i].state,
               entries[i].consecutive_failures, (long)entries[i].open_until,
               entries[i].total_requests, entries[i].total_ok,
               entries[i].total_blocked, entries[i].total_errors,
               entries[i].total_latency_ms, entries[i].trips,
-              (int)entries[i].suspend_reason);
+              (int)entries[i].suspend_reason, (long)entries[i].last_ok,
+              (long)entries[i].last_error,
+              entries[i].ua_profile[0] ? entries[i].ua_profile : "-");
     }
     fclose(file);
   }
+}
+
+void engine_health_persist(void) {
+  if (!health_file[0])
+    return;
+  pthread_mutex_lock(&health_mutex);
+  engine_health_persist_locked();
   pthread_mutex_unlock(&health_mutex);
 }

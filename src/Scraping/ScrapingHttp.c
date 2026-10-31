@@ -75,6 +75,26 @@ const char *get_engine_user_agent_profile(const char *profile,
   return get_engine_user_agent(engine_id);
 }
 
+/* H1: the measured ladder. Brave refused every Chrome UA and served Safari and
+   Firefox; the others accept Chrome, so the ladder is ordered by what was
+   actually observed to work rather than by market share. */
+static const char *UA_LADDER[] = {"safari", "firefox", "chrome"};
+
+const char *get_engine_user_agent_ladder_next(const char *current) {
+  const size_t count = sizeof(UA_LADDER) / sizeof(UA_LADDER[0]);
+  /* no profile, or one that is not in the ladder: start at the top rather than
+     guessing where we are. Anything else would skip the profile most likely to
+     work, which is the point of having a ladder. */
+  if (!current || !current[0])
+    return UA_LADDER[0];
+  for (size_t i = 0; i < count; i++) {
+    if (strcasecmp(current, UA_LADDER[i]) != 0)
+      continue;
+    return (i + 1 < count) ? UA_LADDER[i + 1] : NULL;
+  }
+  return UA_LADDER[0];
+}
+
 /* one stable identity per engine: rotating the UA on every request is a
    fingerprint of its own, and some engines challenge the mismatch */
 const char *get_engine_user_agent(const char *engine_id) {

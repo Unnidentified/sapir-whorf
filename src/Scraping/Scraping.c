@@ -219,6 +219,66 @@ static void classify_job_response(ScrapeJob *job, const char *response,
   job->status = SCRAPE_STATUS_EMPTY;
 }
 
+static void cleanup_job_results(ScrapeJob *job);
+
+/* H1: a challenge page is frequently just the wrong User-Agent. Retry once,
+   blocking, with the next profile in the ladder; if it answers, keep the
+   results and remember the profile that worked. Deliberately does NOT use the
+   cookie jar: the jar is serialised per engine (C14) and a synchronous retry
+   would race the other jobs in this batch. A challenge is about the request
+   fingerprint, not the cookies. */
+static int retry_job_with_next_ua(ScrapeJob *job) {
+  if (!job || !job->engine || !job->ua_profile[0] || !job->full_url[0])
+    return 0;
+  if (job->engine->build_url)
+    return 0; /* API engines: the payload is not a browser page */
+  const char *next = get_engine_user_agent_ladder_next(job->ua_profile);
+  if (!next)
+    return 0;
+
+  CURL *curl = curl_easy_init();
+  if (!curl)
+    return 0;
+  MemoryBuffer chunk = {NULL, 0, 0};
+  struct curl_slist *headers =
+      build_request_headers(job->engine->host_header, job->engine->referer,
+                            job->accept_language && job->accept_language[0]
+                                ? job->accept_language
+                                : "en-GB,en;q=0.9",
+                            job->engine->browser_headers);
+  configure_curl_handle(curl, job->full_url, &chunk, headers,
+                        job->engine->timeout_secs, job->engine->id, next,
+                        job->engine->browser_headers);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
+
+  int ok = 0;
+  CURLcode rc = curl_easy_perform(curl);
+  if (rc == CURLE_OK && chunk.memory && chunk.size > 0) {
+    long http = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http);
+    job->http_status = http;
+    cleanup_job_results(job);
+    classify_job_response(job, chunk.memory, chunk.size);
+    if (job->results_count > 0) {
+      snprintf(job->ua_profile, sizeof(job->ua_profile), "%s", next);
+      engine_health_set_ua_profile(job->engine->id, next);
+      if (getenv("OMNI_PERF"))
+        fprintf(stderr, "[H1] %s challenge cleared by UA profile %s\n",
+                job->engine->id, next);
+      ok = 1;
+    } else {
+      snprintf(job->ua_profile, sizeof(job->ua_profile), "%s", next);
+    }
+  }
+
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
+  if (chunk.memory)
+    free(chunk.memory);
+  return ok;
+}
+
 static void job_cache_salt(const ScrapeJob *job, char *out, size_t size) {
   snprintf(out, size, "%s|%s", job->engine ? job->engine->name : "?",
            job->lang[0] ? job->lang : "en");
@@ -313,6 +373,12 @@ void parse_and_cache_response(ScrapeJob *job) {
   }
 
   classify_job_response(job, job->response.memory, job->response.size);
+
+  /* H1: a challenge is often only the UA. One retry, next profile, same
+     request, BEFORE the failure is recorded - so a cleared challenge is a
+     success, not a strike. */
+  if (job->status == SCRAPE_STATUS_BLOCKED)
+    retry_job_with_next_ua(job);
 
   if (job->status == SCRAPE_STATUS_OK || job->status == SCRAPE_STATUS_EMPTY) {
     char salt[128];
@@ -613,10 +679,24 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
                             job->accept_language,
                             job->engine->browser_headers);
 
+  /* H1: remember what was used, so a challenge can be retried with the next
+     profile without rebuilding the URL or guessing the current one. */
+  snprintf(job->full_url, sizeof(job->full_url), "%s", full_url);
+  {
+    const char *stored =
+        job->engine ? engine_health_ua_profile(job->engine->id) : NULL;
+    const char *profile =
+        stored ? stored : (job->engine ? job->engine->user_agent : NULL);
+    if (profile && profile[0])
+      snprintf(job->ua_profile, sizeof(job->ua_profile), "%s", profile);
+    else
+      job->ua_profile[0] = '\0';
+  }
+
   configure_curl_handle(job->handle, full_url, &job->response, headers,
                         job->engine ? job->engine->timeout_secs : 0,
                         job->engine ? job->engine->id : NULL,
-                        job->engine ? job->engine->user_agent : NULL,
+                        job->ua_profile[0] ? job->ua_profile : NULL,
                         job->engine ? job->engine->browser_headers : 0);
 
   /* per-engine cookie jar: some engines only answer after a challenge cookie */
