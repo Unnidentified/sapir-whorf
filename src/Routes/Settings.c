@@ -129,10 +129,18 @@ int settings_handler(UrlParams *params) {
     /* J5.5 tier 3: three states, because "offered but impossible" is a lie.
          locked  - the server forbids it; the control is not rendered
          off/on  - the server permits it and this browser has/has not opted in */
-    context_set(&ctx, "opt_in_available", opt_in_providers_available() ? "1" : "");
-    context_set(&ctx, "opt_in_on", opt_in_providers_allowed() ? "1" : "");
-    /* beaker's {{if}} has no negation, so expose the positive form */
-    context_set(&ctx, "opt_in_missing", engine_count_opt_in() > 0 ? "" : "1");
+    /* Two keys instead of three flags: the control's state and the sentence
+       that explains it. The page is at the hard context limit (measured 31 of
+       32) and three keys for one control is how a page runs out of room.
+       "locked" means the server forbids it, so the control is not rendered at
+       all; the note is empty unless nothing is registered behind the switch. */
+    int permitted = opt_in_providers_available();
+    context_set(&ctx, "opt_in_state",
+                !permitted ? "locked"
+                           : (opt_in_providers_allowed() ? "on" : "off"));
+    if (permitted && engine_count_opt_in() == 0)
+      context_set(&ctx, "opt_in_note",
+                  beaker_get_locale_value(locale, "opt_in_none_registered"));
   }
   context_set(&ctx, "default_engine", default_engine);
   context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count,
@@ -160,7 +168,10 @@ int settings_handler(UrlParams *params) {
   if (enabled_count > 0) {
     context_set_array_of_arrays(&ctx, "enabled_engines", engine_data,
                                 enabled_count, engine_inner);
-    context_set(&ctx, "has_enabled_engines", "1");
+    /* beaker's {{if exists ...}} does not work for a 2-D array (measured: the
+       engines section silently disappeared), so one flag guards both engine
+       sections. Two flags for two lists was two slots; this is one. */
+    context_set(&ctx, "has_engine_lists", "1");
   }
 
   /* H1: how many independent indexes can answer right now. Three engines that
@@ -255,7 +266,7 @@ int settings_handler(UrlParams *params) {
     if (status_count > 0) {
       context_set_array_of_arrays(&ctx, "engine_status", status_rows,
                                   status_count, status_inner);
-      context_set(&ctx, "has_engine_status", "1");
+
     }
   }
 
