@@ -1,0 +1,18 @@
+<div class="widget widget-translate">
+  <div class="widget-head">
+    <span class="widget-title">{{l("translate_title")}}</span>
+    <span class="widget-source">{{l("translate_title")}}</span>
+  </div>
+  <p class="widget-from">{{widget_expression}}</p>
+  {{if widget_ok == "1"}}
+  <p class="widget-to">{{widget_result}}</p>
+  {{else}}
+  <p class="widget-error">{{widget_result}}</p>
+  {{endif}}
+  <form action="/search" method="GET" class="widget-form">
+    <input name="w" type="hidden" value="translate">
+    <input name="q" type="text" class="widget-input" value="{{widget_expression}}"
+           aria-label="{{l("translate_title")}}" autocomplete="off">
+    <button type="submit" class="widget-button">{{l("translate_form")}}</button>
+  </form>
+</div>

@@ -2,6 +2,7 @@
 #include <math.h>
 #include "AnswerLocal.h"
 #include "Calculator.h"
+#include "Translate.h"
 #include "ColourCode.h"
 #include "CurrencyConversion.h"
 #include "Dictionary.h"
@@ -334,6 +335,19 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
     if (used + strlen(append) + 1 < sizeof(work))
       snprintf(work + used, sizeof(work) - used, "%s", append);
   }
+
+  /* J4b: an explicit translate request. Checked before the calculator so
+     "translate 2+2 to spanish" asks the translator, not the evaluator. */
+  {
+    char text[256];
+    char target[8];
+    if (translate_parse(work, lang, text, sizeof(text), target,
+                        sizeof(target))) {
+      translate_widget(text, target, NULL, out, lang);
+      return 1;
+    }
+  }
+
   if (!is_calculator_query(work))
     return 0;
   return answer_box_widget_forced("calculator", work, lang, out);
@@ -346,6 +360,16 @@ int answer_box_widget_forced(const char *kind, const char *query,
   if (!out || !kind)
     return 0;
   memset(out, 0, sizeof(*out));
+  /* J4b: w=translate carries the text to translate in q, and the target is
+     either "to <language>" inside it or the reader's own language. */
+  if (strcmp(kind, "translate") == 0) {
+    char text[256];
+    char target[8];
+    if (translate_parse(query, lang, text, sizeof(text), target,
+                        sizeof(target)))
+      return translate_widget(text, target, NULL, out, lang);
+    return 0;
+  }
   if (strcmp(kind, "calculator") != 0)
     return 0;
   if (!query)

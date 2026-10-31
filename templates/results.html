@@ -38,7 +38,8 @@
         {{endfor}}
     </nav>
     {{endif}}
-                {{include "widget_calculator.html"}}
+                {{if widget_kind == "calculator"}}{{include "widget_calculator.html"}}{{endif}}
+                {{if widget_kind == "translate"}}{{include "widget_translate.html"}}{{endif}}
                 {{if exists answer_text}}
                 {{if show_answer_strip}}
                 <section class="answer-box" aria-label="{{l("answer_box_label")}}">
@@ -90,12 +91,8 @@
                 <p class="cached-note">{{results_cached}}</p>
                 {{endif}}
 
-                {{if exists one_index_note}}
-                <p class="cached-note">{{one_index_note}}</p>
-                {{endif}}
-
-                {{if exists paused_note}}
-                <p class="cached-note">{{paused_note}}</p>
+                {{if exists source_note}}
+                <p class="cached-note">{{source_note}}</p>
                 {{endif}}
 
                 {{if exists partial_note}}

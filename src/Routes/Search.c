@@ -793,6 +793,28 @@ static char *search_href_builder(int page, void *data) {
   return build_search_href(d->query, d->engine_id, page, d->web, d->cat);
 }
 
+/* The context has 32 slots for a whole page, and these two caveats used to
+   take one each. They are both "a line about where the results came from", so
+   they share a slot and are joined when both apply. */
+static void append_source_note(TemplateContext *ctx, const char *note) {
+  if (!note || !note[0])
+    return;
+  const char *existing = NULL;
+  for (int i = 0; i < ctx->count; i++) {
+    if (strcmp(ctx->vars[i].key, "source_note") == 0) {
+      existing = ctx->vars[i].value.string_val;
+      break;
+    }
+  }
+  if (!existing || !existing[0]) {
+    context_set(ctx, "source_note", note);
+    return;
+  }
+  char joined[400];
+  snprintf(joined, sizeof(joined), "%s · %s", existing, note);
+  context_set(ctx, "source_note", joined);
+}
+
 static char *build_search_request_cache_key(const char *query,
                                             const char *engine_id, int page,
                                             const char *client_key) {
@@ -1317,9 +1339,17 @@ int results_handler(UrlParams *params) {
            slot because a card shows one big value either way. */
         context_set(&ctx, "show_answer_strip", "");
         context_set(&ctx, "widget_kind", widget.kind);
+        /* four keys, and the context has 31 in use on this page: the result
+           slot doubles as the error line, and the title and source come from
+           the locale and the template rather than from here. */
         context_set(&ctx, "widget_result",
                     widget.ok && widget.result[0] ? widget.result
                                                   : widget.note);
+        context_set(&ctx, "widget_expression", widget.expression);
+        context_set(&ctx, "widget_ok", widget.ok ? "1" : "");
+        if (getenv("OMNI_PERF"))
+          fprintf(stderr, "[WIDGET] kind=%s ok=%d expr='%s' note='%s'\n",
+                  widget.kind, widget.ok, widget.expression, widget.note);
       }
     }
   }
@@ -2262,7 +2292,7 @@ int results_handler(UrlParams *params) {
             snprintf(note, sizeof(note), "%s", filled);
           }
         }
-        context_set(&ctx, "one_index_note", note);
+        append_source_note(&ctx, note);
       }
     }
 
@@ -2270,7 +2300,7 @@ int results_handler(UrlParams *params) {
     {
       char note[320];
       if (build_paused_note(note, sizeof note) > 0)
-        context_set(&ctx, "paused_note", note);
+        append_source_note(&ctx, note);
     }
 
     /* F1/F2: a thin page must say why it is thin, and offer the patient view.
@@ -2347,7 +2377,9 @@ int results_handler(UrlParams *params) {
                  funnel_raw, funnel_deduped, funnel_floored, total_results,
                  results_matrix.count, enabled_engine_count, ok_eng, empty_eng,
                  blocked, failed, cancelled, stale_count);
-        context_set(&ctx, "debug_funnel", line);
+        /* the funnel goes to the perf log, not the context: no template reads
+           it, and the context has 32 slots for the whole page */
+        fprintf(stderr, "[FUNNEL] %s\n", line);
       }
     }
 
@@ -2387,7 +2419,6 @@ int results_handler(UrlParams *params) {
       context_set(&ctx, "answer_text", local_answer.answer);
       if (local_answer.detail[0])
         context_set(&ctx, "answer_detail", local_answer.detail);
-      context_set(&ctx, "answer_source", local_answer.source);
       context_set(&ctx, "answer_source_note",
                   beaker_get_locale_value(
                       locale, web_explicit ? "answer_showing_web"
@@ -2410,7 +2441,7 @@ int results_handler(UrlParams *params) {
       char pn[320];
       int paused_now = build_paused_note(pn, sizeof pn);
       if (paused_now > 0) {
-        context_set(&ctx, "paused_note", pn);
+        append_source_note(&ctx, pn);
         reason = "paused";
       }
       context_set(&ctx, "empty_hint",

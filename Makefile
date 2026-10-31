@@ -340,6 +340,7 @@ tests/test_g4_answerbox: tests/test_g4_answerbox.c $(LINT_SRCS) \
                          src/Ranking/Ranker.c src/Query/QueryAnalysis.c \
                          src/Infobox/AnswerBox.c src/Infobox/AnswerLocal.c \
                          src/Infobox/Calculator.c \
+                         src/Infobox/Translate.c \
                          src/Infobox/UnitConversion.c \
                          src/Infobox/ColourCode.c \
                          src/Infobox/CurrencyConversion.c \
@@ -388,6 +389,23 @@ tests/test_j5_defs: tests/test_j5_defs.c src/Scraping/EngineDefs.c $(LINT_SRCS)
 
 defs-check: tests/test_j5_defs
 	@./tests/test_j5_defs
+
+# the template context has 32 slots and beaker drops the 33rd silently
+context-check:
+	@./tests/test_context_budget.sh
+
+# J4b: which queries are translation requests, and which are just searches
+tests/test_j4_translate: tests/test_j4_translate.c src/Infobox/Translate.c \
+                         src/Utility/HttpClient.c src/Utility/Utility.c \
+                         src/Utility/JsonHelper.c src/Utility/XmlHelper.c \
+                         src/Utility/Unescape.c src/Config.c src/Cache/Cache.c \
+                         src/Proxy/Proxy.c src/Scraping/ScrapingParsers.c \
+                         src/Scraping/BlockDetection.c src/Scraping/ApiEngines.c
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -I/usr/include/libxml2 -o $@ $^ \
+		$(LINT_LIBS)
+
+translate-check: tests/test_j4_translate
+	@./tests/test_j4_translate
 
 # J5.3: category tabs - what they offer, what they route, and what they say
 # when nothing serves the category
