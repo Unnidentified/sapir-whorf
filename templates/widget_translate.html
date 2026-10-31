@@ -9,6 +9,9 @@
   {{else}}
   <p class="widget-error">{{widget_result}}</p>
   {{endif}}
+  {{if widget_ok == "1"}}
+  <p class="widget-note">{{l("translate_caveat")}}</p>
+  {{endif}}
   <form action="/search" method="GET" class="widget-form">
     <input name="w" type="hidden" value="translate">
     <input name="q" type="text" class="widget-input" value="{{widget_expression}}"

@@ -1304,11 +1304,9 @@ int results_handler(UrlParams *params) {
      that way. Keep ?web=1 on the links the page generates from here. */
   context_set(&ctx, "show_web_link", web_explicit ? "" : "1");
   {
-    char enc[BUFFER_SIZE_MEDIUM];
-    char href[BUFFER_SIZE_MEDIUM];
-    url_encode(raw_query, enc, sizeof(enc));
-    snprintf(href, sizeof(href), "/search?q=%s&web=1", enc);
-    context_set(&ctx, "web_href", href);
+    /* The href is /search?q=<encoded>&web=1, and query_encoded is already in
+       the context: the template appends the literal suffix. That is one fewer
+       of the 32 slots for a string nobody has to compute here. */
   }
 
   /* G4 + J4.0: the local answer and its card. These are pure computation, so
@@ -1346,6 +1344,8 @@ int results_handler(UrlParams *params) {
                     widget.ok && widget.result[0] ? widget.result
                                                   : widget.note);
         context_set(&ctx, "widget_expression", widget.expression);
+        context_set(&ctx, "widget_note", widget.note);
+        context_set(&ctx, "widget_href", widget.href);
         context_set(&ctx, "widget_ok", widget.ok ? "1" : "");
         if (getenv("OMNI_PERF"))
           fprintf(stderr, "[WIDGET] kind=%s ok=%d expr='%s' note='%s'\n",

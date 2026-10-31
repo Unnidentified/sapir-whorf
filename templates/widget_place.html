@@ -1,0 +1,12 @@
+<div class="widget widget-place">
+  <div class="widget-head">
+    <span class="widget-title">{{l("place_title")}}</span>
+    <span class="widget-source">{{l("place_title")}}</span>
+  </div>
+  {{if widget_ok == "1"}}
+  <p class="widget-to">{{widget_result}}</p>
+  <p class="widget-note">{{widget_note}} · <a href="{{widget_href}}" rel="noopener">{{l("open_map")}}</a></p>
+  {{else}}
+  <p class="widget-error">{{widget_result}}</p>
+  {{endif}}
+</div>

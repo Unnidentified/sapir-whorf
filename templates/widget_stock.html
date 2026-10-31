@@ -1,0 +1,12 @@
+<div class="widget widget-stock">
+  <div class="widget-head">
+    <span class="widget-title">{{l("stock_title")}} · {{widget_expression}}</span>
+    <span class="widget-source">{{widget_note}}</span>
+  </div>
+  {{if widget_ok == "1"}}
+  <p class="widget-to">{{widget_result}}</p>
+  {{else}}
+  <p class="widget-error">{{widget_result}}</p>
+  {{endif}}
+  <p class="widget-note">{{l("stock_disclaimer")}}</p>
+</div>

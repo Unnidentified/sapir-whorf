@@ -33,6 +33,8 @@ typedef struct {
   char expression[256];      /* what was evaluated, as the user typed it */
   char result[64];           /* the headline value */
   char note[96];             /* "Error", "Infinity", or a short caveat */
+  char href[256];            /* optional "more" link, built in C so no template
+                                has to url-encode anything */
   int ok;                    /* 1 when result is a number */
 } WidgetData;
 

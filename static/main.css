@@ -2203,3 +2203,31 @@ input[type="color"]:focus-visible {
   background: var(--accent);
   border-color: var(--accent);
 }
+
+/* J4c/J4d/J4b: the cards say where their data came from and what it is not.
+   A community translation and an unofficial quote both need that line. */
+.widget-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.widget-from {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+.widget-to {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 1.45rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.25;
+  word-break: break-word;
+}
+.widget-error {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 1rem;
+  color: var(--neg);
+}

@@ -40,6 +40,8 @@
     {{endif}}
                 {{if widget_kind == "calculator"}}{{include "widget_calculator.html"}}{{endif}}
                 {{if widget_kind == "translate"}}{{include "widget_translate.html"}}{{endif}}
+                {{if widget_kind == "place"}}{{include "widget_place.html"}}{{endif}}
+                {{if widget_kind == "stock"}}{{include "widget_stock.html"}}{{endif}}
                 {{if exists answer_text}}
                 {{if show_answer_strip}}
                 <section class="answer-box" aria-label="{{l("answer_box_label")}}">
@@ -47,7 +49,7 @@
                     {{if exists answer_detail}}
                     <p class="answer-box-detail">{{answer_detail}}</p>
                     {{endif}}
-                    <p class="answer-box-source">{{answer_source_note}}{{if show_web_link}} — <a href="{{web_href}}">{{l("answer_search_web")}}</a>{{endif}}</p>
+                    <p class="answer-box-source">{{answer_source_note}}{{if show_web_link}} — <a href="/search?q={{query_encoded}}&amp;web=1">{{l("answer_search_web")}}</a>{{endif}}</p>
                 </section>
                 {{endif}}
                 {{endif}}

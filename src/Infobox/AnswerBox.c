@@ -3,6 +3,8 @@
 #include "AnswerLocal.h"
 #include "Calculator.h"
 #include "Translate.h"
+#include "Places.h"
+#include "Stocks.h"
 #include "ColourCode.h"
 #include "CurrencyConversion.h"
 #include "Dictionary.h"
@@ -348,6 +350,22 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
     }
   }
 
+  /* J4c/J4d: place and price requests, also before the calculator */
+  {
+    char place[256];
+    if (places_parse(work, place, sizeof(place))) {
+      places_widget(place, out);
+      return 1;
+    }
+  }
+  {
+    char ticker[16];
+    if (stocks_parse(work, ticker, sizeof(ticker))) {
+      stocks_widget(ticker, out);
+      return 1;
+    }
+  }
+
   if (!is_calculator_query(work))
     return 0;
   return answer_box_widget_forced("calculator", work, lang, out);
@@ -368,6 +386,18 @@ int answer_box_widget_forced(const char *kind, const char *query,
     if (translate_parse(query, lang, text, sizeof(text), target,
                         sizeof(target)))
       return translate_widget(text, target, NULL, out, lang);
+    return 0;
+  }
+  if (strcmp(kind, "place") == 0) {
+    char place[256];
+    if (places_parse(query, place, sizeof(place)))
+      return places_widget(place, out);
+    return 0;
+  }
+  if (strcmp(kind, "stock") == 0) {
+    char ticker[16];
+    if (stocks_parse(query, ticker, sizeof(ticker)))
+      return stocks_widget(ticker, out);
     return 0;
   }
   if (strcmp(kind, "calculator") != 0)
