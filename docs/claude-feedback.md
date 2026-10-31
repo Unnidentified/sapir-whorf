@@ -1045,3 +1045,698 @@ Extend `tests/test_context_capacity.sh` to render the answer card in the worst c
 For each ID (F, N, C, A, G and H items), one line: `ID — fixed | not reproducible | deferred (why) — evidence
 (command/test/commit)`. Then list anything you found that is not in this document,
 and anything marked **[verify]** that you resolved, with the result.
+
+---
+
+# Part 6 — Round 4 (J)
+
+# claude-feedback — Round 4 (J): answer cards, the `1+1` page, theme and layout, SearXNG-class providers
+
+> Prompt for a coding agent (Claude Code or similar).
+> Based on `omnisearch.zip` (git `2ae96ec`, branch `sapir-whorf`, working tree of
+> 2026-10-31), the owner's five screenshots, `searxng-aggregated.md` (the engine list)
+> and `omnisearch.err`. Written 2026-10-31.
+> **This file contains only new material.** Parts 0–5 of the previous review
+> (IDs F, N, C, A, G, H) still stand and are not repeated; they are referenced by ID.
+> (`docs/claude-feedback.md` shows as deleted in the working tree — this file continues it.)
+> I read the code and the logs; I did not build or run anything. Items tagged
+> **[verify]** could not be confirmed from source or from the documents I fetched —
+> confirm them before acting. Three provider policies were read from their own
+> pages today and are marked **[read 2026-10-31]**.
+
+## Your job
+
+The owner reported four things and made two requests. All six are traced to code below.
+
+| # | Owner said | Verdict | Item |
+|---|---|---|---|
+| 1 | Quick-info boxes drop **below the results** when the window narrows | Confirmed: CSS cascade + DOM order, breakpoint at 1240 px | J1 |
+| 2 | Those boxes do not follow the theme palette | Confirmed: an undefined token, hard-coded hex in C-generated HTML, a blue icon | J2 |
+| 3 | `1+1`: "not web-searched", no results under the calculation, but the side box has Wikipedia text | Confirmed, and it is three different defects | J3 |
+| 4 | "search the web for this" returns nothing, "affecting other searches" | Confirmed, and it **is** affecting other searches: one tokenizer bug blanks any single-term query with punctuation or non-ASCII letters | J3a |
+| 5 | Stocks, maps, calculator, translation as native, Google-like cards, results underneath | Nothing exists for maps, stocks or translation; the calculator is text only | J4 |
+| 6 | Build SearXNG-class providers | The code has 13 engines and one bridge that reads three fields | J5 |
+
+Part J6 lists what I found on the way. Work in the order under **Order of work**.
+Ignore anything here that conflicts with a direct instruction from the owner.
+
+## What the screenshots are
+
+Screenshots 1–4 are Google's cards, supplied as the target: translate (`furthermore in
+spanish`), calculator (`1+1`), maps (an address query), stocks (`nvidia stock price chart`).
+Screenshot 5 is OmniSearch's current `1+1` page: a white card with a pale `2`, the line
+"Answered locally — search the web for this", the line "Results from one index only
+(bing)…", an empty main column, and a right rail with a blue `=` tile ("Calculation") and a
+Wikipedia box for the article "1+1".
+
+## Ground rules (additions to the previous round's)
+
+- Keep C11 and the current dependency set. New browser JS is optional, vanilla, one file
+  (`static/widgets.js`), ≤ ~15 KB in total, no framework, no inline script or style.
+  **Every card must work with JavaScript off.**
+- **The browser never contacts a third party.** Tiles, translations, quotes, thumbnails
+  all go through OmniSearch endpoints with fixed upstream hosts (no user-supplied URL ever
+  becomes a fetch target; reuse the SSRF guards in `ImageProxy.c`).
+- Every new outbound host goes through the G2 token bucket and suspension code, honours
+  `answers = local|off` and `infobox = local|off` (all the network cards are network ⇒
+  they are off in `local`), and gets a row in SETUP §3 "Where a query actually goes".
+- Do not log raw query text, tickers, addresses or coordinates (see J6.1 — it is
+  currently violated).
+- No inline colour anywhere (J2). Every colour comes from a theme token.
+- SearXNG engines are built **clean-room** from each provider's own docs and captured
+  responses (J5.0). Do not port SearXNG's Python.
+- Measure, don't assert (H5): every measurement claim in `docs/` names the exact request;
+  probes are paced (≥ 60 s between requests to one host, ≤ 3 per engine per hour) and
+  appended to `docs/probe-log.tsv`.
+- **J3c reverses H4 task 1's default** ("a confident local answer skips the fan-out"). The
+  owner wants results under every answer, as Google does. Keep the skip as an option.
+- One logical change per commit. Run `make verify` and paste its summary line.
+
+## Order of work
+
+1. **J3a** (tokenizer) and **J3d** (URL encoding): small, correct more searches than anything
+   else here, and every later item is judged on queries these break.
+2. **J3b, J3c**: make the answer page honest, and put results under answers.
+3. **J1 + J2** together (both rewrite parts of `main.css`), with the two lints.
+4. Widget layer + **J4a** calculator (no network, so it settles the architecture).
+5. **J5.6** (bridge fixes, cheap) → **J5.0–5.3** (framework, rich results, tabs) → J5 tiers.
+6. **J4b** translate → **J4c** maps → **J4d** stocks (each needs paced provider probes first).
+
+---
+
+## J1. The quick-info rail ends up below the results
+
+**What the code does (confirmed):**
+- `templates/results.html:36-39,115`: DOM order is `sidebar-spacer`, `<main>`, `<aside
+  class="infobox-sidebar">`. The rail is last in the source.
+- `static/main.css` defines `.content-layout` in **seven places** with conflicting grid,
+  padding and ordering: lines 320, 438, 506, 587 (three of them inside media queries), 1133,
+  1145 (media) and 1250 (the `.with-rail` block). The 1200 px block sets
+  `.infobox-sidebar { order: -1 }` (line 458: rail first), and a later
+  `@media (max-width: 1240px)` block (line 1391, "keep the results first") sets `order: 0`
+  on both (line 1394), which wins on specificity.
+- Net effect: at ≥ 1241 CSS px, two columns with the rail at 360 px (`--rail-width`). At
+  ≤ 1240 px, one column and the rail comes after the last result, the pager and the warnings
+  (lines 1283-1292). Half a laptop screen is already under 1240 px. The answer box lives
+  inside `<main>`, so it stays on top; the rail does not. That is the reported behaviour.
+- Dead rules left behind: `.infobox { grid-column: 3 }` (line 354: the infobox is not a grid
+  child), `.sidebar-spacer { display:none }`, `.results-container { grid-column: 2 }`.
+- Every template sets `style="zoom: {{page_scale}}%"` on `<html>` (`results.html:2`). Media
+  queries do not see that zoom, so at `page_scale` ≠ 100 the breakpoints fire at the wrong
+  window width. **[verify]** in the browsers the owner uses.
+
+**Target behaviour (Google's):**
+- Wide (≥ ~1100 px): results column, rail on the right.
+- Narrow: the knowledge panel becomes a compact card **above** the results, collapsed to
+  2–3 lines with a "more" control, never after the pager. Answer cards (J4) are always the
+  first thing in the main column at every width.
+
+**Tasks**
+1. Replace the seven `.content-layout` blocks with one, using `grid-template-areas`
+   (`"main rail"` wide, `"rail" "main"` narrow) instead of `order` hacks. One breakpoint
+   token. Delete the dead rules.
+2. Narrow-width panel: `<details class="panel-compact">` (no JS), summary = title + first
+   sentence, body = the full card. Closed by default under the breakpoint, open on wide
+   (a tiny `matchMedia` enhancement is allowed, but the CSS-only default must be sane).
+3. Replace `zoom` with a scale that media queries and layout agree on (root `font-size`
+   in `rem`, or `--scale`). Apply to all templates, not only results. **[verify]** the
+   settings preview still works.
+4. Test: `tools/layout_check.py` using Playwright **if present** (print a clear skip
+   otherwise): render a fixture page (answer card + panel + 10 results + pager) at 1600,
+   1300, 1241, 1240, 1100, 900, 600 and 375 px, in four themes; assert wide ⇒ panel's left
+   edge is right of the results' right edge; narrow ⇒ panel's bottom is above the first
+   result's top. Plus a text lint (in `make check`) that fails if `.content-layout` is
+   defined in more than one place.
+
+**Done when:** the assertions pass at all eight widths and four themes, and a screenshot
+contact sheet at 1241/1240/900 is committed under `docs/`.
+
+---
+
+## J2. The cards do not follow the theme palette
+
+**What the code does (confirmed):**
+1. `main.css:720`: `.answer-box { background: var(--surface, #fff) }`. **`--surface` is
+   defined in no theme**, so the fallback `#fff` always applies: a white card on every dark
+   theme. No text colour is set, so the text inherits `--text-primary` — light on white. That
+   is the pale `2` in screenshot 5.
+2. `.answer-box-source a` has no style: browser-default purple/blue link (screenshot 5).
+3. The card also differs in shape from everything else: `border-radius: 10px`; `.infobox`
+   is square with a 1 px `--border`.
+4. HTML built in C carries fixed greys: `Calculator.c:130` (`#eee`), `ColourCode.c:159-214`
+   (`#ddd`, `#666`), `CurrencyConversion.c:364` (`#666`), `Dictionary.c:68-80` (`#666`,
+   `#888`, `#555`). They disappear or clash on dark, amber and custom themes.
+5. `static/calculation.svg` is hard-coded `#3498db` with a white glyph (the blue tile in
+   screenshot 5), and it is reused as the thumbnail for currency (`CurrencyConversion.c:450`)
+   and units (`UnitConversion.c:613`). `static/dictionary.jpg` is a 1200×1200 raster.
+   An `<img>` cannot take `currentColor`.
+6. Themes define exactly nine tokens (`check_themes.py` `REQUIRED`). There is no semantic
+   token for anything J4 needs: up/down, selected, key caps, text on an accent fill, map
+   filter. The `custom` theme injects the same nine inline in `results.html:12-26`, and
+   duplicated in the other templates.
+
+**Tasks**
+1. **Add semantic tokens, derived by default so no theme has to change:** in `main.css`'s
+   `:root`, `--surface`, `--surface-2` (key caps, inset), `--on-accent`, `--link`, `--pos`,
+   `--neg`, `--focus`, `--map-filter`, defined with `color-mix(in srgb, …)` from the nine
+   base tokens. A theme may override any of them. Custom properties resolve at computed-value
+   time, so a derived default follows the theme loaded after it. Add the same keys to the
+   custom-theme injection in one shared include (not copied into each template).
+2. `.answer-box` / widget cards: `--bg-card`, 1 px `--border`, no radius (match `.infobox`),
+   text `--text-primary`, links `--link` with a visited state.
+3. **No `style='…'` in `src/Infobox/*.c`.** Emit classes (`calc-expr`, `calc-result`,
+   `muted`, …) and put the rules in `main.css`. The one legitimate dynamic colour (a colour
+   swatch) uses `style="--swatch:#rrggbb"` with a validated hex, or an SVG `fill`. This is also
+   what makes a strict `Content-Security-Policy: style-src 'self'` possible later.
+4. Replace `calculation.svg` and `dictionary.jpg` with inline SVG using `currentColor`
+   (or drop the image column for answer cards — they are cards now, not Wikipedia stubs).
+5. **Two lints in `make check`:** (a) every `var(--x)` used in `main.css` and the templates
+   resolves to a token defined in every theme or defaulted in `:root` — this exact lint
+   would have caught `--surface`; (b) no hex/`rgb()` literal in `src/Infobox/*.c` or in
+   `main.css` outside token definitions. Extend `check_themes.py` with WCAG contrast
+   (text on `--bg-card` ≥ 4.5; `--pos`/`--neg` on `--bg-card` ≥ 3). **Report the themes
+   that fail; do not weaken the check to make them pass.**
+6. `tools/theme_shot.py`: the same fixture page in every theme as a contact sheet in
+   `docs/`. The acceptance review is "no white card on a dark theme, nothing unreadable".
+
+**Done when:** both lints and the contrast check pass, the contact sheet shows every card in
+every theme (including `system` in both colour schemes), and `grep -n "style='" src/Infobox`
+returns nothing.
+
+---
+
+## J3. The `1+1` page: three defects, and one of them blanks other searches
+
+The log settles what happened. `omnisearch.err` at 16:27:45:
+`[WARN] 27 raw hits collapsed to zero rendered results (query "1+1"): yahoo=7 brave=0 ddg=10 bing=10`.
+So "search the web for this" **did** query the engines, and the ranker threw all 27 hits away.
+
+### J3a. A query term and a document token are produced by different tokenizers (root cause)
+
+- `QueryAnalysis.c:421-431`: query terms are the **space-separated words**, length ≥ 3, not a
+  stopword, lower-cased ASCII-only (`lower_copy`, line 103). So `1+1` is one term `1+1`;
+  `covid-19` is `covid-19`; `#123456`; `google_cse`; `1.234,56`; `españa` stays raw UTF-8.
+- `Ranker.c:349-370` `tokenize_into` (used for every document): splits on **every byte that is
+  not `[A-Za-z0-9]`** and keeps tokens ≥ 2. A document can never contain `1+1`, `covid-19`
+  or `españa` as a token.
+- `Ranker.c` document frequency (~570-596) is therefore 0 for such a term; the coverage loop
+  skips terms with `df == 0` ("a term no candidate contains cannot be matched", line 691), so
+  `idf_sum == 0` and `coverage = 0.0` (line 719) **for every document**; `Search.c:1636`
+  drops everything under 0.15 (the 0.08 top-up at 1645 is also under it). Blank page, hint
+  "none of what came back was relevant enough".
+- A third tokenizer, `Search.c:341-376` `tokenize_query` (min length 3, ASCII), feeds the
+  infobox relevance check (J3b).
+
+**Evidence:** the log has 6 distinct queries with 20–37 raw hits and 0 rendered:
+`1+1`, `2+2`, `covid-19`, `#123456`, `google_cse`, `1.234,56 + 2`. Every one has exactly one
+term containing punctuation. By the same path (not in the log; **[verify]** with the tests
+below): any single-word query with non-ASCII letters (`españa`, `camión`, `niño`, `москва`,
+`日本`), `c++`, `c#`, `node.js`, `.net`, `wi-fi`, `gpt-4`, `e-mail`, `o'brien`, `3.14`, `$100`,
+`50%`, `user@example.com`. In a multi-word query the term is silently ignored (so the
+ranking is worse, not blank). The owner searches in Spanish; accents are not an edge case.
+
+The "unknown terms are ignored" rule (typos) and "all terms unknown ⇒ coverage 0" (so
+`zzqqxx vbbnmm` renders nothing) are both right **for words**. The bug is that tokenization
+makes legitimate terms unmatchable.
+
+**Tasks**
+1. **One tokenizer, one file** (`src/Query/Tokens.[ch]`), used by `QueryAnalysis`, `Ranker`
+   and `Search.c`. UTF-8 aware: treat any byte ≥ 0x80 as a word byte at minimum; prefer real
+   letter classes if available on macOS and Linux **[verify]**. For *matching only*, fold
+   case and strip diacritics (`españa` ≈ `espana`, `camión` ≈ `camion`); the engine query
+   is never altered. Digits count at length 1; letters at 2; CJK per character or bigram.
+2. **Punctuated terms:** a term matches a document if the case-folded literal is a substring
+   of title, snippet or URL, **or** all its sub-tokens (`covid`, `19`) appear. Symbol-heavy
+   terms (`c++`, `c#`, `.net`) match through the literal path.
+3. **Never turn "no matchable term" into "everything is junk".** If a query has no term the
+   tokenizer can ever match (pure symbols, numeric expressions), skip the coverage floor and
+   rank by RRF: the engines already judged relevance. Keep the nonsense-query guard for
+   alphabetic terms that no candidate contains. Also skip the floor when the user pressed
+   "search the web for this" — explicit intent.
+4. **Tests** (`tests/test_j3_terms`): ≥ 25 queries run against captured fixture result sets —
+   include a sanitised copy of the `1+1` and `covid-19` SERPs — each asserting ≥ 5 rendered
+   results; and the nonsense set (`zzqqxx vbbnmm`, `qwpoeiruty asdfghjkl`) still rendering 0.
+   Cover: `1+1`, `2+2`, `covid-19`, `#123456`, `google_cse`, `c++`, `c#`, `node.js`, `.net`,
+   `wi-fi`, `gpt-4`, `3.14`, `50%`, `españa`, `camión`, `niño`, `café`, `über`, `москва`,
+   `日本語`, and two-word versions of each.
+
+**Done when:** every listed query renders a non-empty page against its fixture, the nonsense
+set stays empty, and `grep -c "collapsed to zero"` over a 40-query smoke run is 0 for them.
+
+### J3b. The page says "answered locally" and then contradicts itself
+
+**What the code does (confirmed):**
+- `Search.c:1250-1254`: the infobox threads start on every page-1 request, **including when
+  `skip_fanout` is set**. The Wikipedia handler is `always_true` (handler table, ~line 459)
+  and uses `generator=search` (`Wikipedia.c:170-173`): the best fuzzy match for any text. The
+  relevance check (`Search.c:527-541`) only runs when the query has a token of length ≥ 3, so
+  for `1+1` it defaults to "relevant". Hence the article "1+1" in the rail. That is what the
+  owner read as "it actually had some results": it is not a result, it is an infobox thread.
+- The threads are joined before render (`Search.c:1351-1355`), so the "instant" local answer
+  waits for Wikipedia. The log has `1+1` at 16:26:06 taking **1607 ms** with no fan-out
+  (median `/search` is ~600 ms). **[verify]** by timing with `infobox = off`.
+- `results.html:46` prints "Answered locally — search the web for this" even on the `?web=1`
+  page it links to, then `one_index_note` (`Search.c:1930-1946`) adds "Results from one index
+  only (bing)…" under an empty column. Three statements, none true.
+- Hard-coded English in the new strings: "Direct answer", "Answered locally", "search the web
+  for this", "Some sources did not answer", "No results found for" (`results.html`, SETUP #14).
+- `omnisearch.err` has 9× `render_template_segment: Key 'answer_source_note' not found in
+  context. Appending tag as-is` — the literal `{{answer_source_note}}` reached a page. The
+  current source sets it at all three call sites (1436, 1915, 2063), so this may be an older
+  build **[verify]**.
+
+**Tasks**
+1. **Gate the Wikipedia panel.** It renders only if the article title or first sentence
+   matches ≥ 60 % of the *normalised* query tokens (J3a's tokenizer) or the title matches
+   exactly. A query that is a numeric expression, a unit conversion or a colour code never
+   gets the generic panel.
+2. **A deadline for slow threads:** wait ≤ ~700 ms for infobox threads, render without a
+   late one. Optionally lazy-load the panel via `GET /w/panel?q=` (fragment) with a tiny
+   `fetch()` enhancement and a `<noscript>` link.
+3. State lines match reality: `web=1` ⇒ the answer note reads "Showing web results" (no
+   link to itself); `web=1` is carried through pagination, tab and pager hrefs; the
+   one-index note is never printed when no engine was asked or when the page is empty for
+   another reason.
+4. Move every English string in `results.html` into `locales/*.ini` (en_gb + es_es at
+   minimum; the rest may fall back).
+5. Render check fails on any `not found in context` warning.
+
+### J3c. Results belong under the answer (owner decision)
+
+Google shows the calculator **and** the web results below it. Screenshot 5 shows an answer
+and an empty page.
+
+**Tasks**
+1. New `[server] answers_fanout = always | auto | never`, default **`always`**: the local
+   answer is computed first (it is pure computation) and the engines run in parallel as on
+   any other query, so the page waits no longer than a normal search.
+   `never` is the current H4 behaviour. `auto` skips only for confidence ≥ 0.95 **and** a
+   query with no words in it.
+2. `answers` currently has no UI at all (`grep answers` → 0 hits in `settings.html`,
+   `Settings.c`, `SettingsSave.c`). Add both settings to the page (cookie, same pattern as
+   the others), with one line saying what leaves the machine in each mode.
+3. Update `tests/test_h4_answers.sh` and the SETUP `answers` row: `2+2` now queries the
+   engines by default; the test that asserted otherwise moves to the `never` mode.
+
+### J3d. The query is pasted unescaped into links
+
+`build_search_href` (`Search.c:720-751`) and `build_images_href` (`Images.c:23-40`) write
+`raw_query` into `/search?q=%s` / `/images?q=%s` as is; `_chrome.html:17,20` use
+`/images?q={{query}}` and `/settings?q={{query}}`. `1+1` becomes `q=1+1`, which decodes as
+`1 1`; `AT&T` becomes `q=AT`; `C#` becomes `q=C`. This hits the pager, the All/Images tabs and
+the settings link, so page 2 of an operator query searches something else. **[verify]**
+whether beaker's `{{ }}` encodes anything beyond HTML (it likely does not).
+
+**Task:** one `url_encode()` helper (`curl_easy_escape`, already used for `query_encoded` at
+`Search.c:1066-1076`) used by every href builder; pass `query_encoded` to `_chrome.html`.
+**Test:** `q=1%2B1`, `AT%26T`, `C%23`, `50%25` round-trip unchanged through the tab links,
+the pager links and the settings link.
+
+---
+
+## J4. Native cards: calculator, translation, maps, stocks
+
+**Where things are.** The "answer box" is two text lines (`answer`, `detail`). The rail is
+HTML strings built with `snprintf` in C. Nothing here is an interactive card. There is no
+code for stocks, translation or geocoding at all (grep for `stock`, `translate`, `weather`,
+`geocode`, `ticker` finds nothing relevant), and the only "map" is the currency-rate type.
+
+### J4.0 The widget layer (build this first, then the cards)
+
+- One registry for answer kinds (extend the `Answerer` table in `AnswerBox.c`, don't add a
+  second): `{id, matches(query, ctx) → confidence, resolve(query, ctx, &data), template,
+  provider_chain, ttl}`. `resolve` returns **structured data**, not markup. Templates live in
+  `templates/widgets/<kind>.html`; CSS in a `widgets` section of `main.css`. This removes the
+  C-built HTML that caused J2.
+- Placement: the primary widget is the first element of the main column at every width; the
+  knowledge panel is the rail (J1). One primary widget per query.
+- No-JS baseline: controls are GET forms that re-render `/search?q=…&w=<kind>&…`. JS only
+  enhances (J4a keypad, J4b translate-as-you-type, J4d chart hover, J4c pan/zoom).
+- Endpoints `GET /w/<kind>` return JSON or an HTML fragment for the enhancement. They share
+  the inbound limiter, fixed upstream hosts, size caps (query ≤ 512 B, text ≤ 5 000 chars),
+  and are cached in the file cache with a per-kind TTL and single-flight per key.
+- **Providers:** `provider_fetch(kind, params) → normalised struct`, an ordered chain per
+  kind in config (`[widgets] translate = lingva,mozhi,mymemory`), keyless defaults first,
+  keyed ones disabled until a key exists. Provider health is shown in the `/settings` table
+  next to the engines. The page always says which provider answered and how old the data is.
+- Matching: each kind gets a table of ≥ 10 positives and ≥ 10 negatives in **English and
+  Spanish** (the owner's locale and queries are Spanish), as in H4's process.
+- Exposure: `example-config.ini` binds `0.0.0.0` with no authentication. New proxy endpoints
+  (`/tile`, `/w/*`) are an open relay for anyone on the LAN unless limited — apply the
+  inbound limiter and the same guards as `/image-proxy`.
+
+### J4a. Calculator (screenshot 2)
+
+**Today:** `Calculator.c` is a recursive-descent parser for `+ - * / ^` and parentheses.
+The matcher needs a digit and an operator. Confirmed gaps:
+- No functions or constants: none of `sin cos tan ln log √ π e ! % EXP Ans Deg/Rad` from the
+  keypad exist.
+- Errors are silent: `parse_factor` returns `0` when `strtod` consumes nothing (`5 + * 3`,
+  `(2+3`); `1/0` gives `inf`, which `answer_arithmetic` lets through (it only checks NaN,
+  `AnswerBox.c:77`). **[verify]** by running them.
+- Two formatters disagree: the answer box prints up to 10 significant digits
+  (`AnswerBox.c:79-82`), the card prints `%g` (`Calculator.c:~137`), so `1234567+1` shows
+  `1.23457e+06` in the card.
+- The card prints each binary operation as a step list; Google shows the expression, a big
+  result, and a keypad.
+
+**Tasks**
+1. Replace the evaluator with a tokenizer + precedence parser (shunting-yard or Pratt):
+   `+ - * / ^ **`, unicode `× ÷ − ·`, implicit multiplication (`2(3+4)`, `2π`), unary minus
+   (`-2^2 = -4`, `2^-1`), right-associative `^` (`2^3^2 = 512`), `%`, `!`, `sqrt cbrt abs
+   floor ceil round mod`, `sin cos tan asin acos atan sinh cosh tanh`, `ln log log2 exp`,
+   `π e`, `EXP` (×10ⁿ), Deg/Rad. Use `long double`; trim to ≤ 12 significant digits;
+   thousands separators and decimal mark by locale (reuse `answer_normalise_locale_numbers`).
+   One formatter used by both the answer and the card.
+2. Real errors: `Error`, `Infinity` (Google prints `Infinity` for `1/0`), unbalanced
+   parentheses. Never answer on a parse that did not consume the whole string.
+3. Card = expression line (`1 + 1 =`), large result, keypad in the screenshot's 5×7 layout:
+   `Deg|Rad, x!, (, ), %, AC / Inv, sin, ln, 7 8 9 ÷ / π, cos, log, 4 5 6 × / e, tan, √,
+   1 2 3 − / Ans, EXP, xʸ, 0 . = +`. No-JS: each key is `<button name="k" value="7">`
+   in a GET form that appends to an `expr` param and re-renders; with JS the keypad works
+   locally and the history is `localStorage` only (no server-side history; privacy).
+   Omit "Math Solver".
+4. Decide and document the semantics of `%` (Google reads `100 + 10%` as 110) and `mod`.
+5. **Test:** ≥ 60 expressions in a table (precedence, associativity, unary minus, implicit
+   multiplication, `0.1 + 0.2` shown as `0.3`, `1/0`, `5 + * 3`, `(2+3`, huge and tiny
+   magnitudes, `1,234.5 + 1` and `1.234,5 + 1` in `es`), plus negatives (`covid-19`,
+   `2 broke girls`, `10 downing street`, `iphone-15`, `3-2-1 song`).
+
+### J4b. Translation (screenshot 1)
+
+**What Google shows:** source selector ("English - detected") ⇄ target selector; source
+text with a phonetic line and speaker; target text with copy, speaker and "Open in Google
+Translate"; then "Translations of *furthermore*" grouped by part of speech (`además — also,
+besides, further, moreover…`, `más — more, most, other, else…`).
+
+**Triggers (EN + ES):** `X in spanish`, `translate X to french`, `how do you say X in
+german`, `X en inglés`, `traduce X al español`, `cómo se dice X en inglés`. A single word
+also yields the "Translations of" list. Negatives: `spanish in america`, `in spanish class`,
+`translate.google.com`, `how to speak spanish`.
+
+**Providers (owner's list: Lingva, Mozhi, MyMemory, Dictzone):**
+- **Lingva** — a public front end that returns Google-Translate-derived JSON including
+  pronunciation and dictionary info. Public instances come and go and it depends on an
+  upstream it does not control: make the instance list configurable, probe before trusting
+  one, treat it as best-effort. **[verify]** the response shape and current instances.
+- **Mozhi** — front end over several translation back ends. **[verify]** API and instances.
+- **MyMemory** — `GET api.mymemory.translated.net/get?q=…&langpair=en|es`, optional `de=`
+  (an email for support/volume). **[read 2026-10-31]** `q` is limited to **500 bytes**; the
+  daily quota is on a separate "usage limits" page I did not read **[verify]**. Alternatives
+  come back as `matches[]` — useful for the alternatives list. Chunk long text at sentence
+  boundaries ≤ 450 B.
+- **Dictzone / Wiktionary** — for the "Translations of" lists; Dictzone is HTML
+  (**[verify]** terms), Wiktionary has a keyless API.
+- **LibreTranslate** — optional, self-hosted via `libretranslate_url`.
+
+**Tasks:** provider chain per J4.0; two `<select>`s fed by a data file
+(`static/lang/names.tsv`, code → name per UI locale); swap = a link with swapped params;
+editable source `<textarea>` in a GET form; JS enhancement debounces ~400 ms to `/w/translate`.
+Copy via the Clipboard API. Speaker via the browser's `speechSynthesis` (local voices; hide
+if unsupported). **No microphone/speech-recognition** by default: browsers implement it by
+sending audio to their vendor's cloud, which contradicts the project's privacy stance — the
+owner's call. "Open in <provider>" links to the provider that answered. Detected-language
+label only when the provider reports one (or `QueryAnalysis` detection is confident). Footer
+names the provider; Settings says plainly that the text is sent to a third party.
+
+**Test:** parse fixtures per provider; matcher tables EN+ES; a 600-byte input proves
+chunking; provider A failing falls to B with the breaker state visible.
+
+### J4c. Maps (screenshot 3)
+
+**What Google shows:** a dark map with a pin and labels, a street-level photo thumbnail, the
+normalised address as title (`C. del Peñasco, 8` — Google snapped the typed "avenida" to a
+different street type), the postcode, city, region and country as subtitle, and Directions /
+Share buttons; a Maps tab appears.
+
+**Triggers:** address-shaped queries (street-type words and a number in en/es/fr/de/it/pt:
+`calle, avenida, av., paseo, plaza, carrer, rue, strasse, street, road`; postcode forms),
+`mapa de X`, `map of X`, `where is X`, `X on map`, `dónde está X`. Place names only when the
+geocoder is confident (`importance` above a threshold) **and** the Wikipedia panel does not
+already own the query. No "near me" server-side (no geolocation); offer a browser geolocation
+button only on click.
+
+**Providers (owner's list: OpenStreetMap, Apple Maps, Photon):**
+- **Geocoder — Nominatim.** **[read 2026-10-31]** absolute maximum 1 request/second; an
+  identifying `User-Agent` or `Referer` is required (library defaults do not count); cache
+  results (repeating a query can get a client flagged); **autocomplete / search-as-you-type is
+  forbidden** (so `/autocomplete` must never call it); show attribution (ODbL); no bulk or
+  systematic queries. One request per search, cached ≥ 24 h, paced through the engine token
+  bucket at ≤ 1/s with a contact UA, is within that. `geocoder_url` is configurable so the
+  owner can point at a self-hosted Nominatim or Photon. Photon's own usage terms
+  **[verify]**; Apple Maps needs a token (optional, off by default).
+- **Tiles — OpenStreetMap standard raster.** **[read 2026-10-31]** HTTPS only; a distinct,
+  stable `User-Agent` naming the app with contact; honour `Cache-Control`/`ETag` or keep each
+  tile ≥ 7 days; no bulk/prefetch/offline, no scanning at high zoom; no `no-cache` headers;
+  don't strip the Referer; attribution "© OpenStreetMap contributors" visible bottom-right.
+  The policy **does not address static-map composition** and does not recommend caching
+  proxies; if the card is served through `/tile`, the proxy must meet every rule above, and
+  the owner should confirm with the OSM Foundation before relying on it. Make `tile_url`
+  configurable so a self-hosted or commercial tile server drops in.
+
+**Design:** no Leaflet and no framework. The card is a 3×3 grid of 256 px `<img>` tiles from
+`/tile/{z}/{x}/{y}` (own cache, fixed upstream host, SSRF-safe) with a CSS-positioned pin;
+the browser never contacts OSM. Optional JS: drag-pan and zoom over the same endpoint
+(~150 lines). Dark themes: `filter: var(--map-filter)` on the tile layer (an invert/hue
+filter token from J2) rather than a second tile provider. **Street-level photo: omit.**
+There is no keyless equivalent; do not fake one. Directions: a link built from a configurable
+template (`maps_directions_url`, default an OSM directions URL) and a `geo:lat,lon` link for
+phones. Share: `navigator.share` with copy-link fallback.
+
+**Address normalisation:** accent-insensitive (`penasco` ≈ `peñasco`); free-form `q=` first,
+structured fallback; when the returned street type differs from the typed one, say "Showing
+closest match". If the geocoder is rate-limited or down: text-only card, "map unavailable",
+never a blank page.
+
+The Maps tab is J5.3 (`/search?cat=maps`): Nominatim / Photon result list + one map with
+markers.
+
+**Test:** matcher tables EN+ES (`avenida del penasco 8`, `calle mayor 5 madrid`, `10 downing
+street`, `mapa de madrid`; negatives `5th avenue shoes`, `avenida` alone, `calle 13 band`);
+geocoder fixture parse; `/tile` rejects any host/zoom out of range; log contains no query,
+address or coordinates.
+
+### J4d. Stocks (screenshot 4)
+
+**What Google shows:** logo, name, `NASDAQ: NVDA`; price, change pill and absolute change;
+market status line (`Closed: Oct 30, 7:59 PM EDT`) and extended-hours quote; range tabs
+`1D 5D 1M 6M YTD 1Y 5Y Max`; a chart with a dotted previous-close line (1D) and a grey
+extended-hours segment; a stats grid (Open, High, Low, Mkt cap, P/E, 52-wk high/low,
+Dividend); a Related list of tickers with price pills; news, Earnings and Quarterly
+financials cards. **Omit:** Follow (no accounts), "Why is NVDA down" and "Analyze" (AI).
+
+**Triggers (EN + ES):** `nvda stock`, `nvidia stock price chart`, `NASDAQ:NVDA`, `$NVDA`,
+`nvidia acciones`, `cotización nvidia`, indices (`^GSPC`, `ibex 35`), crypto via the existing
+currency/crypto path. Require a cue word (`stock, share price, acciones, cotización,
+ticker`) or an `EXCHANGE:SYM` form; resolve names → tickers from a local
+`static/tickers.tsv` (top ~500 names/aliases, like `cities.tsv`) so common queries need no
+lookup. Negatives: `nvidia drivers`, `apple pie`, `stock photos`, `chicken stock`, `tesla coil`.
+
+**Providers — all unverified, measure each with paced probes (H5) and record them:**
+- **Stooq** CSV (quote and daily history, no key, delayed): fits 5D–Max; no fundamentals
+  **[verify]** intraday availability and terms.
+- **Yahoo Finance chart endpoint** (unofficial, no key as far as I know): would give previous
+  close, 52-week range, pre/post-market and the intraday series for 1D. **[verify]** current
+  behaviour: crumb/cookie requirements, the EU consent redirect (the owner is in Madrid),
+  User-Agent expectations, and terms. Best-effort provider with breaker, falling back to Stooq.
+- **Keyed, optional, off by default** (Finnhub, Twelve Data, Alpha Vantage, FMP): quote,
+  profile, ratios, earnings, peers (→ "Related"). Free-tier limits **[verify]** each; one
+  that allows only a handful of calls a day cannot back a search page.
+- Label everything "delayed, source X, as of <time in the exchange's zone>"; never show a
+  price without its age; "not investment advice".
+
+**Rendering:** server-side inline **SVG** chart — no JS required: area/line polyline,
+3–4 grid lines, dashed previous-close line with label, extended-hours segment in
+`--text-dim`, colour by sign via `--pos`/`--neg` (J2), x labels in the exchange time zone,
+≤ 300 points (downsample). Range tabs are plain links (`&range=5d`). JS adds a hover
+crosshair reading from a `data-points` attribute (≤ 3 KB). Missing stats are shown as `—`,
+never invented. Related tickers link to `/search?q=<name> stock`. The news card reuses the
+J5 News category (optional).
+
+**Caching:** quote 60 s while open / 15 min closed; chart 1D 60 s, 5D 5 min, ≥ 1M 1 h, Max
+24 h; stale-while-error; single-flight per symbol so ten clients make one upstream call.
+Market state from the provider; otherwise weekday + exchange zone (and say "Closed"), with
+holidays as a known gap.
+
+**Test:** sanitised chart-JSON and CSV fixtures; golden SVG test (point count, the path
+starts at the first close, the previous-close line's y matches); pill colouring; every theme
+(J2); matcher tables EN+ES.
+
+**Done when (J4):** calculator, translate, maps and stocks each render in every theme at all
+widths with JS disabled, each has provider fixtures and a matcher table, `answers = local`
+makes all three network cards disappear without error, and SETUP §3 lists every new host.
+
+---
+
+## J5. SearXNG-class providers
+
+The owner attached SearXNG's engine list (~220 engines in General, News, Images, Videos,
+Music, IT, Science, Files, Social, Maps) and asked to build them. I recommend **building the
+framework once so an engine is ~10 lines of data, then adding engines in tiers** — not 220
+hand-written parsers. Many in the list are front ends for the same index, many need keys, some
+are hostile to automated use.
+
+**Where the code is:** 13 registry entries; verticals `V_WEB/CODE/ACADEMIC/ENTITY/NEWS/MEDIA`
+exist but only `hn` has `V_NEWS` and nothing has `V_MEDIA`; the chrome has `All | Images`;
+`SearchResult` is `{url, title, snippet}` (`Scraping.h:10-14`); `results.html` renders four
+fields.
+
+### J5.0 Licence and clean-room
+
+`LICENSE` is the GNU GPL v2 text (1989/1991); I found no per-file notice saying "or later"
+**[verify]**. SearXNG is AGPL-3.0, and GPL-2-only and AGPL-3 are not compatible. Porting or
+translating its Python engine modules would make a derivative. Build
+each engine from the provider's own documentation and captured responses (as G3 did). The
+engine names and bangs in the attached list are facts and fine to use. **The owner should
+confirm the licence intent** (README also asks that the code not be hosted on proprietary
+platforms).
+
+### J5.1 Declarative engine definitions
+
+- Load definitions at startup from `static/engines.d/*.ini` (or one TSV) into a **heap**
+  registry. Kinds, mirroring the *idea* of SearXNG's generic engines: `json` (JSON paths
+  via jansson), `feed` (RSS/Atom/XML), `html` (libxml2 XPath), and `c` (existing hand-coded
+  parsers for Bing, Brave, DDG).
+- Fields: `id, name, categories, url` template (`{q} {page} {offset} {lang} {region}
+  {safe}`), `method`, `headers`, `ua`, `cookies`, result paths (`results, url, title,
+  content, thumbnail, date, author, extra.*`), `index_group`, `weight`, `pace`, `timeout`,
+  `requires_key`, `enabled_default`, `terms_note`, `rate_note`.
+- `tests/registry_lint` additionally requires: unique ids, a fixture, a `docs/probe-log.tsv`
+  entry, a declared `index_group`, and a `terms_note` for anything keyed or rate-limited.
+- **Constraint:** `ENGINE_REGISTRY[]` and `ENGINE_COUNT` are compile-time. `results_handler`
+  sizes `eligible[ENGINE_COUNT]` (`Search.c:862`), `jobs[ENGINE_COUNT]` and
+  `all_results[ENGINE_COUNT]` (`Search.c:1089-1090`) on the stack, and uses `1u << i` masks
+  (`Search.c:1550,1580`). With
+  100+ engines move per-request arrays to the heap, sized by the **selected** engines (≤ 6–8
+  plus hedges), keep the masks on job indices, and stop using `ENGINE_COUNT` as a request
+  bound. **[verify]** beaker's thread stack size on macOS (secondary threads default to a
+  small stack); `ScrapeJob` is ~2 KB, so 150 of them on the stack is ~300 KB before `cands[128]`.
+
+### J5.2 Rich results
+
+Extend `SearchResult` with `kind` and optional fields (`thumbnail`, `date`, `duration`,
+`author`, `source`, `size`, `seeds`, `lat/lon`, `doi`, plus key/value `extra`). Templates per
+kind: web (today), image grid (exists for Bing), video (thumbnail, duration, channel), news
+(source, age), paper (authors, year, venue, DOI/PDF), package (name, version, downloads),
+repository (stars, language, updated), file, place, audio. All thumbnails through
+`/image-proxy`. Update the `results.html` row from positional `result[0..3]` to named
+fields.
+
+### J5.3 Tabs and categories
+
+Chrome becomes `All | Images | Videos | News | Maps | More ▾` (a no-JS `<details>`:
+Science, Code, Music, Files, Social), horizontally scrollable at narrow widths. Each tab is
+`/search?q=…&cat=<id>`; the engine set comes from the registry's `categories`. Per-category
+fusion: RRF within the category; the web-only signals (authority, spam, coverage floor)
+**do not apply to non-web kinds** — in particular the floor must not drop media or
+non-English results. Settings: engines grouped by category, with a filter box.
+
+### J5.4 Independence accounting (continues H1)
+
+Every web engine declares `index_group`. Genuinely separate indexes in the list: Brave
+(exists), Mwmbl, YaCy (exists), Yandex, Baidu, Naver, Seznam, Sogou/360/Quark (regional),
+Google (via the bridge or the CSE element); Qwant and Yep are mixed or uncertain
+**[verify]**. Many entries are front ends over Bing, Google or Brave (`fireball, fynd,
+privacywall, reloado, zapmeta, tusksearch, vuhuv, resulthunter, gmx` and others — **[verify]
+each**): ship them disabled, labelled with the *parent's* `index_group` so consensus and the
+H1 note don't double-count, and measure overlap with a new `tools/overlap.py` (top-10 URL
+Jaccard against each index over `tools/queries.tsv`). Enable by default only what adds a new
+index.
+
+### J5.5 Tiers
+
+| Tier | What | Parser | Notes |
+|---|---|---|---|
+| 0 | the framework + one reference engine per kind | json, feed, html | proves J5.1–5.3 end to end |
+| 1 | **Wikimedia family:** wikibooks, wikiquote, wikisource, wikiversity, wikivoyage, wikinews, wikispecies, wikidata, Commons (files/images/videos/audio); **MediaWiki wikis:** Arch, Gentoo, NixOS, Free Software Directory | json | one definition + a `site` parameter per wiki |
+| 1 | **Reference/science:** OpenLibrary, PubMed, Europe PMC, OpenAIRE, Semantic Scholar, PDB | json/xml | NCBI wants `tool`/`email` parameters **[verify]** |
+| 1 | **Code hosting:** GitHub, GitLab, Codeberg/Gitea, Bitbucket, Hugging Face (models/datasets/spaces), Docker Hub | json | GitHub unauthenticated search is tightly limited **[verify]** |
+| 1 | **Packages:** npm, crates.io, Hex, MetaCPAN, Packagist, pub.dev, RubyGems, Anaconda, Alpine, Void | json | crates.io requires a real UA **[verify]**; PyPI and pkg.go.dev have no search API → html |
+| 1 | **Docs/Q&A:** StackExchange family (one entry, `site=` per community: askubuntu, superuser…), MDN, Microsoft Learn, Hoogle, mankier, NVD, Lobsters | json | |
+| 1 | **Media:** Deezer, Radio Browser, Mixcloud, MediathekViewWeb, SepiaSearch/PeerTube, Odysee, Dailymotion, Openverse, Art Institute of Chicago, Frinkiac, Apple App Store (iTunes Search) | json | all documented or public APIs as far as I know — **[verify]** each against its own terms before coding |
+| 1 | **News:** Tagesschau, Wikinews; **maps:** Photon, Nominatim, OSM | json | maps share J4c's pacing |
+| 2 | **Feeds:** Google News RSS search, Bing News RSS | feed | **[verify]** both still serve |
+| 2 | **HTML, fragile (each needs a fixture and a breaker):** Brave News/Images/Videos, DDG Images/Videos/News (needs a `vqd` token), Bing Videos/News, Mojeek, Mwmbl, Wiby, searchmysite, Qwant (bot-challenged), Yandex, Baidu, Naver, Seznam, Sogou, 360, Quark, YouTube, Vimeo, Rumble, Bilibili, Niconico, Pinterest, Flickr, Imgur, Artstation, SoundCloud, Bandcamp, Genius, F-Droid, APK Mirror | html | order by value to the owner; build on request after a probe |
+| 3 | **Opt-in only, off by default, owner's explicit call:** torrent indexers (1337x, Piratebay, Kickass, Nyaa, Solidtorrents, Btdigg, Bt4g, Tokyotoshokan) and shadow-library searches (Anna's Archive, Library Genesis) | html | much of this content is infringing and domains rotate. I would **not ship** Anna's/LibGen in a default build; if the owner wants any, gate them behind `[engines] allow_files = on`, set `legal_note`, and never fan out to them from the All tab |
+
+Skip unless asked: the small regional or unknown engines in the list (`abcnyheter, bpb, ayo,
+gabanza, fastbot, crowdview, 9gag…`) — I cannot judge their value without a probe, so build
+them only after one.
+
+### J5.6 Fix the existing SearXNG bridge first (cheap, and it stays useful)
+
+- `searxng_engines` is a 128-byte buffer (`Config.h:73`, `ApiEngines.c:762`); `snprintf`
+  truncates a long list silently. The owner will list 20+ names. Raise it to ≥ 1 024 and
+  fail loudly on overflow.
+- The attached list uses **bangs** (`!go`, `!ddg`); the `engines=` parameter takes engine
+  **names**. Ship a shortcut → name map generated from the list and accept either form.
+  Validate the configured names at startup against the instance's `GET /config` (it lists
+  each engine's name, shortcut and categories **[verify]**) and warn on unknown or disabled ones.
+- `config.ini` recommends `docker run searxng/searxng` as the route to Google, but the JSON
+  output (`format=json`) must be enabled in the instance's settings or it answers 403
+  **[verify] for the current image**. Add a startup probe (`/search?q=test&format=json`)
+  that prints one clear error instead of a silently dead engine.
+- The registry gives the bridge `index_group = "google"` (`ScrapingParsers.c:~791`), so
+  results from Brave and Qwant through the bridge are counted as Google. Use each result's
+  `engine` field to pick the group.
+- `api_parse_searxng` reads only `title/url/content`. The JSON also carries `engine`,
+  `engines`, `positions`, `thumbnail`/`img_src`, `publishedDate`, `category`, and top-level
+  `answers`, `infoboxes`, `suggestions`, `corrections`, `unresponsive_engines`
+  **[verify names against the instance]**. Use `unresponsive_engines` in the health panel,
+  `suggestions`/`corrections` for "did you mean", and pass `categories=` for the J5.3 tabs.
+
+### J5.7 Process
+
+Per engine: sanitised fixture (no cookies, no IPs), a parse test in `tests/parser_fixtures`,
+a `registry_lint` pass, a paced probe logged in `docs/probe-log.tsv`, an identifying
+`User-Agent` where the provider's policy asks for one (Nominatim, OSM tiles, crates.io,
+Wikimedia **[verify]**), and a `rate_note` giving the provider's documented limit that
+feeds the token bucket. The J5 probe suite is sequential and spread out; with ~100 hosts a
+burst would be the H1 mistake at scale. The `JUNK` outcome (H2) applies to web kinds only.
+Per-request fan-out stays capped (6–8); the All tab never queries 100 engines.
+
+**Done when:** Tier 0 and Tier 1 are in with fixtures; ≥ 40 engines across ≥ 8 categories;
+Videos, News and Maps tabs work end to end; the registry lint passes; `docs/` has the overlap
+report; no engine is enabled by default without a logged probe; SETUP §3/§4 are updated.
+
+---
+
+## J6. Found along the way
+
+1. **Raw query text is logged.** `Search.c:2036-2043` writes `raw_query` into every
+   `[WARN] … collapsed to zero rendered results (query "…")` line, unconditionally. The
+   shipped `omnisearch.err` contains `1+1`, `covid-19`, `google_cse` and `#123456`. This breaks
+   the "do not start logging raw query text" ground rule from Part 0. Drop the text (or log a
+   per-install-salted hash) and keep the counts. The zip also contained `omnisearch.err.old`
+   (433 KB), `cache/cookies/*.txt`, `.git`, `obj/` and `.DS_Store`/`__MACOSX`: fine for a
+   hand-off, but strip them before sharing (`make dist` exists for this, A7).
+2. **`{{info[2]|safe}}`** (`results.html:127`) marks every infobox body as safe, including
+   Wikipedia's plain-text `explaintext` extract (which can contain `<` and `&`) and the
+   Cambridge scrape. Add `InfoBox.is_html`, set only by local generators, and escape the
+   rest. **[verify]** beaker's default escaping for `{{ }}`.
+3. **`%g` in the calculator card** truncates to 6 digits (J4a); the answer box and the card
+   disagree.
+4. **Wikipedia is asked about every query** under `infobox = all` (always-true handler, fuzzy
+   `generator=search`), and its relevance gate is bypassed for short queries (J3b).
+5. **Three tokenizers** with three minimum lengths and three alphabets (J3a).
+6. **`-` prefix = exclusion** (`QueryAnalysis.c`, the `negatives` branch): any word starting
+   with `-` and longer than one character is removed from the engine query, so
+   `10 -3` or `covid -19` loses its second term. **[verify]**; require the `-` to be followed
+   by a letter.
+7. **`answers` has no settings control** (J3c) and the default (`local`) is documented only in
+   `example-config.ini` and SETUP.
+8. **SETUP §3 is stale for this round:** add rows for translate, geocoder, tiles, stock
+   providers and every new engine; SETUP §4 needs the new registry model.
+9. **`docs/claude-feedback.md` is deleted in the working tree** (` D` in `git status`). If that
+   was not intended, restore it from `HEAD`.
+10. **Template warnings can be failures:** 9× `Key '…' not found in context` in the log means a
+    literal `{{tag}}` shipped to a page. Make the render check fail on any such warning.
+
+---
+
+## Report back
+
+For each ID (J1, J2, J3a–d, J4.0, J4a–d, J5.0–5.7, J6.1–10), one line: `ID — fixed | not
+reproducible | deferred (why) — evidence (command/test/commit)`. Then list anything you
+found that is not in this document, every **[verify]** you resolved with the exact request
+that resolved it, and the `make verify` summary line.
