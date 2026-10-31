@@ -12,6 +12,8 @@ typedef enum {
   UNIT_VOLUME,
   UNIT_AREA,
   UNIT_TIME,
+  UNIT_SPEED,
+  UNIT_DATA,
   UNIT_UNKNOWN
 } UnitType;
 
@@ -82,6 +84,24 @@ static const UnitDef UNITS[] = {
      2589988.0},
     {"acre", {"acres"}, UNIT_AREA, 4046.86},
     {"hectare", {"ha", "hectares"}, UNIT_AREA, 10000.0},
+
+    /* H4: speeds were missing entirely, so "60 mph to kmh" fell through to the
+       network. Base is metres per second. */
+    {"metre per second", {"m/s", "mps", "metres per second"}, UNIT_SPEED, 1.0},
+    {"kilometre per hour",
+     {"kmh", "km/h", "kph", "kilometres per hour"},
+     UNIT_SPEED,
+     0.277778},
+    {"mile per hour", {"mph", "miles per hour"}, UNIT_SPEED, 0.44704},
+    {"knot", {"knots", "kn"}, UNIT_SPEED, 0.514444},
+
+    /* H4: data sizes. Decimal (SI) multiples: 1 MB is 10^6 bytes, which is
+       what storage vendors and Google's converter both use. */
+    {"byte", {"bytes"}, UNIT_DATA, 1.0},
+    {"kilobyte", {"kb", "kbs", "kilobytes"}, UNIT_DATA, 1000.0},
+    {"megabyte", {"mb", "mbs", "megabytes"}, UNIT_DATA, 1e6},
+    {"gigabyte", {"gb", "gbs", "gigabytes"}, UNIT_DATA, 1e9},
+    {"terabyte", {"tb", "tbs", "terabytes"}, UNIT_DATA, 1e12},
 
     {"second", {"sec", "seconds", "s"}, UNIT_TIME, 1.0},
     {"minute", {"min", "minutes"}, UNIT_TIME, 60.0},

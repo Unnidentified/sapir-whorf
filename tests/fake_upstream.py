@@ -29,6 +29,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(503)
             self.send_header("Content-Type", "text/html")
             self.send_header("Retry-After", "120")
+        elif m == "junk":
+            # H2: ten results that answer nothing. HTTP 200, real markup, no
+            # overlap with the query - exactly Bing's failure shape.
+            results = [
+                {
+                    "title": f"Warehouse stock transfer error {7000 + i}",
+                    "url": f"http://sap{i}.example/notes/{7000 + i}",
+                    "content": "Posting change fails, could not determine ERP "
+                               "stock data for stock type.",
+                }
+                for i in range(10)
+            ]
+            body = json.dumps({"results": results}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
         elif m == "empty":
             body = json.dumps({"results": []}).encode()
             self.send_response(200)

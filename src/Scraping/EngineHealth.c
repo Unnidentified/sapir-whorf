@@ -180,6 +180,24 @@ int engine_health_take_token(const char *id) {
   return allowed;
 }
 
+double engine_health_effective_weight(const char *id, double base_weight) {
+  if (!id || !id[0])
+    return base_weight;
+  pthread_mutex_lock(&health_mutex);
+  EngineHealthEntry *entry = find_or_create(id);
+  double result = base_weight;
+  if (entry && entry->quality_samples >= 3) {
+    double q = entry->quality_ewma;
+    if (q < 0.0)
+      q = 0.0;
+    if (q > 1.0)
+      q = 1.0;
+    result = base_weight * (0.5 + 0.5 * q);
+  }
+  pthread_mutex_unlock(&health_mutex);
+  return result;
+}
+
 void engine_health_set_ua_profile(const char *id, const char *profile) {
   if (!id || !id[0] || !profile)
     return;
@@ -464,6 +482,16 @@ void engine_health_record_quality(const char *id, int returned, int useful) {
       entry->quality_ewma = (1.0 - alpha) * entry->quality_ewma + alpha * sample;
     entry->quality_samples++;
   }
+  pthread_mutex_unlock(&health_mutex);
+}
+
+void engine_health_record_junk(const char *id) {
+  if (!id)
+    return;
+  pthread_mutex_lock(&health_mutex);
+  EngineHealthEntry *entry = find_or_create(id);
+  if (entry)
+    entry->total_junk++;
   pthread_mutex_unlock(&health_mutex);
 }
 

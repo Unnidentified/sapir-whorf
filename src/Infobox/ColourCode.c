@@ -97,6 +97,10 @@ int is_colour_code_query(const char *query) {
   if (!query)
     return 0;
   const char *p = query;
+  /* H4: a leading space is common when people paste, and the old check was
+     p[0]=='#' so "  #123456" fell through to the network. */
+  while (*p == ' ' || *p == '\t')
+    p++;
   /* G4: rgb() is how most people paste a colour, and without this the answer
      box fell through to a network lookup for a question it can answer
      instantly. */
@@ -129,6 +133,8 @@ InfoBox fetch_colour_data(char *query) {
     return info;
 
   const char *p = query;
+  while (*p == ' ' || *p == '\t')
+    p++;
   if (strncasecmp(p, "rgb(", 4) == 0 || strncasecmp(p, "rgba(", 5) == 0) {
     int r = -1, g = -1, b = -1;
     const char *open = strchr(p, '(');

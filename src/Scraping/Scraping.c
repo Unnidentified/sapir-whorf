@@ -103,7 +103,11 @@ static int response_declares_no_results(const ScrapeJob *job,
     return 0;
   const char *id = job->engine->id;
   if (strcmp(id, "bing") == 0)
-    return response_contains(response, "b_no") ||
+    /* NOT the bare "b_no": every Bing page carries #b_notificationContainer,
+       which starts with those four letters, so the loose test classified every
+       zero-result Bing response as "declares no results" and hid real parse
+       mismatches. The attribute form is the actual marker. */
+    return response_contains(response, "class=\"b_no\"") ||
            response_contains(response, "There are no results");
   if (strcmp(id, "google") == 0 || strcmp(id, "google_cse") == 0)
     return response_contains(response, "did not match any documents");

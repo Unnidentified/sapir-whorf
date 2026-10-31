@@ -43,7 +43,7 @@
                     {{if exists answer_detail}}
                     <p class="answer-box-detail">{{answer_detail}}</p>
                     {{endif}}
-                    <p class="answer-box-source">Answered locally by {{answer_source}}</p>
+                    <p class="answer-box-source">{{answer_source_note}} — <a href="/search?q={{query_encoded}}&amp;web=1">search the web for this</a></p>
                 </section>
                 {{endif}}
 

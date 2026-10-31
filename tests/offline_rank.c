@@ -21,6 +21,9 @@
 
 #define MAX_DOCS 512
 
+/* H2: set by --junk */
+static int junk_report = 0;
+
 typedef struct {
   char *q;
   char *engine;
@@ -198,24 +201,32 @@ static int load(const char *path, QueryRecord **out, int *out_count) {
 }
 
 int main(int argc, char **argv) {
-  if (argc < 2) {
-    fprintf(stderr, "usage: %s <replay.jsonl> [judgments.tsv]\n", argv[0]);
+  int arg_start = 1;
+  for (int i = 1; i < argc; i++)
+    if (strcmp(argv[i], "--junk") == 0) {
+      junk_report = 1;
+      arg_start++;
+    }
+  if (argc <= arg_start) {
+    fprintf(stderr,
+            "usage: %s [--junk] <replay.jsonl> [judgments.tsv]\n", argv[0]);
     return 2;
   }
 
   QueryRecord *recs = NULL;
   int nrecs = 0;
-  if (argc >= 3)
-    load_judgments(argv[2]);
+  if (argc > arg_start + 1)
+    load_judgments(argv[arg_start + 1]);
 
-  if (load(argv[1], &recs, &nrecs) != 0) {
-    fprintf(stderr, "cannot read %s\n", argv[1]);
+  if (load(argv[arg_start], &recs, &nrecs) != 0) {
+    fprintf(stderr, "cannot read %s\n", argv[arg_start]);
     return 2;
   }
 
   printf("offline replay: %d queries\n", nrecs);
 
   int queries = 0, empty = 0, total = 0;
+  int junk_queries = 0, junk_hits = 0;
   double coverage_sum = 0.0;
   int judged = 0, hit3 = 0;
   double reciprocal_sum = 0.0, dcg = 0.0, idcg = 0.0;
@@ -258,9 +269,11 @@ int main(int argc, char **argv) {
     rank_score(recs[r].docs, deduped, &analysis);
 
     int kept = 0;
+    int floored_here = 0;
     double cov = 0.0;
     for (int i = 0; i < deduped; i++) {
       if (recs[r].docs[i].coverage < 0.15) {
+        floored_here++;
         rank_doc_free(&recs[r].docs[i]);
         continue;
       }
@@ -271,6 +284,18 @@ int main(int argc, char **argv) {
     }
     if (kept > 0)
       coverage_sum += cov / kept;
+
+    /* H2: a JUNK answer is HTTP 200 with results that are almost all below
+       the coverage floor. Distinct from OK and from EMPTY, and it is what
+       Bing does for some queries from this host. */
+    if (junk_report && deduped >= 5) {
+      double share = (double)floored_here / (double)deduped;
+      printf("%-46s docs=%-3d floored=%-3d share=%.2f %s\n", recs[r].q,
+             deduped, floored_here, share, share >= 0.9 ? "JUNK" : "ok");
+      junk_queries++;
+      if (share >= 0.9)
+        junk_hits++;
+    }
 
     queries++;
     total += kept;

@@ -686,6 +686,13 @@ static int build_paused_note(char *note, size_t size) {
   return paused;
 }
 
+/* H2: selection weight, adjusted by measured quality. */
+static double engine_effective_weight(const SearchEngine *e) {
+  if (!e)
+    return 0.0;
+  return engine_health_effective_weight(e->id, e->weight);
+}
+
 static const SearchEngine *find_enabled_engine(const char *engine_id) {
   if (!engine_id || engine_id[0] == '\0' || engine_id_matches(engine_id, "all"))
     return NULL;
@@ -904,7 +911,7 @@ int results_handler(UrlParams *params) {
             already = 1;
         if (already)
           continue;
-        if (!best || e->weight > best->weight)
+        if (!best || engine_effective_weight(e) > engine_effective_weight(best))
           best = e;
       }
       if (!best || eligible_count >= ENGINE_COUNT)
@@ -921,7 +928,7 @@ int results_handler(UrlParams *params) {
         const SearchEngine *e = eligible_all[i];
         if (!(e->verticals & V_WEB))
           continue;
-        if (!best || e->weight > best->weight)
+        if (!best || engine_effective_weight(e) > engine_effective_weight(best))
           best = e;
       }
       if (best && eligible_count < ENGINE_COUNT)
@@ -1003,7 +1010,7 @@ int results_handler(UrlParams *params) {
     for (int i = 1; i < routed_count; i++) {
       const SearchEngine *key = routed[i];
       int j = i - 1;
-      while (j >= 0 && routed[j]->weight < key->weight) {
+      while (j >= 0 && engine_effective_weight(routed[j]) < engine_effective_weight(key)) {
         routed[j + 1] = routed[j];
         j--;
       }
@@ -1032,6 +1039,39 @@ int results_handler(UrlParams *params) {
   if (engine_query[0] == '\0')
     snprintf(engine_query, sizeof(engine_query), "%s", raw_query);
 
+  /* H4: resolve the local answer BEFORE deciding whether to fan out. A
+     confident local answer needs no upstream request at all - "2+2" should not
+     query three search engines to be told it is 4. */
+  AnswerBoxResult local_answer;
+  int have_local_answer = 0;
+  int answers_off = strcmp(global_config.answers_mode, "off") == 0;
+  if (!answers_off)
+    have_local_answer = answer_box_resolve_local(raw_query, &local_answer);
+  int skip_fanout = have_local_answer && local_answer.confidence >= 0.95;
+
+  /* ?web=1 asks for the web explicitly, which is what the "search the web for
+     this" link does - a confident answer must not be a dead end. */
+  for (int i = 0; i < params->count; i++) {
+    if (strcmp(params->params[i].key, "web") == 0 &&
+        strcmp(params->params[i].value, "1") == 0)
+      skip_fanout = 0;
+  }
+
+  /* the answer box and the patient link both need it, on both branches */
+  {
+    char enc[512] = {0};
+    CURL *c = curl_easy_init();
+    if (c) {
+      char *e = curl_easy_escape(c, raw_query, 0);
+      if (e) {
+        snprintf(enc, sizeof(enc), "%s", e);
+        curl_free(e);
+      }
+      curl_easy_cleanup(c);
+    }
+    context_set(&ctx, "query_encoded", enc);
+  }
+
   pthread_t infobox_threads[HANDLER_COUNT];
   InfoBoxThreadData infobox_data[HANDLER_COUNT];
 
@@ -1048,6 +1088,8 @@ int results_handler(UrlParams *params) {
   memset(all_results, 0, sizeof(all_results));
 
   int engine_idx = 0;
+  if (skip_fanout)
+    eligible_count = 0; /* answered locally; do not spend a request */
   for (int i = 0; i < eligible_count; i++) {
     {
       all_results[engine_idx] = NULL;
@@ -1358,6 +1400,31 @@ int results_handler(UrlParams *params) {
   }
   string_matrix_free(&infobox_matrix);
 
+  /* H4: answers = all. If no local answerer fired, promote the best infobox
+     the rail already fetched into the answer box. No extra request: the work
+     was done in parallel anyway, and doing it twice would be the only way to
+     make this slower than the rail it mirrors. */
+  if (!have_local_answer && !answers_off && page == 1 &&
+      strcmp(global_config.answers_mode, "all") == 0) {
+    static const int priority[] = {3, 0, 5}; /* currency, dictionary, wiki */
+    static const char *labels[] = {"currency", "dictionary", "wikipedia"};
+    for (size_t k = 0; k < sizeof(priority) / sizeof(priority[0]); k++) {
+      int idx = priority[k];
+      if (!infobox_data[idx].success || !infobox_data[idx].result.extract)
+        continue;
+      if (!infobox_text_is_meaningful(infobox_data[idx].result.extract))
+        continue;
+      context_set(&ctx, "answer_text",
+                  infobox_data[idx].result.title
+                      ? infobox_data[idx].result.title
+                      : labels[k]);
+      context_set(&ctx, "answer_detail", infobox_data[idx].result.extract);
+      context_set(&ctx, "answer_source_note", "From the web");
+      context_set(&ctx, "answer_is_web", "1");
+      break;
+    }
+  }
+
   int stale_count = 0;
   for (int i = 0; i < enabled_engine_count; i++) {
     if (jobs[i].stale)
@@ -1641,6 +1708,7 @@ int results_handler(UrlParams *params) {
     {
       int returned[32] = {0};
       int useful[32] = {0};
+      int junk_engines = 0;
       for (int i = 0; i < enabled_engine_count; i++)
         returned[i] = jobs[i].results_count;
       for (int c = 0; c < cand_count; c++) {
@@ -1650,9 +1718,20 @@ int results_handler(UrlParams *params) {
         }
       }
       for (int i = 0; i < enabled_engine_count; i++) {
-        if (jobs[i].engine && returned[i] > 0)
-          engine_health_record_quality(jobs[i].engine->id, returned[i],
-                                       useful[i]);
+        if (!jobs[i].engine || returned[i] <= 0)
+          continue;
+        engine_health_record_quality(jobs[i].engine->id, returned[i],
+                                     useful[i]);
+        /* H2: JUNK is its own outcome. HTTP 200, results parsed, and almost
+           all of them below the floor - that is not OK and not EMPTY, and it
+           should be visible as such rather than inferred from a low EWMA. */
+        if (returned[i] >= 5 && useful[i] * 10 <= returned[i]) {
+          engine_health_record_junk(jobs[i].engine->id);
+          junk_engines++;
+          if (getenv("OMNI_PERF"))
+            fprintf(stderr, "[JUNK] %s returned %d, %d survived the floor\n",
+                    jobs[i].engine->id, returned[i], useful[i]);
+        }
       }
     }
 
@@ -1814,18 +1893,16 @@ int results_handler(UrlParams *params) {
     /* G4: the answer box. Local answerers only, resolved on the request path -
        they are pure computation, so this costs nothing measurable. If nothing
        local answers, the infobox card carries the network answer instead. */
-    {
-      AnswerBoxResult ans;
-      if (answer_box_resolve_local(raw_query, &ans)) {
-        context_set(&ctx, "answer_text", ans.answer);
-        if (ans.detail[0])
-          context_set(&ctx, "answer_detail", ans.detail);
-        context_set(&ctx, "answer_source", ans.source);
-        /* "2+2" answered 4: telling the user nothing was found on top of that
-           would be silly. "answered" is not a state the empty block matches. */
-        if (results_matrix.count == 0)
-          context_set(&ctx, "results_state", "answered");
-      }
+    if (have_local_answer) {
+      context_set(&ctx, "answer_text", local_answer.answer);
+      if (local_answer.detail[0])
+        context_set(&ctx, "answer_detail", local_answer.detail);
+      context_set(&ctx, "answer_source", local_answer.source);
+      context_set(&ctx, "answer_source_note", "Answered locally");
+      /* "2+2" answered 4: telling the user nothing was found on top of that
+         would be silly. "answered" is not a state the empty block matches. */
+      if (results_matrix.count == 0)
+        context_set(&ctx, "results_state", "answered");
     }
 
     /* H1: if every result came from one index, say so. It is the difference
@@ -1886,20 +1963,7 @@ int results_handler(UrlParams *params) {
       }
     }
 
-    {
-      /* the patient link needs an encoded query */
-      char enc[512] = {0};
-      CURL *c = curl_easy_init();
-      if (c) {
-        char *e = curl_easy_escape(c, raw_query, 0);
-        if (e) {
-          snprintf(enc, sizeof(enc), "%s", e);
-          curl_free(e);
-        }
-        curl_easy_cleanup(c);
-      }
-      context_set(&ctx, "query_encoded", enc);
-    }
+
 
     /* F1 funnel: where did the results go? Without this a thin page is
        indistinguishable from a slow one or a blocked one. */
@@ -1977,6 +2041,13 @@ int results_handler(UrlParams *params) {
     string_matrix_free(&results_matrix);
   } else {
     context_set(&ctx, "results_state", "empty");
+    if (have_local_answer) {
+      context_set(&ctx, "answer_text", local_answer.answer);
+      if (local_answer.detail[0])
+        context_set(&ctx, "answer_detail", local_answer.detail);
+      context_set(&ctx, "answer_source", local_answer.source);
+      context_set(&ctx, "results_state", "answered");
+    }
     {
       const char *reason = "none";
       int any_blocked = 0, any_failed = 0;

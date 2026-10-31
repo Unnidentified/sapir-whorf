@@ -1,4 +1,5 @@
 #include "AnswerBox.h"
+#include "AnswerLocal.h"
 #include "Calculator.h"
 #include "ColourCode.h"
 #include "CurrencyConversion.h"
@@ -18,7 +19,29 @@ static int any_query(const char *query) {
   return 1;
 }
 
+/* H4: the arithmetic answerer must only fire on something that is actually an
+   expression. "covid-19" passed the operator test (a '-' with a digit after
+   it) and evaluated to 0, which is a confidently wrong answer - worse than no
+   answer. Only digits, spaces, a decimal point and the operators may appear. */
+static int looks_like_expression(const char *query) {
+  if (!query || !query[0])
+    return 0;
+  int digits = 0;
+  for (const char *p = query; *p; p++) {
+    if (*p >= '0' && *p <= '9')
+      digits = 1;
+    else if (*p == ' ' || *p == '.' || *p == '+' || *p == '-' || *p == '*' ||
+             *p == '/' || *p == '^' || *p == '(' || *p == ')')
+      continue;
+    else
+      return 0;
+  }
+  return digits;
+}
+
 static int answer_arithmetic(const char *query, AnswerBoxResult *out) {
+  if (!looks_like_expression(query))
+    return 0;
   if (!is_calculator_query(query))
     return 0;
   /* the infobox extract is HTML for the card; the answer box wants the number.
@@ -32,6 +55,7 @@ static int answer_arithmetic(const char *query, AnswerBoxResult *out) {
   else
     snprintf(out->answer, sizeof(out->answer), "%.10g", value);
   snprintf(out->detail, sizeof(out->detail), "%s", query);
+  out->confidence = 1.0; /* an evaluated expression is not a guess */
   return 1;
 }
 
@@ -40,6 +64,7 @@ static int answer_units(const char *query, AnswerBoxResult *out) {
     return 0;
   if (!unit_conv_answer(query, out->answer, sizeof(out->answer)))
     return 0;
+  out->confidence = 1.0; /* a parsed conversion is not a guess */
   return 1;
 }
 
@@ -59,6 +84,7 @@ static int answer_colour(const char *query, AnswerBoxResult *out) {
       return 0;
     snprintf(out->answer, sizeof(out->answer), "#%02X%02X%02X", r, g, b);
     snprintf(out->detail, sizeof(out->detail), "RGB(%d, %d, %d)", r, g, b);
+    out->confidence = 1.0;
     return 1;
   }
   char hex[16];
@@ -70,6 +96,7 @@ static int answer_colour(const char *query, AnswerBoxResult *out) {
     hex[n++] = *p++;
   hex[n] = '\0';
   snprintf(out->answer, sizeof(out->answer), "#%s", hex);
+  out->confidence = 1.0;
   return 1;
 }
 
@@ -89,6 +116,7 @@ static int answer_dictionary(const char *query, AnswerBoxResult *out) {
            box.title ? box.title : "Definition");
   snprintf(out->detail, sizeof(out->detail), "%s", box.extract);
   snprintf(out->source, sizeof(out->source), "dictionary");
+  out->confidence = 0.7;
   free_infobox(&box);
   return 1;
 }
@@ -109,6 +137,7 @@ static int answer_currency(const char *query, AnswerBoxResult *out) {
   }
   snprintf(out->detail, sizeof(out->detail), "%s", box.title ? box.title : "");
   snprintf(out->source, sizeof(out->source), "currency");
+  out->confidence = 0.8;
   free_infobox(&box);
   return 1;
 }
@@ -127,6 +156,7 @@ static int answer_wikipedia(const char *query, AnswerBoxResult *out) {
            box.title ? box.title : "Wikipedia");
   snprintf(out->detail, sizeof(out->detail), "%s", box.extract);
   snprintf(out->source, sizeof(out->source), "wikipedia");
+  out->confidence = 0.6;
   free_infobox(&box);
   return 1;
 }
@@ -136,6 +166,12 @@ static int answer_wikipedia(const char *query, AnswerBoxResult *out) {
 static const Answerer answerers[] = {
     /* local first: instant, deterministic, no network. Order among these is
        intentional - a bare expression is arithmetic, not a unit conversion. */
+    /* H4: the local kinds that need neither network nor a new dependency.
+       time and dates come before arithmetic because "10 days until
+       2025-12-25" also looks like an expression to the matcher. */
+    {"time", 1, NULL, answer_time_zone},
+    {"days", 1, NULL, answer_days_between},
+    {"random", 1, NULL, answer_random},
     {"arithmetic", 1, is_calculator_query, answer_arithmetic},
     {"units", 1, is_unit_conv_query, answer_units},
     {"colour", 1, is_colour_code_query, answer_colour},
@@ -159,7 +195,9 @@ int answer_box_resolve_local(const char *query, AnswerBoxResult *out) {
   const Answerer *table = answer_box_answerers(&count);
   for (size_t i = 0; i < count; i++) {
     const Answerer *a = &table[i];
-    if (!a->local || !a->matches || !a->matches(query))
+    if (!a->local)
+      continue;
+    if (a->matches && !a->matches(query))
       continue;
     AnswerBoxResult candidate;
     memset(&candidate, 0, sizeof(candidate));
@@ -188,7 +226,7 @@ int answer_box_resolve(const char *query, AnswerBoxResult *out) {
       const Answerer *a = &table[i];
       if (a->local != pass)
         continue;
-      if (!a->matches || !a->matches(query))
+      if (a->matches && !a->matches(query))
         continue;
       AnswerBoxResult candidate;
       memset(&candidate, 0, sizeof(candidate));

@@ -1,0 +1,69 @@
+# H4: city/alias -> IANA time zone, for "time in tokyo" and date maths.
+# One "<zone>\t<alias>" per line; the first column is what the tz database
+# knows, the rest are names people type. Kept short on purpose - this is not a
+# gazetteer, it is the list of places people ask the time for.
+Europe/Madrid	madrid	spain	espana	españa
+Europe/London	london	uk	england	reino unido
+Europe/Paris	paris	france
+Europe/Berlin	berlin	germany	alemania
+Europe/Rome	rome	roma	italy
+Europe/Lisbon	lisbon	lisboa	portugal
+Europe/Amsterdam	amsterdam	netherlands
+Europe/Brussels	brussels	belgium
+Europe/Vienna	vienna	austria
+Europe/Stockholm	stockholm	sweden
+Europe/Oslo	oslo	norway
+Europe/Copenhagen	copenhagen	denmark
+Europe/Helsinki	helsinki	finland
+Europe/Dublin	dublin	ireland
+Europe/Warsaw	warsaw	poland
+Europe/Prague	prague	czechia
+Europe/Budapest	budapest	hungary
+Europe/Athens	athens	greece
+Europe/Istanbul	istanbul	turkey	turquia
+Europe/Moscow	moscow	russia	rusia
+Europe/Kyiv	kyiv	kiev	ukraine
+Atlantic/Canary	canary islands	canarias
+America/New_York	new york	nyc	ny
+America/Chicago	chicago
+America/Denver	denver
+America/Los_Angeles	los angeles	la	sf	san francisco	california
+America/Phoenix	phoenix
+America/Toronto	toronto
+America/Vancouver	vancouver
+America/Mexico_City	mexico city	ciudad de mexico
+America/Bogota	bogota
+America/Lima	lima
+America/Santiago	santiago	chile
+America/Sao_Paulo	sao paulo	brasil	brazil
+America/Argentina/Buenos_Aires	buenos aires	argentina
+America/Panama	panama
+America/Havana	havana	habana	cuba
+Asia/Tokyo	tokyo	japan	japon	japón
+Asia/Seoul	seoul	korea	corea
+Asia/Shanghai	shanghai	beijing	china
+Asia/Hong_Kong	hong kong
+Asia/Singapore	singapore
+Asia/Bangkok	bangkok	thailandia
+Asia/Jakarta	jakarta
+Asia/Manila	manila
+Asia/Kolkata	mumbai	delhi	india
+Asia/Karachi	karachi	pakistan
+Asia/Dhaka	dhaka	dhaka	bangladesh
+Asia/Dubai	dubai	uae	emiratos
+Asia/Riyadh	riyadh	saudi
+Asia/Tehran	tehran	iran
+Asia/Jerusalem	jerusalem	israel
+Africa/Cairo	cairo	egypt	egipto
+Africa/Lagos	lagos	nigeria
+Africa/Nairobi	nairobi	kenya
+Africa/Johannesburg	johannesburg	south africa
+Africa/Casablanca	casablanca	morocco	marruecos
+Africa/Algiers	algiers	argel	algeria
+Australia/Sydney	sydney	australia
+Australia/Melbourne	melbourne
+Australia/Brisbane	brisbane
+Australia/Perth	perth
+Pacific/Auckland	auckland	new zealand	nueva zelanda
+Pacific/Honolulu	honolulu	hawaii
+UTC	utc	gmt

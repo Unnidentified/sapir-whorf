@@ -5,3 +5,20 @@ utc	engine	query	http	bytes	verdict	ua	headers	url
 2026-10-31T12:20:40Z	google_cse_element	zzqxjkwvbnmplkjhgfdsa98765	200	432	0 results	safari	referer:cse.google.com	https://cse.google.com/cse/element/v1?...&cse_tok=<minted>
 2026-10-31T11:05:00Z	google_cse_token	Round-2 probe: cse.google.com/cse.js (wrong path)	404	-	no token page; this is the error H3 identified	safari	-	https://cse.google.com/cse.js?cx=...
 2026-10-31T11:05:30Z	google_cse_element	Round-2 probe: element/v1 with empty cse_tok	403	1103	Google bot page	safari	-	https://cse.google.com/cse/element/v1?...&cse_tok=
+2026-10-31T12:26:49Z	bing	linux kernel	200	52027	junk-ab:baseline	safari	baseline	https://www.bing.com/search?q=linux%20kernel
+2026-10-31T12:27:02Z	bing	mechanical keyboard	200	42828	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=mechanical%20keyboard&adlt=off
+2026-10-31T12:27:23Z	bing	python asyncio tutorial	200	52376	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=python%20asyncio%20tutorial&adlt=off
+2026-10-31T12:28:02Z	bing	python asyncio tutorial	200	52332	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=python%20asyncio%20tutorial&adlt=off
+2026-10-31T12:28:23Z	bing	best budget mechanical keyboard	200	52648	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=best%20budget%20mechanical%20keyboard&adlt=off
+2026-10-31T12:29:02Z	bing	best budget mechanical keyboard	200	53593	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=best%20budget%20mechanical%20keyboard&adlt=off
+2026-10-31T12:29:23Z	bing	how to tie a tie	200	52898	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=how%20to%20tie%20a%20tie&adlt=off
+2026-10-31T12:30:02Z	bing	how to tie a tie	200	52432	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=how%20to%20tie%20a%20tie&adlt=off
+2026-10-31T12:30:23Z	bing	best noise cancelling headphones	200	52223	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=best%20noise%20cancelling%20headphones&adlt=off
+2026-10-31T12:31:02Z	bing	best noise cancelling headphones	200	52729	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=best%20noise%20cancelling%20headphones&adlt=off
+2026-10-31T12:31:23Z	bing	cheap flights to lisbon	200	52523	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=cheap%20flights%20to%20lisbon&adlt=off
+2026-10-31T12:32:02Z	bing	cheap flights to lisbon	200	53082	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=cheap%20flights%20to%20lisbon&adlt=off
+2026-10-31T12:32:23Z	bing	running shoes for flat feet	200	52455	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=running%20shoes%20for%20flat%20feet&adlt=off
+2026-10-31T12:33:02Z	bing	running shoes for flat feet	200	53526	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=running%20shoes%20for%20flat%20feet&adlt=off
+2026-10-31T12:33:23Z	bing	how to lose weight fast	200	53360	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=how%20to%20lose%20weight%20fast&adlt=off
+2026-10-31T12:34:02Z	bing	how to lose weight fast	200	52892	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=how%20to%20lose%20weight%20fast&adlt=off
+2026-10-31T12:34:23Z	bing	best credit card for travel	200	52634	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=best%20credit%20card%20for%20travel&adlt=off

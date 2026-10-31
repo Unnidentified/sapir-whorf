@@ -4,6 +4,7 @@
 #include "../src/Infobox/AnswerBox.h"
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 static int failures = 0;
 
@@ -62,14 +63,68 @@ int main(void) {
       {"2+2", "arithmetic", "4", 1},
       {"12 * 12", "arithmetic", "144", 1},
       {"2^10", "arithmetic", "1024", 1},
+      {"7-3", "arithmetic", "4", 1},
+      {"100 / 4", "arithmetic", "25", 1},
+      {"3.5 * 2", "arithmetic", "7", 1},
+      {"(2+3)*4", "arithmetic", "20", 1},
+      {"2 ^ 3 ^ 2", "arithmetic", "512", 1},
+      {"-5 + 8", "arithmetic", "3", 1},
+      {"0.1 + 0.2", "arithmetic", "0.3", 1},
+      {"1 + 1 + 1", "arithmetic", "3", 1},
       /* units: local */
       {"10 km to miles", "units", "6.21 miles", 1},
       {"100 f to c", "units", "37.78", 1},
+      {"1 kg to lb", "units", NULL, 1},
+      {"60 mph to kmh", "units", NULL, 1},
+      {"5 feet in cm", "units", NULL, 1},
+      {"2 litres in gallons", "units", NULL, 1},
+      {"30 c to f", "units", NULL, 1},
+      {"12 inches to cm", "units", NULL, 1},
+      {"1 mile in km", "units", NULL, 1},
+      {"512 mb to gb", "units", NULL, 1},
       /* colour: local */
       {"#ff0000", "colour", "#ff0000", 1},
       {"rgb(0, 128, 255)", "colour", "#0080FF", 1},
-      /* a query with no operator is not arithmetic */
+      {"#16a34a", "colour", "#16a34a", 1},
+      {"#000", "colour", "#000", 1},
+      {"#FFFFFF", "colour", "#FFFFFF", 1},
+      {"rgb(255, 255, 255)", "colour", "#FFFFFF", 1},
+      {"rgba(1, 2, 3, 0.5)", "colour", "#010203", 1},
+      {"#abc", "colour", "#abc", 1},
+      {"  #123456", "colour", "#123456", 1},
+      {"rgb(1,2,3)", "colour", "#010203", 1},
   };
+
+  /* Negatives: one table, every kind. A local answerer that fires on these is
+     worse than one that misses - it is confidently wrong. The review named
+     four of these (H4). */
+  static const char *negatives[] = {
+      /* arithmetic look-alikes */
+      "2 broke girls", "python 3.12 vs 3.11", "10 downing street",
+      "covid-19", "area 51", "24 season 1", "windows 10",
+      "iphone 15 pro max", "1 direction", "3 body problem",
+      /* unit words without a conversion */
+      "convert to judaism", "convert pdf to word", "miles davis",
+      "pounds sterling", "football", "celsius band", "kgb", "litre of tears",
+      "inches away", "ounce of prevention",
+      /* colour words that are not colours */
+      "rgb gaming", "red dead redemption", "blue whale", "hashing",
+      "sharp tv", "black friday", "white house", "green day", "grey's anatomy",
+      "colour theory",
+      /* spanish: the same traps */
+      "2 chicas sin blanca", "convertir a pdf", "10 de mayo",
+      "kilogramo de café", "pies de foto", "millas a ninguna parte",
+      "rojo pasión", "verde que te quiero verde", "azul celeste",
+      "negro como la noche",
+  };
+  for (size_t i = 0; i < sizeof(negatives) / sizeof(negatives[0]); i++) {
+    AnswerBoxResult neg;
+    if (answer_box_resolve_local(negatives[i], &neg)) {
+      printf("FAIL negative %-24s answered locally by %s (\"%s\")\n",
+             negatives[i], neg.source, neg.answer);
+      failures++;
+    }
+  }
   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
     failures += run_case(&cases[i]);
 
@@ -95,6 +150,67 @@ int main(void) {
   if (!answer_box_resolve_local("10 km to miles", &loc) || !loc.local) {
     printf("FAIL: local resolve did not answer a unit query\n");
     failures++;
+  }
+
+  /* H4: time / dates / random. These answers move, so the assertions are on
+     the source and the shape, not on the value. */
+  {
+    static const struct {
+      const char *query;
+      const char *source;
+    } dynamic[] = {
+        {"time in tokyo", "time"},
+        {"what time is it in new york", "time"},
+        {"que hora es en madrid", "time"},
+        {"qué hora es en madrid", "time"},
+        {"current time in lisbon", "time"},
+        {"days between 2024-01-01 and 2024-03-01", "days"},
+        {"how many days until 2025-12-25", "days"},
+        {"flip a coin", "random"},
+        {"roll a dice", "random"},
+        {"random number between 1 and 10", "random"},
+        {"uuid", "random"},
+    };
+    for (size_t i = 0; i < sizeof(dynamic) / sizeof(dynamic[0]); i++) {
+      AnswerBoxResult d;
+      if (!answer_box_resolve_local(dynamic[i].query, &d)) {
+        printf("FAIL dynamic %-38s did not answer\n", dynamic[i].query);
+        failures++;
+        continue;
+      }
+      if (strcmp(d.source, dynamic[i].source) != 0) {
+        printf("FAIL dynamic %-38s source=%s want=%s\n", dynamic[i].query,
+               d.source, dynamic[i].source);
+        failures++;
+      }
+      if (!d.answer[0]) {
+        printf("FAIL dynamic %-38s empty answer\n", dynamic[i].query);
+        failures++;
+      }
+      if (strcmp(dynamic[i].source, "time") == 0 &&
+          !(isdigit((unsigned char)d.answer[0]) &&
+            isdigit((unsigned char)d.answer[1]) && d.answer[2] == ':')) {
+        printf("FAIL dynamic %-38s time answer \"%s\" is not HH:MM\n",
+               dynamic[i].query, d.answer);
+        failures++;
+      }
+    }
+
+    /* and the negatives for these kinds, in both languages */
+    static const char *dyn_neg[] = {
+        "time magazine", "time after time", "tempo", "dicey",
+        "random access memory", "uuid v4 format spec",
+        "days of our lives", "between the lines", "cities in spain",
+        "hora de comer",
+    };
+    for (size_t i = 0; i < sizeof(dyn_neg) / sizeof(dyn_neg[0]); i++) {
+      AnswerBoxResult d;
+      if (answer_box_resolve_local(dyn_neg[i], &d)) {
+        printf("FAIL negative %-28s answered by %s (\"%s\")\n", dyn_neg[i],
+               d.source, d.answer);
+        failures++;
+      }
+    }
   }
 
   if (failures == 0)

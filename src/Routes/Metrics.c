@@ -45,12 +45,14 @@ int metrics_handler(UrlParams *params) {
         "omnisearch_engine_blocked{engine=\"%s\"} %lu\n"
         "omnisearch_engine_cancelled{engine=\"%s\"} %lu\n"
         "omnisearch_engine_breaker_open{engine=\"%s\"} %d\n"
+        "omnisearch_engine_junk{engine=\"%s\"} %lu\n"
         "omnisearch_engine_quality{engine=\"%s\"} %.3f\n"
         "omnisearch_engine_latency_ms_avg{engine=\"%s\"} %.1f\n",
         id, h ? h->total_requests : 0UL, id, h ? h->total_ok : 0UL, id,
         h ? h->total_errors : 0UL, id, h ? h->total_blocked : 0UL, id,
         h ? h->total_cancelled : 0UL, id,
         (h && h->state == HEALTH_OPEN) ? 1 : 0, id,
+        h ? h->total_junk : 0UL, id,
         (h && h->quality_samples) ? h->quality_ewma : -1.0, id,
         (h && h->total_requests) ? h->total_latency_ms / h->total_requests
                                  : 0.0);

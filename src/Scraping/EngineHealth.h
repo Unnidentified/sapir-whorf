@@ -36,6 +36,10 @@ typedef struct {
      and still be returning junk that the coverage floor throws away - that is
      what Bing did for "best podcast app". */
   unsigned long total_cancelled;  /* cut off by our own batch deadline */
+  /* H2: answers that arrived, parsed, and were junk - >=90% of what it
+     returned fell below the relevance floor. Distinct from EMPTY (nothing
+     found) and from a failure (nothing arrived). */
+  unsigned long total_junk;
   int pace_override;        /* 0 = use the global rate                  */
   /* H1: when did this engine last succeed, and when did it last fail? A
      persisted "0/2" cannot be tied to a build or to a moment without these. */
@@ -76,6 +80,12 @@ void engine_health_set_engine_pace(const char *id, int requests_per_minute);
 void engine_health_set_ua_profile(const char *id, const char *profile);
 const char *engine_health_ua_profile(const char *id);
 
+/* H2: the routing weight adjusted by what this engine's results have been
+   worth. A2 recorded quality but nothing read it, so "healthy but junk" cost
+   nothing. 0.5x at quality 0, 1.0x at quality 1, and no penalty until there is
+   enough evidence to deserve one. */
+double engine_health_effective_weight(const char *id, double base_weight);
+
 EngineHealthEntry *engine_health_get(const char *id);
 const char *engine_health_state_name(BreakerState state);
 void engine_health_persist(void);
@@ -91,5 +101,8 @@ void engine_health_record_quality(const char *id, int returned, int useful);
 /* C12: an engine that is cancelled every time is either consistently slow or
    consistently a bad fit for the query mix. Recording it makes that visible. */
 void engine_health_record_cancelled(const char *id);
+
+/* H2: a JUNK answer - 200, results present, >=90% below the relevance floor. */
+void engine_health_record_junk(const char *id);
 
 #endif

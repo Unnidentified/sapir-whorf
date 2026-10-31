@@ -20,6 +20,7 @@
 #define DEFAULT_RATE_LIMIT_IMAGES_INTERVAL 60
 
 #define DEFAULT_BREAKER_THRESHOLD 5
+#define DEFAULT_ANSWERS_MODE "local"
 #define DEFAULT_PACE_PER_MINUTE 40
 #define DEFAULT_PACE_BURST 6
 #define DEFAULT_BREAKER_COOLDOWN 900
@@ -76,6 +77,8 @@ typedef struct {
      "local"  - calculator, units and colour only; nothing leaves the box
      "off"    - no infobox at all */
   char infobox_mode[16];
+  /* H4: all | local | off - what the answer box is allowed to do */
+  char answers_mode[16];
   int rate_limit_search_requests;
   int rate_limit_search_interval;
   int rate_limit_images_requests;

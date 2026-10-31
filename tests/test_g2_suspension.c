@@ -76,6 +76,34 @@ int main(void) {
   check("ch1/recovered", engine_health_suspension("ch1", &left), SUSPEND_NONE);
   check("ch1/allowed", engine_health_allow("ch1"), 1);
 
+  /* H2: quality demotes, but only once there is evidence. A2 recorded the
+     number and nothing read it; this is the factor the router now uses. */
+  engine_health_record_quality("q-new", 10, 0); /* one sample: not enough */
+  if (engine_health_effective_weight("q-new", 1.0) != 1.0) {
+    printf("FAIL: one low sample already demoted the engine\n");
+    failures++;
+  }
+  for (int i = 0; i < 4; i++)
+    engine_health_record_quality("q-new", 10, 0);
+  double low = engine_health_effective_weight("q-new", 1.0);
+  if (low < 0.49 || low > 0.51) {
+    printf("FAIL: all-junk engine weight %.3f, want ~0.5\n", low);
+    failures++;
+  }
+  engine_health_record_quality("q-new", 10, 10);
+  engine_health_record_quality("q-new", 10, 10);
+  engine_health_record_quality("q-new", 10, 10);
+  double better = engine_health_effective_weight("q-new", 1.0);
+  if (better <= low) {
+    printf("FAIL: quality recovery did not raise the weight (%.3f)\n", better);
+    failures++;
+  }
+  /* it demotes, it does not ban */
+  if (engine_health_effective_weight("q-new", 1.0) <= 0.0) {
+    printf("FAIL: junk engine reduced to zero weight\n");
+    failures++;
+  }
+
   if (failures == 0)
     printf("G2 suspension table: PASS\n");
   return failures ? 1 : 0;

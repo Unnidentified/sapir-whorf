@@ -17,6 +17,9 @@ typedef struct {
   char detail[512];   /* optional second line: working, source, caveat */
   char source[64];    /* which answerer produced it */
   int local;          /* 1 = answered without the network */
+  /* H4: how sure the answerer is. Only a confident local answer is allowed to
+     skip the engine fan-out - a shaky one is shown but the web is still asked. */
+  double confidence;  /* 0..1 */
 } AnswerBoxResult;
 
 typedef struct {

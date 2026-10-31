@@ -67,12 +67,14 @@ int main(void) {
     int expect_blocked; /* the blocked-page detector must fire */
   } cases[] = {
       {"yahoo", "good.html", 3, 0},
-      {"bing", "empty-shell.html", 0, 0},
+      /* H2: a real junk SERP parses fine - ten results, none relevant. The
+         parser's job is to return them; the floor's job is to drop them. */
+      {"bing", "junk-sap.html", 10, 0},
+      {"bing", "good.html", 10, 0},
       {"ddg", "challenge.html", 0, 1},
-      {"brave", "challenge.html", 0, 1},
       {"ddg", "good.html", 3, 0},
-      {"brave", "good.html", 3, 0},
-      {"bing", "good.html", 3, 0},
+      /* the real captcha shell Brave serves to refused UAs */
+      {"brave", "challenge-captcha.html", 0, 1},
   };
 
   printf("parser fixtures\n");
@@ -80,9 +82,10 @@ int main(void) {
   for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); c++) {
     snprintf(path, sizeof(path), "%s/%s/%s", fixtures, cases[c].engine,
              cases[c].file);
+    /* A listed fixture that is not there is a broken test, not a reason to
+       skip: three of these silently did nothing for two rounds. */
     if (!file_exists(path)) {
-      printf("  skip %-8s %-14s (no fixture yet)\n", cases[c].engine,
-             cases[c].file);
+      fail(cases[c].engine, cases[c].file, "listed fixture is missing");
       continue;
     }
 
