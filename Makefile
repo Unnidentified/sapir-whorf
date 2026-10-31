@@ -436,6 +436,10 @@ translate-check: tests/test_j4_translate
 categories-check:
 	@./tests/test_j5_categories.sh
 
+# J5.5: the per-engine weight editor and the cookie behind it
+weights-check:
+	@./tests/test_j5_weights.sh
+
 # J4.0: /w/<kind> serves one card, and the keypad protocol works through it
 widgets-check:
 	@./tests/test_widget_endpoints.sh

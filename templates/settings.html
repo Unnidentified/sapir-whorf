@@ -270,6 +270,19 @@
 
                     {{if has_engine_lists}}
                     <section class="settings-section">
+                        <h3 class="settings-section-title">{{l("weights_label")}}</h3>
+                        <p class="settings-section-desc">{{l("weights_desc")}}</p>
+                        <input type="hidden" name="weights_present" value="1">
+                        <div class="settings-fields settings-weights">
+                            {{for wt in engine_weights}}
+                            <label class="settings-field" for="w_{{wt[0]}}">
+                                <input type="number" id="w_{{wt[0]}}" name="w_{{wt[0]}}" value="{{wt[1]}}" min="0.5" max="5" step="0.5">
+                                <span class="settings-label">{{wt[0]}}</span>
+                            </label>
+                            {{endfor}}
+                        </div>
+                    </section>
+                    <section class="settings-section">
                         <h3 class="settings-section-title">{{l("engines_label")}}</h3>
                         <p class="settings-section-desc">{{l("engines_desc")}}</p>
                         <input type="hidden" name="engines_present" value="1">

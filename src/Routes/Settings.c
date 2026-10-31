@@ -172,6 +172,50 @@ int settings_handler(UrlParams *params) {
        engines section silently disappeared), so one flag guards both engine
        sections. Two flags for two lists was two slots; this is one. */
     context_set(&ctx, "has_engine_lists", "1");
+
+    /* J5.5: the editor. One row per engine with its effective weight - the
+       configured one, or this browser's override when it has one - so the form
+       always shows what routing will actually use. */
+    {
+      char ***weight_ptrs = malloc(sizeof(char **) * (size_t)enabled_count);
+      int *weight_inner = malloc(sizeof(int) * (size_t)enabled_count);
+      int rows = 0;
+      if (weight_ptrs && weight_inner) {
+        char *cookie = get_cookie("engine_weights");
+        for (int i = 0; i < ENGINE_COUNT && rows < enabled_count; i++) {
+          if (!ENGINE_REGISTRY[i].enabled)
+            continue;
+          double weight = ENGINE_REGISTRY[i].weight;
+          if (cookie && cookie[0]) {
+            char needle[48];
+            snprintf(needle, sizeof(needle), "%s:", ENGINE_REGISTRY[i].id);
+            const char *hit = strstr(cookie, needle);
+            if (hit) {
+              double parsed = strtod(hit + strlen(needle), NULL);
+              if (parsed >= 0.5 && parsed <= 5.0)
+                weight = parsed;
+            }
+          }
+          char *value = malloc(16);
+          if (!value)
+            break;
+          snprintf(value, 16, "%g", weight);
+          weight_ptrs[rows] = malloc(sizeof(char *) * 2);
+          if (!weight_ptrs[rows]) {
+            free(value);
+            break;
+          }
+          weight_ptrs[rows][0] = strdup(ENGINE_REGISTRY[i].id);
+          weight_ptrs[rows][1] = value;
+          weight_inner[rows] = 2;
+          rows++;
+        }
+        free(cookie);
+        if (rows > 0)
+          context_set_array_of_arrays(&ctx, "engine_weights", weight_ptrs, rows,
+                                      weight_inner);
+      }
+    }
   }
 
   /* H1: how many independent indexes can answer right now. Three engines that

@@ -703,11 +703,67 @@ static int build_paused_note(char *note, size_t size) {
   return paused;
 }
 
-/* H2: selection weight, adjusted by measured quality. */
+/* J5.5: per-browser weight overrides from the engine_weights cookie.
+
+   Thread-local rather than global: beaker serves requests concurrently, and a
+   file-static table filled at request start would let one reader's policy leak
+   into another's request. It is parsed once per request and read by the weight
+   function below. */
+#define WEIGHT_OVERRIDES_MAX 32
+static _Thread_local struct {
+  char id[32];
+  double weight;
+} tl_weights[WEIGHT_OVERRIDES_MAX];
+static _Thread_local int tl_weight_count;
+
+static void weights_load_from_cookie(void) {
+  tl_weight_count = 0;
+  char *cookie = get_cookie("engine_weights");
+  if (!cookie || !cookie[0]) {
+    free(cookie);
+    return;
+  }
+  char *copy = strdup(cookie);
+  free(cookie);
+  if (!copy)
+    return;
+  char *saveptr = NULL;
+  for (char *token = strtok_r(copy, "|", &saveptr);
+       token && tl_weight_count < WEIGHT_OVERRIDES_MAX;
+       token = strtok_r(NULL, ",", &saveptr)) {
+    char *colon = strchr(token, ':');
+    if (!colon)
+      continue;
+    *colon = '\0';
+    char *end = NULL;
+    double weight = strtod(colon + 1, &end);
+    if (end == colon + 1 || weight < 0.5 || weight > 5.0 || !token[0])
+      continue;
+    snprintf(tl_weights[tl_weight_count].id, sizeof(tl_weights[0].id), "%s",
+             token);
+    tl_weights[tl_weight_count].weight = weight;
+    tl_weight_count++;
+  }
+  free(copy);
+}
+
+static double weight_override_for(const char *id) {
+  if (!id)
+    return 0.0;
+  for (int i = 0; i < tl_weight_count; i++)
+    if (strcmp(tl_weights[i].id, id) == 0)
+      return tl_weights[i].weight;
+  return 0.0;
+}
+
+/* H2: selection weight, adjusted by measured quality. J5.5: and by this
+   browser's own policy, when it set one. */
 static double engine_effective_weight(const SearchEngine *e) {
   if (!e)
     return 0.0;
-  return engine_health_effective_weight(e->id, e->weight);
+  double override = weight_override_for(e->id);
+  return engine_health_effective_weight(e->id,
+                                        override > 0.0 ? override : e->weight);
 }
 
 static const SearchEngine *find_enabled_engine(const char *engine_id) {
@@ -1447,6 +1503,8 @@ int results_handler(UrlParams *params) {
         strcmp(params->params[i].value, "1") == 0)
       request_is_patient = 1;
   }
+
+  weights_load_from_cookie();
 
   char *request_cache_key = build_search_request_cache_key(
       raw_query, selected_engine_id, page, client_key);

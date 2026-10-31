@@ -24,6 +24,10 @@ int settings_save_handler(UrlParams *params) {
   const char *answers_fanout = NULL;
   char selected_ids[MAX_ENGINES][32];
   int selected_count = 0;
+  /* J5.5: per-engine weights from the form, as "id:weight,id:weight" */
+  char weight_spec[512] = "";
+  size_t weight_len = 0;
+  int weights_present = 0;
 
   if (params) {
     for (int i = 0; i < params->count; i++) {
@@ -35,6 +39,23 @@ int settings_save_handler(UrlParams *params) {
         title_font = params->params[i].value;
       } else if (strcmp(params->params[i].key, "pagescale") == 0) {
         page_scale = params->params[i].value;
+      } else if (strncmp(params->params[i].key, "w_", 2) == 0) {
+        /* one input per engine. An unparseable or out-of-range value is
+           dropped rather than clamped: silently changing 99 into 5 would be a
+           policy change the reader never asked for. */
+        weights_present = 1;
+        const char *id = params->params[i].key + 2;
+        const char *value = params->params[i].value;
+        char *end = NULL;
+        double weight = strtod(value, &end);
+        if (!id[0] || end == value || weight < 0.5 || weight > 5.0)
+          continue;
+        if (weight_len + strlen(id) + 16 < sizeof(weight_spec)) {
+          weight_len += (size_t)snprintf(weight_spec + weight_len,
+                                         sizeof(weight_spec) - weight_len,
+                                         "%s%s:%g",
+                                         weight_len ? "|" : "", id, weight);
+        }
       } else if (strncmp(params->params[i].key, "c_", 2) == 0) {
         static const char *SLOT_KEYS[CUSTOM_COLOUR_COUNT] = {
             "c_bg_main", "c_bg_card", "c_border", "c_text_primary",
@@ -137,6 +158,15 @@ int settings_save_handler(UrlParams *params) {
     set_cookie("answers_fanout", answers_fanout,
                "Fri, 31 Dec 2038 23:59:59 GMT", "/", false, false);
   }
+
+  /* J5.5: written only when the form carried weight inputs, so an unrelated
+     save does not wipe the reader's policy. An empty spec is a real request -
+     it means "back to the configured weights". */
+  /* beaker drops a cookie whose value contains a comma (measured: the header
+     never appeared), so pairs are joined with '|' rather than ','. */
+  if (weights_present)
+    set_cookie("engine_weights", weight_spec, "Fri, 31 Dec 2038 23:59:59 GMT",
+               "/", false, false);
 
   if (engines_present) {
     char cookie_value[512];
