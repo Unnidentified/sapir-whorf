@@ -81,6 +81,13 @@ The text lives in `locales/en_gb.ini` and `locales/es_es.ini`
 without patching C — and *should* review it, because it is not legal advice for
 their jurisdiction.
 
+## Not this item
+
+The per-hit `index_group` fix for the bridge is in `docs/J4-widgets.md`'s
+neighbour commit, not here: it belongs to the bridge (J5.6), and it is the
+reason `/settings` no longer claims one independent index when a SearXNG
+instance answered with three.
+
 ## What is deliberately not here
 
 No provider is implemented, and I did not add one to "prove" the switch. The
