@@ -7,7 +7,7 @@
 #include <string.h>
 
 extern SearchEngine ENGINE_REGISTRY[];
-extern const int ENGINE_COUNT;
+extern int ENGINE_COUNT;
 
 static int failures = 0;
 

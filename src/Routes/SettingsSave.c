@@ -22,7 +22,7 @@ int settings_save_handler(UrlParams *params) {
   const char *opt_in = NULL;
   const char *answers = NULL;
   const char *answers_fanout = NULL;
-  char selected_ids[ENGINE_COUNT][32];
+  char selected_ids[MAX_ENGINES][32];
   int selected_count = 0;
 
   if (params) {

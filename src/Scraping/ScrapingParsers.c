@@ -549,7 +549,7 @@ static int parse_brave(const char *engine_name, xmlDocPtr doc,
   return found_count;
 }
 
-SearchEngine ENGINE_REGISTRY[] = {
+SearchEngine ENGINE_REGISTRY[MAX_ENGINES] = {
     {.id = "ddg",
      .name = "DuckDuckGo",
      /* html. rather than lite.: lite. answered a region-selector shell to every
@@ -790,7 +790,24 @@ SearchEngine ENGINE_REGISTRY[] = {
      .verticals = V_WEB,
      .weight = 1.25, .index_group = "google" }};
 
-const int ENGINE_COUNT = sizeof(ENGINE_REGISTRY) / sizeof(SearchEngine);
+/* J5.1: counted at startup rather than compiled in, so the array can grow.
+   A constructor runs before main, so every existing use - including in tests
+   that link this file - sees the right number. */
+int ENGINE_COUNT = 0;
+
+__attribute__((constructor)) static void engine_registry_count(void) {
+  int n = 0;
+  while (n < MAX_ENGINES && ENGINE_REGISTRY[n].id)
+    n++;
+  ENGINE_COUNT = n;
+}
+
+int engine_registry_add(const SearchEngine *engine) {
+  if (!engine || !engine->id || ENGINE_COUNT >= MAX_ENGINES)
+    return -1;
+  ENGINE_REGISTRY[ENGINE_COUNT] = *engine;
+  return ENGINE_COUNT++;
+}
 
 /* J5.5 tier 3: how many registered engines are behind the opt-in gate. The
    settings page uses this to say plainly whether the switch does anything in
@@ -833,7 +850,7 @@ void engine_set_enabled(const char *engine_id, int enabled) {
    slot on every query. It now means "the engines the registry ships enabled";
    naming a disabled engine explicitly ("*,yacy") still opts it in, which is
    what docs/SETUP.md tells people to do. */
-static int shipped_enabled[ENGINE_COUNT];
+static int shipped_enabled[MAX_ENGINES];
 static int shipped_enabled_captured = 0;
 
 static void capture_shipped_enabled(void) {

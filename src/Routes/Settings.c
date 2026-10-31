@@ -167,7 +167,7 @@ int settings_handler(UrlParams *params) {
      resell one index are one source, and a page that only ever hears from one
      index should say so. */
   {
-    const char *groups[ENGINE_COUNT];
+    const char *groups[MAX_ENGINES];
     int group_count = 0;
     for (int i = 0; i < ENGINE_COUNT; i++) {
       if (!ENGINE_REGISTRY[i].enabled)

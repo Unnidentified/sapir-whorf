@@ -804,9 +804,12 @@ int results_handler(UrlParams *params) {
      raw_query initially points into the request params, which must not be
      written to, so an appended query is built in this buffer and raw_query is
      re-pointed at it. */
-  char key_pressed[16];
-  char keyed_buffer[512];
-  char widget_mode[32];
+  /* J4.0: these are read before they are written when the parameter is
+     absent, so they must start empty - an uninitialised widget_mode[0] decided
+     whether the card rendered at all. */
+  char key_pressed[16] = "";
+  char keyed_buffer[512] = "";
+  char widget_mode[32] = "";
   char selected_engine_id[32];
   char *default_engine = get_default_search_engine();
   snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
@@ -937,7 +940,7 @@ int results_handler(UrlParams *params) {
 
   /* eligible engines for this request: filtered once so the counting and the
      job setup below can never disagree */
-  const SearchEngine *eligible[ENGINE_COUNT];
+  const SearchEngine *eligible[MAX_ENGINES];
   int eligible_count = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
     if (!ENGINE_REGISTRY[i].enabled)
@@ -950,14 +953,14 @@ int results_handler(UrlParams *params) {
     eligible[eligible_count++] = &ENGINE_REGISTRY[i];
   }
 
-  const SearchEngine *eligible_all[ENGINE_COUNT];
+  const SearchEngine *eligible_all[MAX_ENGINES];
   int eligible_all_count = eligible_count;
   for (int i = 0; i < eligible_count; i++)
     eligible_all[i] = eligible[i];
 
   /* skip engines whose breaker is open, but never leave the page without one */
   if (eligible_count > 0) {
-    int healthy[ENGINE_COUNT];
+    int healthy[MAX_ENGINES];
     int healthy_count = 0;
     for (int i = 0; i < eligible_count; i++) {
       healthy[i] = engine_health_allow(eligible[i]->id);
@@ -1039,7 +1042,7 @@ int results_handler(UrlParams *params) {
      general web engines fill the remaining slots so recall never depends on a
      single API */
   {
-    const SearchEngine *routed[ENGINE_COUNT];
+    const SearchEngine *routed[MAX_ENGINES];
     int routed_count = 0;
     int max_engines = 6;
     int want = V_WEB;
@@ -1227,10 +1230,26 @@ int results_handler(UrlParams *params) {
     infobox_data[i].result = (InfoBox){NULL};
   }
 
-  ScrapeJob jobs[ENGINE_COUNT];
-  SearchResult *all_results[ENGINE_COUNT];
-  memset(jobs, 0, sizeof(jobs));
-  memset(all_results, 0, sizeof(all_results));
+  /* J5.1: sized by what this request will actually fire, on the heap. It used
+     to be ENGINE_COUNT on the stack; with a growable registry that would be a
+     VLA, and 1760 bytes times 192 engines is a quarter of a megabyte of stack
+     on a thread the review already calls small. Each engine fires at most one
+     job and the recovery round adds at most three, so the selected count plus
+     a margin is the real bound. */
+  const size_t job_capacity = (size_t)eligible_count + 8;
+  ScrapeJob *jobs = calloc(job_capacity, sizeof(ScrapeJob));
+  SearchResult **all_results = calloc(job_capacity, sizeof(SearchResult *));
+  if (!jobs || !all_results) {
+    /* nothing else has been allocated yet at this point */
+    free(jobs);
+    free(all_results);
+    free(locale);
+    free_user_engine_list(user_engines, user_engine_count);
+    free_context(&ctx);
+    send_status("500 Internal Server Error");
+    send_response("<h1>Out of memory</h1>");
+    return 0;
+  }
 
   int engine_idx = 0;
   if (skip_fanout)
@@ -1418,7 +1437,7 @@ int results_handler(UrlParams *params) {
          already heard from and that is not the index that just failed. Three
          engines that all resell the same index are one source, so hedging
          within a group buys nothing - see index_group in the registry. */
-      const char *used_groups[ENGINE_COUNT];
+      const char *used_groups[MAX_ENGINES];
       int used_group_count = 0;
       for (int j = 0; j < engine_idx && used_group_count < ENGINE_COUNT; j++) {
         const char *g = jobs[j].engine ? jobs[j].engine->index_group : NULL;
@@ -1429,7 +1448,7 @@ int results_handler(UrlParams *params) {
 
       int added = 0;
       for (int pass = 0; pass < 2 && added < 3; pass++) {
-      for (int i = 0; i < ENGINE_COUNT && engine_idx < ENGINE_COUNT; i++) {
+      for (int i = 0; i < ENGINE_COUNT && engine_idx < (int)job_capacity; i++) {
         const SearchEngine *cand = &ENGINE_REGISTRY[i];
         if (!cand->enabled || !(cand->verticals & V_WEB))
           continue;
@@ -1504,6 +1523,8 @@ int results_handler(UrlParams *params) {
       if (jobs[i].results_count > 0 && all_results[i][0].url) {
         char *redirect_url = strdup(all_results[i][0].url);
         free_search_results(all_results, jobs, engine_idx);
+        free(jobs);
+        free(all_results);
         if (page == 1)
           free_infobox_results(infobox_data);
         free(request_cache_key);
@@ -1518,6 +1539,8 @@ int results_handler(UrlParams *params) {
       }
     }
     free_search_results(all_results, jobs, engine_idx);
+    free(jobs);
+    free(all_results);
     if (page == 1)
       free_infobox_results(infobox_data);
     free(request_cache_key);
@@ -2102,7 +2125,7 @@ int results_handler(UrlParams *params) {
     /* H1: if every result came from one index, say so. It is the difference
        between "this is what the web says" and "this is what one index says". */
     {
-      const char *groups[ENGINE_COUNT];
+      const char *groups[MAX_ENGINES];
       int group_count = 0;
       for (int i = 0; i < enabled_engine_count; i++) {
         if (jobs[i].results_count <= 0 || !jobs[i].engine)
@@ -2306,6 +2329,8 @@ int results_handler(UrlParams *params) {
     free_search_results(all_results, jobs, engine_idx);
   }
 
+  free(jobs);
+  free(all_results);
   free(request_cache_key);
 
   if (page == 1)

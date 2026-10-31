@@ -36,7 +36,7 @@ typedef struct {
 } QueryRecord;
 
 extern SearchEngine ENGINE_REGISTRY[];
-extern const int ENGINE_COUNT;
+extern int ENGINE_COUNT;
 
 static int engine_ordinal(QueryRecord *r, const char *id) {
   for (int i = 0; i < r->engine_count; i++)

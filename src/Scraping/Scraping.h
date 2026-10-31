@@ -151,8 +151,15 @@ typedef struct {
   char full_url[BUFFER_SIZE_LARGE];
 } ScrapeJob;
 
+/* J5.1: the registry is now a fixed-capacity array with a runtime count, so a
+   definition loaded from static/engines.d/ can be appended at startup without
+   touching the 68 places that index it. MAX_ENGINES is the allocation cap, not
+   a promise: ENGINE_COUNT is how many are actually registered. */
+#define MAX_ENGINES 192
 extern SearchEngine ENGINE_REGISTRY[];
-extern const int ENGINE_COUNT;
+/* appends one definition; returns its index, or -1 when full */
+int engine_registry_add(const SearchEngine *engine);
+extern int ENGINE_COUNT;
 void apply_engines_config(const char *engines_str);
 void engine_set_enabled(const char *engine_id, int enabled);
 /* J5.5 tier 3: engines behind the opt-in gate, so the UI can be honest */

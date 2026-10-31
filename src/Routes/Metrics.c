@@ -6,7 +6,7 @@
 #include <string.h>
 
 extern SearchEngine ENGINE_REGISTRY[];
-extern const int ENGINE_COUNT;
+extern int ENGINE_COUNT;
 
 /* Prometheus text format, loopback only. The review's point was that
    total_latency_ms alone hides the tail and that there was no way to see the
