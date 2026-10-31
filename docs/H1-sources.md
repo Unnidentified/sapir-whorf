@@ -67,12 +67,42 @@ parser plus a config line rather than new machinery.
 Measured on the live instance: `Independent indexes answering now: 1 (bing)`,
 the warning, and the page note, while Brave was paused.
 
+## Brave after the fix
+
+The persisted health file at the start of this round showed Brave `open`,
+`rate-limited`, 2 requests, 0 OK. After the ladder landed, the running instance
+reports:
+
+```
+brave   closed   ok=6  errors=2  trips=0  ua_profile=-
+```
+
+Six answers, breaker closed, no trips. The pinned Safari profile is being
+served again without the ladder having to fire — `ua_profile` is unset, meaning
+no challenge page was encountered and cleared. So the honest statement is:
+
+- Brave is answering again with the pinned profile;
+- the retry-once path is **implemented and unit-tested, but has not been
+  exercised by a real challenge** since it landed. It is a safety net that has
+  not caught anything yet.
+
+A single paced Safari probe is still the right confirmation from a cold
+process, and `tools/probe.sh` now paces itself and refuses to burst.
+
 ## Still open
 
-- **Brave itself.** Its cooldown was still running during this round; the
-  re-test must wait a full hour from the last probe and be a single Safari
-  request, per the review. Until that happens, the honest statement is: the
-  ladder is in place and unit-tested, the retry path is untested against live
-  Brave, and the instance still has one index.
-- Until a second independent source is enabled, the page note is the truthful
+- **Independent sources.** Brave answering again makes *two* groups
+  (bing, brave) some of the time, but that is one scrape target that could be
+  refused again tomorrow; the Brave API and Marginalia are still deferred for
+  want of keys. Until one of those is enabled, the page note is the truthful
   outcome, not a defect.
+- **A warm cache can still produce "one index only" with two healthy groups.**
+  Measured: with a cold cache and four engines, Brave answers (10 results,
+  944 ms) and the page has two groups. With warm per-engine caches the early
+  exit (F1) is satisfied by whichever group answers from cache first, and the
+  second group is never asked — so the note appears even though `/settings`
+  says two indexes are available. Both statements are true: one is what could
+  answer, the other is what did.
+  The fix would be to make the *initial* selection index-diverse rather than
+  only the recovery round. That is a routing change and is not done here.
+- The ladder has not met a real challenge page yet (see above).
