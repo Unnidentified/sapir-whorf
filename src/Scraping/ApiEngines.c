@@ -947,6 +947,31 @@ char *api_url_searxng(const char *encoded_query, int page, const char *lang) {
   return url;
 }
 
+/* J5.6: one SearXNG job carries results from several indexes. These are the
+   names known to share an index with something already in the registry; an
+   engine we do not recognise counts as "other" rather than being attributed to
+   whatever the bridge's own group says, because over-counting independence is
+   how the H1 one-index note becomes a lie. */
+static const char *searxng_group_for(const char *engine) {
+  static const struct {
+    const char *engine;
+    const char *group;
+  } MAP[] = {
+      {"google", "google"},     {"startpage", "google"},
+      {"brave", "brave"},       {"duckduckgo", "ddg"},
+      {"bing", "bing"},         {"yahoo", "bing"},
+      {"qwant", "qwant"},       {"mojeek", "mojeek"},
+      {"yandex", "yandex"},     {"baidu", "baidu"},
+      {"wikipedia", "wikipedia"}, {"marginalia", "marginalia"},
+  };
+  if (engine) {
+    for (size_t i = 0; i < sizeof(MAP) / sizeof(MAP[0]); i++)
+      if (strcasecmp(engine, MAP[i].engine) == 0)
+        return MAP[i].group;
+  }
+  return "other";
+}
+
 int api_parse_searxng(const char *body, size_t len, const char *lang,
                       SearchResult **out, int max) {
   (void)lang;
@@ -967,7 +992,19 @@ int api_parse_searxng(const char *body, size_t len, const char *lang,
       if (link) {
         html_unescape_inplace(title);
         html_unescape_inplace(snippet);
+        int before = count;
         add_result(*out, &count, max, link, title, snippet);
+        if (count > before && *out) {
+          /* the result's own engine, so the group is the index that answered.
+             When the instance does not say, leave it empty: the caller then
+             falls back to the engine entry's group rather than inheriting
+             "other" for every hit. */
+          const char *engine = json_string_value(json_object_get(item, "engine"));
+          if (engine && engine[0])
+            snprintf((*out)[before].index_group,
+                     sizeof((*out)[before].index_group), "%s",
+                     searxng_group_for(engine));
+        }
       }
       free(title);
       free(link);

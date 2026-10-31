@@ -11,6 +11,13 @@ typedef struct {
   char *url;
   char *title;
   char *snippet;
+  /* J5.6: which search index actually produced this hit, when the source can
+     say. The SearXNG bridge is one job but many engines, so taking the job's
+     index_group called Brave and Qwant results "google" and broke the
+     independent-index count in /settings and in the one-index note. Empty
+     means "ask the engine entry", which is what every other source does.
+     Zeroed by calloc in the allocator. */
+  char index_group[24];
 } SearchResult;
 
 typedef enum {

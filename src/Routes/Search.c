@@ -1703,8 +1703,12 @@ int results_handler(UrlParams *params) {
           cands[existing].rrf += score;
           cands[existing].engine_mask |= (1u << i);
           if (i < 32) {
+            /* J5.6: a bridge job carries hits from several indexes, so the
+               hit's own group wins when it has one */
             cands[existing].engine_groups[i] =
-                jobs[i].engine ? jobs[i].engine->index_group : NULL;
+                (all_results[i][j].index_group[0])
+                    ? all_results[i][j].index_group
+                    : (jobs[i].engine ? jobs[i].engine->index_group : NULL);
             cands[existing].engine_weights[i] = engine_weight;
           }
           if (strlen(cleaned) > strlen(cands[existing].snippet)) {
@@ -1734,7 +1738,9 @@ int results_handler(UrlParams *params) {
         cand->engine_mask = (1u << i);
         if (i < 32) {
           cand->engine_groups[i] =
-              jobs[i].engine ? jobs[i].engine->index_group : NULL;
+              (all_results[i][j].index_group[0])
+                  ? all_results[i][j].index_group
+                  : (jobs[i].engine ? jobs[i].engine->index_group : NULL);
           cand->engine_weights[i] = engine_weight;
         }
         cand->order = cand_count;

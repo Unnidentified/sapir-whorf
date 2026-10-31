@@ -372,6 +372,15 @@ terms-check: tests/test_j3_terms
 hrefs-check:
 	@./tests/test_j3_hrefs.sh
 
+# J5.6: the SearXNG bridge - bangs, and per-hit index groups
+tests/test_j5_searxng: tests/test_j5_searxng.c src/Scraping/ApiEngines.c \
+                       src/Utility/Display.c $(LINT_SRCS)
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -I/usr/include/libxml2 -o $@ $^ \
+		$(LINT_LIBS)
+
+searxng-check: tests/test_j5_searxng
+	@./tests/test_j5_searxng
+
 # J4.0/J4a: the calculator card, its keypad, and its states
 widget-check:
 	@./tests/test_j4_widget.sh
@@ -441,6 +450,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check optin-check terms-check hrefs-check ua-check answers-check junk-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check terms-check hrefs-check ua-check answers-check junk-check smoke
 
-.PHONY: terms-check hrefs-check answersfanout-check widget-check optin-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: terms-check hrefs-check answersfanout-check widget-check searxng-check optin-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
