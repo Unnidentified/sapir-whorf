@@ -9,3 +9,12 @@ cache/
 # macOS
 .DS_Store
 __MACOSX/
+
+# built test binaries (make rebuilds them)
+tests/test_canonical
+tests/registry_lint
+tests/parser_fixtures
+tests/offline_rank
+tests/test_g2_suspension
+tests/test_g3_cse_element
+tests/test_g4_answerbox
