@@ -2177,9 +2177,10 @@ input[type="color"]:focus-visible {
     }
 }
 
-/* J5.3: category strip. Only rendered when an enabled engine declares the
-   vertical, so it is a statement of what this build can actually ask. */
-.category-tabs {
+/* J5.3 + J5.4: one strip for both the category chips and the per-engine chips.
+   Dim by design - it states what was asked and what each engine returned, not a
+   control anyone needs on every visit. */
+.filter-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -2187,7 +2188,7 @@ input[type="color"]:focus-visible {
   padding: 0 0 0.6rem;
   border-bottom: 1px solid var(--border);
 }
-.category-tabs a {
+.filter-tabs a {
   font-size: 0.82rem;
   padding: 0.28rem 0.7rem;
   border-radius: 999px;
@@ -2196,12 +2197,12 @@ input[type="color"]:focus-visible {
   text-decoration: none;
   white-space: nowrap;
 }
-.category-tabs a:hover,
-.category-tabs a:focus-visible {
+.filter-tabs a:hover,
+.filter-tabs a:focus-visible {
   color: var(--text-primary);
   border-color: var(--accent);
 }
-.category-tabs a.active {
+.filter-tabs a.active {
   /* --on-accent is derived per theme in :root from the accent and the text, so
      this stays readable on all 16 themes instead of assuming a white label */
   color: var(--on-accent);
@@ -2235,4 +2236,14 @@ input[type="color"]:focus-visible {
   margin: 0.15rem 0 0.35rem;
   font-size: 1rem;
   color: var(--neg);
+}
+
+
+/* the per-engine chips are secondary: they report, they do not lead */
+.filter-tabs a.chip-eng {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+.filter-tabs a.chip-eng.active {
+  opacity: 1;
 }

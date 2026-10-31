@@ -1240,9 +1240,20 @@ int results_handler(UrlParams *params) {
     }
   }
 
-  /* J5.3: one key, a loop in the template. A category appears only when an
-     enabled engine actually declares it - a tab that can only ever return
-     nothing is a lie about what the site can do. */
+  /* J5.3 + J5.4: one strip, one context key.
+
+     Two strips used to be two keys, and the context is a hard 32 slots
+     (beaker's MAX_CONTEXT_VARS) - adding the engine strip took a slot that
+     paused_note needed, and the page silently lost its pause notice. Both
+     strips are the same thing: a chip that narrows the fan-out. So they share
+     one matrix of {href, label, class, group}; the group is a class name, not
+     data the template has to branch on.
+
+     A category appears only when an enabled engine declares it: a chip that can
+     only ever return nothing is a lie about what the build can do. The engine
+     rows are appended after the fan-out, in the same matrix. */
+  StringMatrix filters;
+  string_matrix_init(&filters);
   {
     static const struct {
       const char *id;
@@ -1251,20 +1262,20 @@ int results_handler(UrlParams *params) {
     } categories[] = {{"news", V_NEWS, "news_tab"},
                       {"code", V_CODE, "code_tab"},
                       {"academic", V_ACADEMIC, "academic_tab"}};
-    StringMatrix strip;
-    string_matrix_init(&strip);
 
-    /* "All" is a row like any other, so it is active only when no category is
-       selected - the hardcoded link it replaces was active on every page. */
+    /* "All" is a row like any other, so it is active only when nothing else is
+       selected - the hardcoded link it replaced was active on every page. */
     {
       char *href = build_search_href(raw_query, NULL, 1, web_explicit, NULL);
       if (href) {
-        char *fields[LINK_FIELD_COUNT];
+        char *fields[4];
         fields[0] = href;
         fields[1] = (char *)beaker_get_locale_value(locale, "all_tab");
-        fields[2] = (char *)(cat[0] ? "" : "active");
-        string_matrix_append(&strip, (const char *const *)fields,
-                             LINK_FIELD_COUNT);
+        fields[2] = (char *)(!cat[0] && engine_id_matches(selected_engine_id, "all")
+                                 ? "chip chip-all active"
+                                 : "chip chip-all");
+        fields[3] = (char *)"all";
+        string_matrix_append(&filters, (const char *const *)fields, 4);
         free(href);
       }
     }
@@ -1284,20 +1295,21 @@ int results_handler(UrlParams *params) {
                                      categories[c].id);
       if (!href)
         continue;
-      char *fields[LINK_FIELD_COUNT];
+      char *fields[4];
       fields[0] = href;
       fields[1] = (char *)beaker_get_locale_value(locale, categories[c].label);
-      fields[2] = (char *)(strcmp(cat, categories[c].id) == 0 ? "active" : "");
-      string_matrix_append(&strip, (const char *const *)fields,
-                           LINK_FIELD_COUNT);
+      fields[2] = (char *)(strcmp(cat, categories[c].id) == 0
+                               ? "chip chip-cat active"
+                               : "chip chip-cat");
+      fields[3] = (char *)categories[c].id;
+      string_matrix_append(&filters, (const char *const *)fields, 4);
       free(href);
     }
-
-    /* set even when empty: the render check fails on a key the template reads
-       and the context never defines */
-    context_set_array_of_arrays(&ctx, "category_links", strip.rows, strip.count,
-                                strip.count > 0 ? strip.field_counts : NULL);
-    string_matrix_free(&strip);
+    /* set here as well as after the fan-out: an empty result page still has a
+       strip, and the later set (with the engine rows) overwrites this one */
+    context_set_array_of_arrays(&ctx, "filter_links", filters.rows,
+                                filters.count,
+                                filters.count > 0 ? filters.field_counts : NULL);
   }
 
   /* J3b: the card offers a way to ask for the web - unless this request *is*
@@ -2399,6 +2411,39 @@ int results_handler(UrlParams *params) {
         fprintf(stderr, " %s=%d", jobs[i].engine->id, jobs[i].results_count);
       fprintf(stderr, "\n");
     }
+
+    /* J5.4: one row per engine that was actually asked, with what it returned.
+       The counts come from the jobs, not from the rendered rows: an engine that
+       answered and was then deduplicated away is not the same as one that
+       answered nothing. */
+    for (int i = 0; i < engine_idx && filters.count < 10; i++) {
+      if (!jobs[i].engine || !jobs[i].engine->id)
+        continue;
+      char *href = build_search_href(raw_query, jobs[i].engine->id, 1,
+                                     web_explicit, cat);
+      if (!href)
+        continue;
+      char name[128];
+      snprintf(name, sizeof(name), "%s (%d)", jobs[i].engine->name,
+               jobs[i].results_count);
+      char *fields[4];
+      fields[0] = href;
+      fields[1] = name;
+      fields[2] = (char *)(engine_id_matches(selected_engine_id,
+                                             jobs[i].engine->id)
+                               ? "chip chip-eng active"
+                               : "chip chip-eng");
+      fields[3] = (char *)jobs[i].engine->id;
+      string_matrix_append(&filters, (const char *const *)fields, 4);
+      free(href);
+    }
+
+    /* set even when empty: the render check fails on a key the template reads
+       and the context never defines */
+    context_set_array_of_arrays(&ctx, "filter_links", filters.rows,
+                                filters.count,
+                                filters.count > 0 ? filters.field_counts : NULL);
+    string_matrix_free(&filters);
 
     char *html = render_template("results.html", &ctx);
     if (html) {

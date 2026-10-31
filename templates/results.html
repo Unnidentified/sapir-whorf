@@ -31,10 +31,10 @@
         <p class="no-results-hint"><a href="{{chrome_all_href}}">{{l("all_tab")}}</a></p>
     </div>
     {{endif}}
-    {{if exists category_links}}
-    <nav class="category-tabs" aria-label="{{l("category_label")}}">
-        {{for catlink in category_links}}
-        <a href="{{catlink[0]}}" class="{{catlink[2]}}">{{catlink[1]}}</a>
+    {{if exists filter_links}}
+    <nav class="filter-tabs" aria-label="{{l("filter_label")}}">
+        {{for f in filter_links}}
+        <a href="{{f[0]}}" class="{{f[2]}}">{{f[1]}}</a>
         {{endfor}}
     </nav>
     {{endif}}
