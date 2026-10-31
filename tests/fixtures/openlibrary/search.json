@@ -1,0 +1,99 @@
+{
+ "numFound": 89,
+ "start": 0,
+ "numFoundExact": true,
+ "num_found": 89,
+ "documentation_url": "https://openlibrary.org/dev/docs/api/search",
+ "q": "linux kernel",
+ "offset": null,
+ "docs": [
+  {
+   "author_name": [
+    "Robert Love"
+   ],
+   "cover_i": 410921,
+   "first_publish_year": 2004,
+   "key": "/works/OL5739563W",
+   "title": "Linux Kernel Development",
+   "subject": [
+    "Computer Technology",
+    "Nonfiction",
+    "Linux (computer operating system)",
+    "Professional",
+    "Technology",
+    "Operating systems (Computers)",
+    "Operating systems (computers)",
+    "Sistemas operacionais",
+    "Qa76.76.o63 l673 2005"
+   ]
+  },
+  {
+   "author_name": [
+    "Daniel P. Bovet"
+   ],
+   "cover_i": 388839,
+   "first_publish_year": 2000,
+   "key": "/works/OL3940957W",
+   "title": "Understanding The Linux Kernel",
+   "subject": [
+    "Linux (computer operating system)",
+    "Operating systems (Computers)",
+    "General",
+    "Com046070",
+    "Cs.cmp_sc.opert_systm"
+   ]
+  },
+  {
+   "author_name": [
+    "Greg Kroah-Hartman"
+   ],
+   "cover_i": 8688604,
+   "first_publish_year": 2006,
+   "key": "/works/OL8167381W",
+   "title": "Linux Kernel in a Nutshell",
+   "subject": [
+    "Linux (computer operating system)",
+    "Operating systems (Computers)",
+    "COMPUTERS / System Administration / Linux & UNIX Administration",
+    "UNIX (computer operating system)",
+    "Network protocols",
+    "General",
+    "Com046070",
+    "Cs.cmp_sc.app_sw",
+    "Cs.cmp_sc.opert_systm"
+   ]
+  },
+  {
+   "author_name": [
+    "Wolfgang Mauerer"
+   ],
+   "cover_i": 5549113,
+   "first_publish_year": 2008,
+   "key": "/works/OL11977952W",
+   "title": "Professional Linux kernel architecture",
+   "subject": [
+    "Application software",
+    "Computer Technology",
+    "Computer architecture",
+    "Linux (computer operating system)",
+    "Nonfiction",
+    "Operating systems (Computers)"
+   ]
+  },
+  {
+   "author_name": [
+    "Michael Beck"
+   ],
+   "cover_i": 134429,
+   "first_publish_year": 1998,
+   "key": "/works/OL16936571W",
+   "title": "Linux kernel internals",
+   "subject": [
+    "Linux (computer operating system)",
+    "Operating systems (Computers)",
+    "Application software",
+    "Sistemas operacionais (computadores)"
+   ]
+  }
+ ]
+}

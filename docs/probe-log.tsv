@@ -49,3 +49,4 @@ utc	engine	query	http	bytes	verdict	ua	headers	url
 2026-10-31T12:55:47Z	bing	best credit card for travel	200	66538	junk-ab:baseline	safari	baseline	https://www.bing.com/search?q=best%20credit%20card%20for%20travel
 2026-10-31T12:56:47Z	bing	learn spanish fast	200	52332	junk-ab:baseline	safari	baseline	https://www.bing.com/search?q=learn%20spanish%20fast
 2026-10-31T12:57:47Z	bing	weather madrid	200	52388	junk-ab:baseline	safari	baseline	https://www.bing.com/search?q=weather%20madrid
+2026-10-31T17:02:30Z	openlibrary	linux kernel	200	1809	results(json): numFound=89, first hit "Linux Kernel Development" (2004)	omnisearch/1.0	plain	tier1 probe	https://openlibrary.org/search.json?q=linux%20kernel&limit=5&fields=key,title,author_name,first_publish_year,cover_i
