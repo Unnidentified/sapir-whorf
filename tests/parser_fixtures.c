@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern SearchEngine ENGINE_REGISTRY[];
+extern SearchEngine *ENGINE_REGISTRY;
 extern int ENGINE_COUNT;
 
 static int failures = 0;

@@ -274,7 +274,12 @@ static int load_one(const char *path, char *reason, size_t reason_size) {
   engine.xpath_link = arena_strdup(xpath_link);
   engine.xpath_snippet = arena_strdup(xpath_snippet);
   engine.parser = parse_definition;
-  engine.enabled = 1;
+  /* Off unless the file says on. A definition is a claim about a page someone
+     may not have measured against this build's 2 s page deadline: Open Library
+     answers in ~1.7 s against three engines and is cancelled against eleven,
+     so shipping it enabled would spend a connection per query and produce
+     nothing. Enabling it is a decision, deliberately. */
+  engine.enabled = json_is_true(json_object_get(root, "enabled")) ? 1 : 0;
   engine.is_xml = 0;
   engine.page_param = "page";
   engine.page_multiplier = 1;

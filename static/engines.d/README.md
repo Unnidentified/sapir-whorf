@@ -20,9 +20,26 @@ time rather than returning nothing in production.
 | `xpath_snippet` | no | within a block |
 | `base_url`, `index_group`, `weight`, `pace_per_minute` | no | |
 | `verticals` | no | `web` (default), `news`, `media`, `code`, `academic`, `entity` |
+| `enabled` | no | **off by default.** A definition is a claim about a page nobody has measured against this build's 2 s page deadline |
 | `opt_in` | no | tier 3; still gated by `[engines] allow_files` and the visitor's switch |
 
 An engine defined this way is a **HTML** engine: it fetches a page and runs
 XPaths. For a JSON API, the body parser still has to exist in C - that is the
 remaining half of the review's J5.1 and it is described in
 `docs/J5-engines.md`.
+
+## Enabling one is a measurement, not a default
+
+A definition ships off. `openlibrary` is the shipped example and it is off for a
+measured reason: it answers in **1.7 s** against three engines and is
+**cancelled by the 2 s page deadline** against eleven, so enabling it by default
+would spend a connection on every query and usually produce nothing.
+
+```
+[engines]
+engines = openlibrary,ddg
+```
+
+measured at 1.7 s / 10 results. If yours is slower than the deadline, the fan-out
+will cancel it and the page will say "some sources did not answer" - which is
+true, and is why the definition does not enable itself.

@@ -98,7 +98,8 @@ int main(void) {
     check(engine->pace_per_minute == 7, "pace is carried");
     check(engine->opt_in == 0, "opt_in is off unless the file says so");
     check(engine->parser != NULL, "the definition has a parser");
-    check(engine->enabled == 1, "a definition starts enabled");
+    /* off unless the file says on: see the enabled field's comment */
+    check(engine->enabled == 0, "a definition starts disabled");
   }
 
   /* the point of the exercise: the file produces results */
@@ -166,10 +167,46 @@ int main(void) {
                "{\"id\":\"ttier3\",\"name\":\"Tier Three Test\","
                "\"search_url\":\"https://e.test/?q=%s\","
                "\"xpath_result\":\"//li\",\"xpath_link\":\".//a\","
-               "\"opt_in\":true}");
+               "\"enabled\":true,\"opt_in\":true}");
     check(engines_load_definitions(dir2) == 1, "an opt-in definition loads");
     const SearchEngine *t3 = find("ttier3");
     check(t3 != NULL && t3->opt_in == 1, "opt_in is carried from the file");
+    check(t3 != NULL && t3->enabled == 1, "a file can enable its own engine");
+  }
+
+  /* the registry is a heap array now: appending past its initial capacity has
+     to grow it, and every definition has to survive the realloc */
+  char dir5[] = "/tmp/omnidefs5XXXXXX";
+  if (mkdtemp(dir5)) {
+    int before_growth = ENGINE_COUNT;
+    char body[512];
+    for (int i = 0; i < 50; i++) {
+      snprintf(body, sizeof(body),
+               "{\"id\":\"grow%d\",\"name\":\"Grow %d\","
+               "\"search_url\":\"https://e.test/?q=%%s&i=%d\","
+               "\"xpath_result\":\"//li\",\"xpath_link\":\".//a\"}",
+               i, i, i);
+      char name[32];
+      snprintf(name, sizeof(name), "g%d.json", i);
+      write_file(dir5, name, body);
+    }
+    int grew = engines_load_definitions(dir5);
+    printf("grown by %d of 50\n", grew);
+    check(grew == 50, "50 definitions are appended");
+    check(ENGINE_COUNT == before_growth + 50, "the registry grew by 50");
+    int found_all = 1;
+    for (int i = 0; i < 50; i++) {
+      char id[32];
+      snprintf(id, sizeof(id), "grow%d", i);
+      const SearchEngine *e = find(id);
+      if (!e || !e->search_url_fmt)
+        found_all = 0;
+    }
+    check(found_all, "every grown definition survived the realloc");
+    /* the first-seeded engines must still be there and still be themselves */
+    const SearchEngine *first = find("ddg");
+    check(first && first->name && strcmp(first->name, "DuckDuckGo") == 0,
+          "the seeded engines survive the growth");
   }
 
   printf("J5 engine definitions: %s\n", failures == 0 ? "PASS" : "FAIL");

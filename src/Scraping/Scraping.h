@@ -167,7 +167,7 @@ typedef struct {
    touching the 68 places that index it. MAX_ENGINES is the allocation cap, not
    a promise: ENGINE_COUNT is how many are actually registered. */
 #define MAX_ENGINES 192
-extern SearchEngine ENGINE_REGISTRY[];
+extern SearchEngine *ENGINE_REGISTRY;
 /* appends one definition; returns its index, or -1 when full */
 int engine_registry_add(const SearchEngine *engine);
 /* J5.1: load every *.json in dir as an engine definition. Returns how many

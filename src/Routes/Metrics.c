@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-extern SearchEngine ENGINE_REGISTRY[];
+extern SearchEngine *ENGINE_REGISTRY;
 extern int ENGINE_COUNT;
 
 /* Prometheus text format, loopback only. The review's point was that

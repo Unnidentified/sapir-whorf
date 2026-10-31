@@ -1,14 +1,19 @@
 {
+  "_comment": "enabled is false by default: enable it in [engines] only after measuring it against the 2 s page deadline",
   "id": "openlibrary",
   "name": "Open Library",
   "base_url": "https://openlibrary.org",
   "search_url": "https://openlibrary.org/search?q=%s",
   "index_group": "openlibrary",
-  "verticals": ["web", "academic"],
+  "verticals": [
+    "web",
+    "academic"
+  ],
   "weight": 0.9,
   "pace_per_minute": 20,
   "xpath_result": "//li[contains(@class,'searchResultItem')]",
   "xpath_title": ".//h3[contains(@class,'booktitle')]//a[1]",
   "xpath_link": ".//h3[contains(@class,'booktitle')]//a[1]",
-  "xpath_snippet": ".//span[contains(@class,'bookauthor')]"
+  "xpath_snippet": ".//span[contains(@class,'bookauthor')]",
+  "enabled": false
 }

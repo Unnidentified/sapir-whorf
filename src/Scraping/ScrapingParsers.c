@@ -549,7 +549,7 @@ static int parse_brave(const char *engine_name, xmlDocPtr doc,
   return found_count;
 }
 
-SearchEngine ENGINE_REGISTRY[MAX_ENGINES] = {
+static const SearchEngine SEED_ENGINES[] = {
     {.id = "ddg",
      .name = "DuckDuckGo",
      /* html. rather than lite.: lite. answered a region-selector shell to every
@@ -790,22 +790,67 @@ SearchEngine ENGINE_REGISTRY[MAX_ENGINES] = {
      .verticals = V_WEB,
      .weight = 1.25, .index_group = "google" }};
 
-/* J5.1: counted at startup rather than compiled in, so the array can grow.
-   A constructor runs before main, so every existing use - including in tests
-   that link this file - sees the right number. */
+/* J5.1: the registry is a heap array with a runtime count.
+
+   It used to be a compile-time array whose size was the count, which made
+   "load a definition at startup" impossible without touching 114 sites. Now a
+   constructor copies the seed list into malloc'd memory before main, and
+   engine_registry_add grows it - so every existing ENGINE_REGISTRY[i] keeps
+   working and a definition appends without a recompile.
+
+   MAX_ENGINES is an enforced cap rather than an allocation size: the routing
+   arrays in the request path are sized by it, so growth past it is refused
+   loudly instead of silently truncating a fan-out. */
+SearchEngine *ENGINE_REGISTRY = NULL;
 int ENGINE_COUNT = 0;
 
-__attribute__((constructor)) static void engine_registry_count(void) {
-  int n = 0;
-  while (n < MAX_ENGINES && ENGINE_REGISTRY[n].id)
-    n++;
-  ENGINE_COUNT = n;
+static int registry_capacity = 0;
+static int *shipped_enabled = NULL;
+static int shipped_enabled_captured = 0;
+
+static int registry_ensure(int wanted) {
+  if (wanted > MAX_ENGINES)
+    wanted = MAX_ENGINES;
+  if (wanted <= registry_capacity)
+    return registry_capacity >= wanted;
+  int capacity = registry_capacity ? registry_capacity : 16;
+  while (capacity < wanted)
+    capacity *= 2;
+  if (capacity > MAX_ENGINES)
+    capacity = MAX_ENGINES;
+  SearchEngine *grown = realloc(ENGINE_REGISTRY, (size_t)capacity * sizeof(*grown));
+  if (!grown)
+    return 0;
+  ENGINE_REGISTRY = grown;
+  int *flags = realloc(shipped_enabled, (size_t)capacity * sizeof(*flags));
+  if (!flags)
+    return 0;
+  shipped_enabled = flags;
+  registry_capacity = capacity;
+  return 1;
+}
+
+/* A constructor runs before main, so every existing use - including in tests
+   that link this file - sees a populated registry. */
+__attribute__((constructor)) static void engine_registry_init(void) {
+  if (!registry_ensure((int)(sizeof(SEED_ENGINES) / sizeof(SEED_ENGINES[0]))))
+    return;
+  memcpy(ENGINE_REGISTRY, SEED_ENGINES, sizeof(SEED_ENGINES));
+  ENGINE_COUNT = (int)(sizeof(SEED_ENGINES) / sizeof(SEED_ENGINES[0]));
 }
 
 int engine_registry_add(const SearchEngine *engine) {
-  if (!engine || !engine->id || ENGINE_COUNT >= MAX_ENGINES)
+  if (!engine || !engine->id)
+    return -1;
+  if (ENGINE_COUNT >= MAX_ENGINES)
+    return -1;
+  if (!registry_ensure(ENGINE_COUNT + 1))
     return -1;
   ENGINE_REGISTRY[ENGINE_COUNT] = *engine;
+  /* a definition added before the first apply_engines_config must not look
+     like it shipped disabled */
+  if (shipped_enabled_captured)
+    shipped_enabled[ENGINE_COUNT] = engine->enabled;
   return ENGINE_COUNT++;
 }
 
@@ -850,9 +895,6 @@ void engine_set_enabled(const char *engine_id, int enabled) {
    slot on every query. It now means "the engines the registry ships enabled";
    naming a disabled engine explicitly ("*,yacy") still opts it in, which is
    what docs/SETUP.md tells people to do. */
-static int shipped_enabled[MAX_ENGINES];
-static int shipped_enabled_captured = 0;
-
 static void capture_shipped_enabled(void) {
   if (shipped_enabled_captured)
     return;
