@@ -1293,7 +1293,8 @@ int results_handler(UrlParams *params) {
       reddit_lane_job = engine_idx;
       engine_idx++;
       if (getenv("OMNI_PERF"))
-        fprintf(stderr, "[F3] reddit lane via %s: %s\n", lane->id, lane_query);
+        fprintf(stderr, "[F3] reddit lane via %s (query length %zu)\n", lane->id,
+                strlen(lane_query));
     }
   }
 
@@ -2111,10 +2112,17 @@ int results_handler(UrlParams *params) {
     }
 
     if (results_matrix.count == 0 && total_results > 0) {
+      /* J6.1: the query text was written into every one of these lines, which
+         is why the shipped log contained "1+1", "covid-19", "#123456" and a
+         personal search. Part 0 says not to log the query; the counts and the
+         per-engine breakdown are what actually diagnose this, so keep those
+         and drop the text. A per-install-salted hash would allow correlating
+         repeats; the length alone is enough to tell a one-word query from a
+         sentence, and it is not reversible. */
       fprintf(stderr,
               "[WARN] %d raw hits collapsed to zero rendered results (query "
-              "\"%s\"):",
-              total_results, raw_query);
+              "length %zu):",
+              total_results, strlen(raw_query));
       for (int i = 0; i < enabled_engine_count; i++)
         fprintf(stderr, " %s=%d", jobs[i].engine->id, jobs[i].results_count);
       fprintf(stderr, "\n");
