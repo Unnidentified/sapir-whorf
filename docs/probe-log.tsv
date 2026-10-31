@@ -36,3 +36,5 @@ utc	engine	query	http	bytes	verdict	ua	headers	url
 2026-10-31T12:41:23Z	bing	python documentation	200	52121	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=python%20documentation&adlt=off
 2026-10-31T12:42:23Z	bing	carbonara recipe	200	53580	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=carbonara%20recipe&adlt=off
 2026-10-31T12:43:23Z	bing	world war 2 summary	200	53809	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=world%20war%202%20summary&adlt=off
+2026-10-31T12:44:43Z	brave	linux kernel	302	110	unknown	safari	plain	https://search.brave.com/search?q=linux%20kernel
+2026-10-31T12:45:54Z	brave	linux kernel	200	325978	results(html) +captcha-marker	safari	plain	https://search.brave.com/search?q=linux%20kernel

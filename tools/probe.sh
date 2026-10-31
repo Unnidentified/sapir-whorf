@@ -67,7 +67,10 @@ OUT=/tmp/probe-${ENGINE}-${HTTPV}-${HDRMODE}-${COOKIEMODE}
 JAR="$OUT.cookies"
 rm -f "$OUT.body" "$OUT.hdr" "$JAR"
 
-ARGS=(-sS --max-time 20 -o "$OUT.body" -D "$OUT.hdr" -w "%{http_code}")
+# The app follows redirects (Brave 302s to safe.search.brave.com), so the probe
+# must too - otherwise it reports a 302 and calls the cell "unknown", which is a
+# probe defect masquerading as an engine finding.
+ARGS=(-sS -L -m 20 -o "$OUT.body" -D "$OUT.hdr" -w "%{http_code}")
 [ "$HTTPV" = "http1.1" ] && ARGS+=(--http1.1)
 [ "$HTTPV" = "http2" ] && ARGS+=(--http2)
 
@@ -112,7 +115,13 @@ case "$ENGINE" in
   brave)    contains "snippet" && VERDICT="results(html)" || { contains "challengeSet\|challenge" && VERDICT="challenge"; }; ;;
   yahoo)    contains "compTitle" && VERDICT="results" || { contains "captcha\|challenge" && VERDICT="challenge"; }; ;;
 esac
-contains "captcha\|unusual traffic\|are you a robot\|turnstile" && VERDICT="$VERDICT +captcha-marker"
+# Only call it a captcha when no results were found: a 325 KB results page
+# contains the word "captcha" in its JavaScript, which made every good Brave
+# probe read as half-blocked.
+case "$VERDICT" in
+  results*) ;;
+  *) contains "captcha\|unusual traffic\|are you a robot\|turnstile" && VERDICT="$VERDICT +captcha-marker" ;;
+esac
 
 printf '%-10s %-7s %-7s %-9s http=%-4s bytes=%-7s %s\n' \
   "$ENGINE" "$HTTPV" "$HDRMODE" "$COOKIEMODE" "$CODE" "$SIZE" "$VERDICT"

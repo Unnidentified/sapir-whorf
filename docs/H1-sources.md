@@ -86,8 +86,18 @@ no challenge page was encountered and cleared. So the honest statement is:
   exercised by a real challenge** since it landed. It is a safety net that has
   not caught anything yet.
 
-A single paced Safari probe is still the right confirmation from a cold
-process, and `tools/probe.sh` now paces itself and refuses to burst.
+Confirmed once more from a cold process with `tools/probe.sh brave "linux
+kernel"` after the cooldown: **200, 325 978 bytes, results**. Two probe defects
+turned up doing it, both of which had been producing misleading verdicts:
+
+- the probe did not follow redirects, so Brave's 302 to `safe.search.brave.com`
+  was reported as `unknown`. The app follows redirects; the probe now does too.
+- the "+captcha-marker" suffix fired on any page containing the word
+  "captcha", which every 325 KB Brave results page does in its JavaScript. It
+  is now only added when no results were found.
+
+Both are the same lesson as H3: a probe that does not make the request the
+application makes can report a finding that is really a probe bug.
 
 ## Still open
 
