@@ -202,6 +202,22 @@ int main(int argc, char **argv) {
     engine_set_enabled("google", 1);
     fprintf(stderr, "[INFO] Google Programmable Search enabled\n");
   }
+  /* G3: the element path is opt-in twice over - a cx AND a token. Without a
+     token the endpoint is a 403, and an engine that can only 403 is worse than
+     no engine: it spends a request slot and reports a failure that is really a
+     missing credential. */
+  if (cfg.google_cse_cx[0] != '\0' && cfg.google_cse_tok[0] != '\0') {
+    api_google_cse_element_configure(cfg.google_cse_cx, cfg.google_cse_tok);
+    engine_set_enabled("google_cse_element", 1);
+    fprintf(stderr,
+            "[INFO] Google Programmable Search Element enabled (token "
+            "supplied)\n");
+  } else if (cfg.google_cse_cx[0] != '\0') {
+    fprintf(stderr,
+            "[INFO] google_cse_cx is set but google_cse_tok is not; the "
+            "element endpoint needs both, so google_cse_element stays off "
+            "(see docs/G3-google-cse.md)\n");
+  }
   if (cfg.searxng_url[0] != '\0') {
     api_searxng_configure(cfg.searxng_url, cfg.searxng_engines);
     engine_set_enabled("searxng", 1);

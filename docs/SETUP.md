@@ -72,7 +72,8 @@ Defaults in `src/Config.h`.
 | cache | ttl_search / ttl_infobox / ttl_image | 3600 / 86400 / 604800 | seconds |
 | engines | engines | all | allowlist, supports `*` and `-id` |
 | engines | yacy_instance | 127.0.0.1:8090 | YaCy peer |
-| engines | google_cse_key / google_cse_cx | empty | enables Google if both set |
+| engines | google_cse_key / google_cse_cx | empty | Google JSON API. Existing keys only: Google stopped issuing new ones in 2026-01 and the service ends 2027-01-01 |
+| engines | google_cse_cx / google_cse_tok | empty | `google_cse_element`, clean-room and **disabled by default**. Needs a pasted `cse_tok`; the endpoint 403s without one. See docs/G3-google-cse.md |
 | engines | searxng_url / searxng_engines | empty / google | enables SearXNG bridge |
 | rate_limit | search_requests / search_interval | 0 / 0 | inbound limit per client; 0 disables |
 | rate_limit | trusted_proxies | empty | addresses whose X-Forwarded-For may be believed (`loopback`, `lan`, or a list); empty trusts nobody |

@@ -32,6 +32,16 @@ int api_parse_google_cse(const char *body, size_t len, const char *lang,
                          SearchResult **out, int max);
 char *api_url_google_cse(const char *encoded_query, int page, const char *lang);
 
+/* G3: Google Programmable Search *Element*. Clean-room. Needs cx plus the
+   cse_tok that only the widget JavaScript can mint, so it stays unavailable
+   unless the operator supplies one. Disabled by default. */
+void api_google_cse_element_configure(const char *cx, const char *tok);
+int api_google_cse_element_available(void);
+int api_parse_google_cse_element(const char *body, size_t len, const char *lang,
+                                 SearchResult **out, int max);
+char *api_url_google_cse_element(const char *encoded_query, int page,
+                                 const char *lang);
+
 /* SearXNG instance acting as a bridge to Google and other engines */
 void api_searxng_configure(const char *base_url, const char *engines);
 int api_searxng_available(void);

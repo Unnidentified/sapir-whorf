@@ -47,6 +47,7 @@ static const ConfigOption CONFIG_OPTIONS[] = {
     STRING_OPTION("engines", "yacy_instance", yacy_instance),
     STRING_OPTION("engines", "google_cse_key", google_cse_key),
     STRING_OPTION("engines", "google_cse_cx", google_cse_cx),
+    STRING_OPTION("engines", "google_cse_tok", google_cse_tok),
     STRING_OPTION("engines", "searxng_url", searxng_url),
     STRING_OPTION("engines", "searxng_engines", searxng_engines),
     STRING_OPTION("rate_limit", "trusted_proxies", trusted_proxies),

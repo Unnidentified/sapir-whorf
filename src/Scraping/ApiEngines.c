@@ -419,6 +419,103 @@ int api_parse_arxiv(const char *body, size_t len, const char *lang,
   return count;
 }
 
+/* ---- Google Programmable Search Element ----------------------------
+   Clean-room, from the endpoint's observed behaviour only - nothing here is
+   derived from SearXNG or any other AGPL code.
+
+   Why a token and not just cx: the element's JSON endpoint answers 403 to any
+   request without a valid cse_tok. The token is minted by Google's obfuscated
+   widget JavaScript at runtime; it is not in the HTML shell (which is a 1 KB
+   "enable JavaScript" page loading /cse.js) and not in cse.js either until a
+   real cx resolves. Rather than fake a working engine, this one refuses to be
+   available without a token and says so - see docs/G3-google-cse.md. */
+
+static char cse_element_cx[128];
+static char cse_element_tok[512];
+
+void api_google_cse_element_configure(const char *cx, const char *tok) {
+  snprintf(cse_element_cx, sizeof(cse_element_cx), "%s", cx ? cx : "");
+  snprintf(cse_element_tok, sizeof(cse_element_tok), "%s", tok ? tok : "");
+}
+
+int api_google_cse_element_available(void) {
+  return cse_element_cx[0] != '\0' && cse_element_tok[0] != '\0';
+}
+
+char *api_url_google_cse_element(const char *encoded_query, int page,
+                                 const char *lang) {
+  if (!api_google_cse_element_available() || !encoded_query)
+    return NULL;
+  char *url = malloc(2048);
+  if (!url)
+    return NULL;
+  int start = (page > 1 ? page - 1 : 0) * API_PAGE_SIZE;
+  snprintf(url, 2048,
+           "https://cse.google.com/cse/element/v1?rsz=filtered_cse&num=%d"
+           "&hl=%s&source=gcsc&start=%d&cselibv=9c7b0d0b1f3b0f2e"
+           "&cx=%s&q=%s&safe=off&cse_tok=%s&exp=csqr,cc&callback=cb",
+           API_PAGE_SIZE, (lang && lang[0]) ? lang : "en", start,
+           cse_element_cx, encoded_query, cse_element_tok);
+  return url;
+}
+
+/* The element wraps its JSON in a callback: cb({...}) - strip that, then read
+   the same field names the widget renders from. */
+int api_parse_google_cse_element(const char *body, size_t len, const char *lang,
+                                 SearchResult **out, int max) {
+  (void)lang;
+  if (!body || len == 0)
+    return 0;
+  const char *start = strchr(body, '{');
+  const char *end = NULL;
+  for (size_t i = len; i > 0; i--) {
+    if (body[i - 1] == '}') {
+      end = body + i;
+      break;
+    }
+  }
+  if (!start || !end || end <= start)
+    return 0;
+
+  json_error_t error;
+  json_t *root = json_loadb(start, (size_t)(end - start), 0, &error);
+  if (!root) {
+    if (getenv("OMNI_CSE_DEBUG"))
+      fprintf(stderr, "[G3] json_loadb failed: %s at line %d\n", error.text,
+              error.line);
+    return 0;
+  }
+
+  json_t *results = json_object_get(root, "results");
+  int count = 0;
+  if (json_is_array(results)) {
+    *out = alloc_results_array((int)json_array_size(results), max);
+    for (size_t i = 0; i < json_array_size(results) && count < max; i++) {
+      json_t *item = json_array_get(results, i);
+      char *title = dup_string(item, "titleNoFormatting");
+      if (!title)
+        title = dup_string(item, "title");
+      char *link = dup_string(item, "unescapedUrl");
+      if (!link)
+        link = dup_string(item, "url");
+      char *snippet = dup_string(item, "content");
+      if (!snippet)
+        snippet = dup_string(item, "contentNoFormatting");
+      if (link && link[0]) {
+        html_unescape_inplace(title);
+        html_unescape_inplace(snippet);
+        assign_result(&(*out)[count++], link, title, snippet, count + 1);
+      } else {
+        free(title);
+        free(snippet);
+        free(link);
+      }
+    }
+  }
+  json_decref(root);
+  return count;
+}
+
 /* ---- Google Programmable Search ------------------------------------ */
 
 static char google_key[256];

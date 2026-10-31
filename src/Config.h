@@ -65,6 +65,9 @@ typedef struct {
   char yacy_instance[512];
   char google_cse_key[256];
   char google_cse_cx[128];
+  /* G3: the element endpoint needs a token the widget JS mints at runtime.
+     Supplying one is an explicit opt-in, and the engine stays off without it. */
+  char google_cse_tok[512];
   char searxng_url[256];
   char searxng_engines[128];
   char trusted_proxies[512];
