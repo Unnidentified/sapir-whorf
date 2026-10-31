@@ -1223,7 +1223,21 @@ int results_handler(UrlParams *params) {
 
     if (delivered < 2 && user_engine_count == 0 && engine_idx < ENGINE_COUNT &&
         page == 1) {
+      /* G2 fallback chain: prefer an engine backed by an index we have NOT
+         already heard from and that is not the index that just failed. Three
+         engines that all resell the same index are one source, so hedging
+         within a group buys nothing - see index_group in the registry. */
+      const char *used_groups[ENGINE_COUNT];
+      int used_group_count = 0;
+      for (int j = 0; j < engine_idx && used_group_count < ENGINE_COUNT; j++) {
+        const char *g = jobs[j].engine ? jobs[j].engine->index_group : NULL;
+        if (!g)
+          continue;
+        used_groups[used_group_count++] = g;
+      }
+
       int added = 0;
+      for (int pass = 0; pass < 2 && added < 3; pass++) {
       for (int i = 0; i < ENGINE_COUNT && engine_idx < ENGINE_COUNT; i++) {
         const SearchEngine *cand = &ENGINE_REGISTRY[i];
         if (!cand->enabled || !(cand->verticals & V_WEB))
@@ -1236,6 +1250,15 @@ int results_handler(UrlParams *params) {
             already = 1;
         if (already)
           continue;
+        /* pass 0 wants a fresh index, pass 1 takes whatever is left */
+        if (pass == 0 && cand->index_group) {
+          int seen = 0;
+          for (int k = 0; k < used_group_count; k++)
+            if (strcmp(used_groups[k], cand->index_group) == 0)
+              seen = 1;
+          if (seen)
+            continue;
+        }
 
         all_results[engine_idx] = NULL;
         jobs[engine_idx].engine = cand;
@@ -1261,8 +1284,11 @@ int results_handler(UrlParams *params) {
         jobs[engine_idx].status = SCRAPE_STATUS_PENDING;
         engine_idx++;
         added++;
+        if (cand->index_group && used_group_count < ENGINE_COUNT)
+          used_groups[used_group_count++] = cand->index_group;
         if (added >= 3)
           break;
+      }
       }
 
       if (added > 0) {
