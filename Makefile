@@ -342,6 +342,14 @@ tests/test_h1_ua: tests/test_h1_ua.c src/Scraping/EngineHealth.c \
 ua-check: tests/test_h1_ua
 	@./tests/test_h1_ua
 
+# H4: the answer modes and the fan-out skip (starts its own instances)
+answers-check:
+	@./tests/test_h4_answers.sh
+
+# H2: a JUNK answer is distinct from OK and EMPTY (fake upstream, no network)
+junk-check:
+	@./tests/test_h2_junk.sh
+
 # A3: offline relevance benchmark. Reranks a recorded replay file with the
 # production ranker - no network, no server, deterministic.
 tests/offline_rank: tests/offline_rank.c src/Ranking/Ranker.c \
@@ -391,6 +399,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check smoke
 
-.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

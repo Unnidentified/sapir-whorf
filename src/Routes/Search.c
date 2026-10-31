@@ -1267,8 +1267,11 @@ int results_handler(UrlParams *params) {
       if (jobs[i].results_count > 0)
         delivered++;
 
-    if (delivered < 2 && user_engine_count == 0 && engine_idx < ENGINE_COUNT &&
-        page == 1) {
+    /* H4: a confident local answer must not be hedged around. Without this the
+       recovery round saw "0 engines delivered" and quietly re-added two of
+       them, which is exactly the request the skip exists to avoid. */
+    if (!skip_fanout && delivered < 2 && user_engine_count == 0 &&
+        engine_idx < ENGINE_COUNT && page == 1) {
       /* G2 fallback chain: prefer an engine backed by an index we have NOT
          already heard from and that is not the index that just failed. Three
          engines that all resell the same index are one source, so hedging
@@ -2057,6 +2060,7 @@ int results_handler(UrlParams *params) {
       if (local_answer.detail[0])
         context_set(&ctx, "answer_detail", local_answer.detail);
       context_set(&ctx, "answer_source", local_answer.source);
+      context_set(&ctx, "answer_source_note", "Answered locally");
       context_set(&ctx, "results_state", "answered");
     }
     {

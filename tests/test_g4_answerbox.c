@@ -160,17 +160,39 @@ int main(void) {
       const char *query;
       const char *source;
     } dynamic[] = {
+        /* time: ten */
         {"time in tokyo", "time"},
         {"what time is it in new york", "time"},
         {"que hora es en madrid", "time"},
         {"qué hora es en madrid", "time"},
         {"current time in lisbon", "time"},
+        {"time in sydney", "time"},
+        {"time in chicago", "time"},
+        {"time in sao paulo", "time"},
+        {"time in hong kong", "time"},
+        {"time in buenos aires", "time"},
+        /* days: ten (date maths) */
         {"days between 2024-01-01 and 2024-03-01", "days"},
         {"how many days until 2025-12-25", "days"},
+        {"days between 2024-02-01 and 2024-03-01", "days"},
+        {"days between 2025-01-01 and 2025-12-31", "days"},
+        {"how many days until 2026-01-01", "days"},
+        {"days between 2023-06-15 and 2023-06-20", "days"},
+        {"days between 2024-03-01 and 2024-01-01", "days"},
+        {"how many days until 2027-06-30", "days"},
+        {"days between 2020-02-29 and 2020-03-01", "days"},
+        {"days between 1999-12-31 and 2000-01-01", "days"},
+        /* random: ten */
         {"flip a coin", "random"},
         {"roll a dice", "random"},
         {"random number between 1 and 10", "random"},
         {"uuid", "random"},
+        {"roll a d20", "random"},
+        {"roll a die", "random"},
+        {"lanzar una moneda", "random"},
+        {"random number between 5 and 5", "random"},
+        {"random number between 100 and 1", "random"},
+        {"guid", "random"},
     };
     for (size_t i = 0; i < sizeof(dynamic) / sizeof(dynamic[0]); i++) {
       AnswerBoxResult d;
@@ -202,7 +224,12 @@ int main(void) {
         "time magazine", "time after time", "tempo", "dicey",
         "random access memory", "uuid v4 format spec",
         "days of our lives", "between the lines", "cities in spain",
-        "hora de comer",
+        "hora de comer", "time zone map", "time complexity of quicksort",
+        "days inn madrid", "how many days in a leap year",
+        "time series analysis", "time travel movies", "roll of honour",
+        "random forest classifier", "coin cell battery", "dice game rules",
+        "uuid primary key postgres", "guid vs uuid", "tokyo drift",
+        "new york times", "madrid weather",
     };
     for (size_t i = 0; i < sizeof(dyn_neg) / sizeof(dyn_neg[0]); i++) {
       AnswerBoxResult d;

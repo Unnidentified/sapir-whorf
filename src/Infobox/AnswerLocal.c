@@ -350,6 +350,17 @@ int answer_random(const char *query, AnswerBoxResult *out) {
   for (char *p = lower; *p; p++)
     *p = (char)tolower((unsigned char)*p);
 
+  /* A question *about* the thing is not a request for one: "guid vs uuid",
+     "how does uuid work", "uuid format". "random number between 1 and 10" is a
+     request however long it is, so it is exempt. */
+  static const char *QUESTIONY[] = {" vs ", " versus ", "difference", "format",
+                                    "spec",  "how ",    "what ",     "why ",
+                                    "?",     "work",    "primary key"};
+  if (!strstr(lower, "random number")) {
+    for (size_t i = 0; i < sizeof(QUESTIONY) / sizeof(QUESTIONY[0]); i++)
+      if (strstr(lower, QUESTIONY[i]))
+        return 0;
+  }
   /* "random number between 1 and 10" is a request however long it is; the
      guard is for coin/dice/uuid, where a longer query is a question about the
      thing rather than a request for one. */
