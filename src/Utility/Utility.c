@@ -1,6 +1,7 @@
 #include "Utility.h"
 #include "../Scraping/Scraping.h"
 #include <beaker.h>
+#include <curl/curl.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,6 +93,32 @@ void set_default_locale(const char *locale) {
     strncpy(global_default_locale, locale, sizeof(global_default_locale) - 1);
     global_default_locale[sizeof(global_default_locale) - 1] = '\0';
   }
+}
+
+/* J3d: the query reached every link verbatim, so /search?q=1+1 decoded as
+   "1 1", AT&T became "AT" and C# became "C". One encoder, used by every href
+   builder and by the templates. curl_easy_escape is already a dependency
+   (the engine queries go through it). */
+int url_encode(const char *in, char *out, size_t size) {
+  CURL *curl;
+  char *esc;
+  if (!out || size == 0)
+    return 0;
+  out[0] = '\0';
+  if (!in)
+    return 0;
+  curl = curl_easy_init();
+  if (!curl)
+    return 0;
+  esc = curl_easy_escape(curl, in, 0);
+  if (!esc) {
+    curl_easy_cleanup(curl);
+    return 0;
+  }
+  snprintf(out, size, "%s", esc);
+  curl_free(esc);
+  curl_easy_cleanup(curl);
+  return (int)strlen(out);
 }
 
 int hex_to_int(char c) {

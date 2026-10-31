@@ -20,6 +20,8 @@ typedef struct {
   int capacity;
 } StringMatrix;
 
+/* percent-encode for a query string; returns the encoded length */
+int url_encode(const char *in, char *out, size_t size);
 int hex_to_int(char c);
 char *get_theme(const char *default_theme);
 const char *get_title_font(void);

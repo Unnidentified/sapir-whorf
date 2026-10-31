@@ -7,17 +7,17 @@
         <input name="q" type="text" class="search-box" autocomplete="off" placeholder="{{l("search_placeholder")}}"
         value="{{query}}">
     </form>
-    <a href="/settings?q={{query}}" class="nav-settings-icon" title="{{l("settings_tab")}}"></a>
+    <a href="/settings?q={{query_encoded}}" class="nav-settings-icon" title="{{l("settings_tab")}}"></a>
 </header>
 <nav class="nav-tabs">
     <div class="nav-container">
         <a href="{{chrome_all_href}}" {{if chrome_active == "all"}}class="active"{{endif}}>
             {{l("all_tab")}}
         </a>
-        <a href="/images?q={{query}}" {{if chrome_active == "images"}}class="active"{{endif}}>
+        <a href="/images?q={{query_encoded}}" {{if chrome_active == "images"}}class="active"{{endif}}>
             {{l("images_tab")}}
         </a>
-        <a href="/settings?q={{query}}" class="nav-settings-link">
+        <a href="/settings?q={{query_encoded}}" class="nav-settings-link">
             {{l("settings_tab")}}
         </a>
     </div>

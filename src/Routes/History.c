@@ -26,6 +26,11 @@ int history_handler(UrlParams *params) {
   context_set(&ctx, "query", query);
   context_set(&ctx, "chrome_action", "/search");
   context_set(&ctx, "chrome_active", "");
+  {
+    char enc[512];
+    url_encode(query ? query : "", enc, sizeof(enc));
+    context_set(&ctx, "query_encoded", enc);
+  }
   context_set(&ctx, "chrome_engine", "");
   context_set(&ctx, "chrome_all_href", "/");
   context_set(&ctx, "version", VERSION);

@@ -699,7 +699,10 @@ static char *build_search_href(const char *query, const char *engine_id,
   const char *safe_query = query ? query : "";
   int use_engine =
       engine_id && engine_id[0] != '\0' && !engine_id_matches(engine_id, "all");
-  size_t needed = strlen("/search?q=") + strlen(safe_query) + 1;
+  /* J3d: encode here, not at the call sites, so no caller can forget */
+  char encoded_query[BUFFER_SIZE_MEDIUM];
+  url_encode(safe_query, encoded_query, sizeof(encoded_query));
+  size_t needed = strlen("/search?q=") + strlen(encoded_query) + 1;
 
   if (use_engine)
     needed += strlen("&engine=") + strlen(engine_id);
@@ -710,7 +713,7 @@ static char *build_search_href(const char *query, const char *engine_id,
   if (!href)
     return NULL;
 
-  snprintf(href, needed, "/search?q=%s", safe_query);
+  snprintf(href, needed, "/search?q=%s", encoded_query);
 
   if (use_engine) {
     strcat(href, "&engine=");
@@ -828,6 +831,11 @@ int results_handler(UrlParams *params) {
   char *search_href = build_search_href(raw_query, selected_engine_id, 1);
   context_set(&ctx, "chrome_action", "/search");
   context_set(&ctx, "chrome_active", "all");
+  {
+    char enc[BUFFER_SIZE_MEDIUM];
+    url_encode(raw_query ? raw_query : "", enc, sizeof(enc));
+    context_set(&ctx, "query_encoded", enc);
+  }
   context_set(&ctx, "chrome_engine",
               selected_engine_id ? selected_engine_id : "");
   context_set(&ctx, "chrome_all_href",
@@ -1044,20 +1052,6 @@ int results_handler(UrlParams *params) {
   }
 
   /* the answer box and the patient link both need it, on both branches */
-  {
-    char enc[512] = {0};
-    CURL *c = curl_easy_init();
-    if (c) {
-      char *e = curl_easy_escape(c, raw_query, 0);
-      if (e) {
-        snprintf(enc, sizeof(enc), "%s", e);
-        curl_free(e);
-      }
-      curl_easy_cleanup(c);
-    }
-    context_set(&ctx, "query_encoded", enc);
-  }
-
   pthread_t infobox_threads[HANDLER_COUNT];
   InfoBoxThreadData infobox_data[HANDLER_COUNT];
 

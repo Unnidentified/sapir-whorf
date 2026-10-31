@@ -19,7 +19,9 @@ static char *build_images_request_cache_key(const char *query, int page,
 
 static char *build_images_href(const char *query, int page) {
   const char *safe_query = query ? query : "";
-  size_t needed = strlen("/images?q=") + strlen(safe_query) + 1;
+  char encoded_query[1024];
+  url_encode(safe_query, encoded_query, sizeof(encoded_query));
+  size_t needed = strlen("/images?q=") + strlen(encoded_query) + 1;
   if (page > 1)
     needed += strlen("&p=") + 16;
 
@@ -27,7 +29,7 @@ static char *build_images_href(const char *query, int page) {
   if (!href)
     return NULL;
 
-  snprintf(href, needed, "/images?q=%s", safe_query);
+  snprintf(href, needed, "/images?q=%s", encoded_query);
   if (page > 1) {
     char page_buf[16];
     snprintf(page_buf, sizeof(page_buf), "%d", page);
@@ -62,6 +64,11 @@ int images_handler(UrlParams *params) {
   context_set(&ctx, "query", raw_query);
   context_set(&ctx, "chrome_action", "/images");
   context_set(&ctx, "chrome_active", "images");
+  {
+    char enc[BUFFER_SIZE_MEDIUM];
+    url_encode(raw_query ? raw_query : "", enc, sizeof(enc));
+    context_set(&ctx, "query_encoded", enc);
+  }
   context_set(&ctx, "chrome_engine", "");
   context_set(&ctx, "chrome_all_href", "/");
 
