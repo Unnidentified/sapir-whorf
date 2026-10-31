@@ -203,6 +203,41 @@
                         </div>
                     </section>
 
+                    <section class="settings-section settings-legal">
+                        <h3 class="settings-section-title">{{l("opt_in_title")}}</h3>
+                        <p class="settings-section-desc">{{l("opt_in_what")}}</p>
+
+                        {{if opt_in_available}}
+                        <p class="settings-section-desc">{{l("opt_in_off_by_default")}}</p>
+                        {{if opt_in_missing}}
+                        <p class="settings-section-desc settings-locked">{{l("opt_in_none_registered")}}</p>
+                        {{endif}}
+                        <div class="settings-fields">
+                            <label class="settings-field settings-check" for="opt_in">
+                                <!-- an unchecked checkbox submits nothing, so
+                                     without this an opt-in could never be
+                                     withdrawn: there would be no request that
+                                     said "off" -->
+                                <input type="hidden" name="opt_in_present" value="1">
+                                <input type="checkbox" id="opt_in" name="opt_in" value="1" {{if opt_in_on}}checked{{endif}}>
+                                <span class="settings-label">{{l("opt_in_enable")}}</span>
+                            </label>
+                        </div>
+                        {{else}}
+                        <p class="settings-section-desc settings-locked">{{l("opt_in_locked")}}</p>
+                        {{endif}}
+
+                        <details class="settings-legal-details">
+                            <summary>{{l("opt_in_disclaimer_summary")}}</summary>
+                            <div class="settings-legal-text">
+                                <p>{{l("opt_in_disclaimer_1")}}</p>
+                                <p>{{l("opt_in_disclaimer_2")}}</p>
+                                <p>{{l("opt_in_disclaimer_3")}}</p>
+                                <p>{{l("opt_in_disclaimer_4")}}</p>
+                            </div>
+                        </details>
+                    </section>
+
                     {{if has_engine_status}}
                     <section class="settings-section">
                         <h3 class="settings-section-title">Engine status</h3>

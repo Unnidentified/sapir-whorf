@@ -126,6 +126,13 @@ int settings_handler(UrlParams *params) {
     get_answers_fanout(global_config.answers_fanout, fanout, sizeof(fanout));
     context_set(&ctx, "answers_mode", mode);
     context_set(&ctx, "answers_fanout", fanout);
+    /* J5.5 tier 3: three states, because "offered but impossible" is a lie.
+         locked  - the server forbids it; the control is not rendered
+         off/on  - the server permits it and this browser has/has not opted in */
+    context_set(&ctx, "opt_in_available", opt_in_providers_available() ? "1" : "");
+    context_set(&ctx, "opt_in_on", opt_in_providers_allowed() ? "1" : "");
+    /* beaker's {{if}} has no negation, so expose the positive form */
+    context_set(&ctx, "opt_in_missing", engine_count_opt_in() > 0 ? "" : "1");
   }
   context_set(&ctx, "default_engine", default_engine);
   context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count,

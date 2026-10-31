@@ -1,4 +1,5 @@
 #include "Utility.h"
+#include "../Config.h"
 #include "../Scraping/Scraping.h"
 #include <beaker.h>
 #include <curl/curl.h>
@@ -185,6 +186,32 @@ void get_answers_mode(const char *fallback, char *out, size_t size) {
 void get_answers_fanout(const char *fallback, char *out, size_t size) {
   static const char *const ALLOWED[] = {"always", "auto", "never"};
   user_choice("answers_fanout", fallback, ALLOWED, 3, out, size);
+}
+
+/* J5.5 tier 3: providers whose content is legally contested. Two keys, in
+   series, on purpose:
+
+     - the server decides whether they may exist at all ([engines]
+       allow_files, default off, restart to change);
+     - the person in front of the browser opts in per client (a cookie), and
+       the settings page will not even offer it while the server says no.
+
+   So a crafted link cannot turn them on, and an operator cannot be opted in by
+   a visitor. Nothing is registered under this gate yet; the function is the
+   single place a provider must ask. */
+int opt_in_providers_available(void) { return config_allow_files(); }
+
+int opt_in_providers_allowed(void) {
+  char *cookie;
+  if (!config_allow_files())
+    return 0;
+  cookie = get_cookie("opt_in");
+  if (cookie && strcmp(cookie, "1") == 0) {
+    free(cookie);
+    return 1;
+  }
+  free(cookie);
+  return 0;
 }
 
 /* ---------- user-defined palette ---------- */

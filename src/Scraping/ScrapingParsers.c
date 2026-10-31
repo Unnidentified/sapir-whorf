@@ -792,6 +792,17 @@ SearchEngine ENGINE_REGISTRY[] = {
 
 const int ENGINE_COUNT = sizeof(ENGINE_REGISTRY) / sizeof(SearchEngine);
 
+/* J5.5 tier 3: how many registered engines are behind the opt-in gate. The
+   settings page uses this to say plainly whether the switch does anything in
+   this build, instead of implying it does. */
+int engine_count_opt_in(void) {
+  int n = 0;
+  for (int i = 0; i < ENGINE_COUNT; i++)
+    if (ENGINE_REGISTRY[i].opt_in)
+      n++;
+  return n;
+}
+
 static int engine_id_compare(const char *engine_id, const char *config_id) {
   while (*engine_id && *config_id) {
     char e = *engine_id;

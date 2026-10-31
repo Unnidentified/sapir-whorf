@@ -69,6 +69,13 @@ typedef struct {
   int pace_per_minute;
   /* cookies to seed the jar with on first use (locale selectors and the like) */
   const char *init_cookies;
+  /* J5.5 tier 3: content the owner may not be entitled to redistribute
+     (file indexes, torrent indexes, shadow libraries). Never on by default,
+     never reached from the All tab, and only fetched when
+     opt_in_providers_allowed() says this browser asked for it AND the server
+     permits it. Zero for every engine today; the field exists so the gate has
+     somewhere to read from instead of a list in the request path. */
+  int opt_in;
 } SearchEngine;
 
 typedef struct {
@@ -133,6 +140,8 @@ extern SearchEngine ENGINE_REGISTRY[];
 extern const int ENGINE_COUNT;
 void apply_engines_config(const char *engines_str);
 void engine_set_enabled(const char *engine_id, int enabled);
+/* J5.5 tier 3: engines behind the opt-in gate, so the UI can be honest */
+int engine_count_opt_in(void);
 void configure_yacy_engine(const char *instance);
 
 size_t write_memory_callback(void *contents, size_t size, size_t nmemb,

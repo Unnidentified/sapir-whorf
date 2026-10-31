@@ -18,6 +18,8 @@ int settings_save_handler(UrlParams *params) {
   int default_engine_present = 0;
   int engines_present = 0;
   int answers_present = 0;
+  int opt_in_present = 0;
+  const char *opt_in = NULL;
   const char *answers = NULL;
   const char *answers_fanout = NULL;
   char selected_ids[ENGINE_COUNT][32];
@@ -51,6 +53,10 @@ int settings_save_handler(UrlParams *params) {
       } else if (strcmp(params->params[i].key, "answers") == 0) {
         answers = params->params[i].value;
         answers_present = 1;
+      } else if (strcmp(params->params[i].key, "opt_in") == 0) {
+        opt_in = params->params[i].value;
+      } else if (strcmp(params->params[i].key, "opt_in_present") == 0) {
+        opt_in_present = 1;
       } else if (strcmp(params->params[i].key, "answers_fanout") == 0) {
         answers_fanout = params->params[i].value;
       } else if (strcmp(params->params[i].key, "engines_present") == 0) {
@@ -112,6 +118,17 @@ int settings_save_handler(UrlParams *params) {
   }
   /* J3c: what leaves the machine is a per-user choice, so these are cookies.
      Both values are validated here -- they end up in string comparisons. */
+  /* J5.5 tier 3: the per-user half of the opt-in gate. A form that does not
+     carry the control (the server forbids it, so it was not rendered) must not
+     silently clear an existing choice, and nothing here can override the
+     server -- opt_in_providers_allowed() asks the config as well. */
+  if (opt_in_present) {
+    /* the hidden opt_in_present says the control was on the page; the checkbox
+       says what it now is. Its absence means unchecked, which means "off". */
+    const char *value = (opt_in && strcmp(opt_in, "1") == 0) ? "1" : "0";
+    set_cookie("opt_in", value, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false,
+               false);
+  }
   if (answers_present && answers_mode_ok(answers)) {
     set_cookie("answers", answers, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false,
                false);

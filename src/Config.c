@@ -50,6 +50,7 @@ static const ConfigOption CONFIG_OPTIONS[] = {
     STRING_OPTION("engines", "google_cse_tok", google_cse_tok),
     STRING_OPTION("engines", "searxng_url", searxng_url),
     STRING_OPTION("engines", "searxng_engines", searxng_engines),
+    BOOLEAN_OPTION("engines", "allow_files", allow_files),
     STRING_OPTION("rate_limit", "trusted_proxies", trusted_proxies),
     STRING_OPTION("server", "infobox", infobox_mode),
     STRING_OPTION("server", "answers", answers_mode),
@@ -83,6 +84,7 @@ void config_set_defaults(Config *config) {
       .breaker_cooldown = DEFAULT_BREAKER_COOLDOWN,
       .answers_mode = DEFAULT_ANSWERS_MODE,
       .answers_fanout = DEFAULT_ANSWERS_FANOUT,
+      .allow_files = DEFAULT_ALLOW_FILES,
       .pace_per_minute = DEFAULT_PACE_PER_MINUTE,
       .pace_burst = DEFAULT_PACE_BURST,
       .rate_limit_search_requests = DEFAULT_RATE_LIMIT_SEARCH_REQUESTS,
@@ -280,3 +282,10 @@ int load_config(const char *filename, Config *config) {
   fclose(file);
   return result;
 }
+
+/* The one config object. It lives here rather than in Main.c so that any
+   module (or test) that links Config.c can ask it a question without also
+   linking the server's main(). */
+Config global_config;
+
+int config_allow_files(void) { return global_config.allow_files ? 1 : 0; }

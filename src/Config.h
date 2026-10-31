@@ -25,6 +25,10 @@
    previous behaviour (a confident local answer skipped the fan-out), `auto`
    skips only for a very confident answer and a query with no words in it. */
 #define DEFAULT_ANSWERS_FANOUT "always"
+/* J5.5 tier 3: providers whose content is legally contested (files, torrent
+   indexes, shadow libraries) are never on by default, and the server can
+   forbid them outright whatever a browser asks for. */
+#define DEFAULT_ALLOW_FILES 0
 #define DEFAULT_PACE_PER_MINUTE 40
 #define DEFAULT_PACE_BURST 6
 #define DEFAULT_BREAKER_COOLDOWN 900
@@ -89,6 +93,8 @@ typedef struct {
   /* H4: all | local | off - what the answer box is allowed to do */
   char answers_mode[16];
   char answers_fanout[16];
+  /* the server-side half of the opt-in gate; the per-user half is a cookie */
+  int allow_files;
   int rate_limit_search_requests;
   int rate_limit_search_interval;
   int rate_limit_images_requests;
@@ -103,5 +109,8 @@ typedef struct {
 
 void config_set_defaults(Config *config);
 int load_config(const char *filename, Config *config);
+/* J5.5 tier 3: the server-side half of the opt-in gate, so a caller does not
+   have to know where the global config object lives. */
+int config_allow_files(void);
 
 #endif

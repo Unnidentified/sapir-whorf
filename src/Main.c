@@ -74,7 +74,7 @@ static void start_cache_sweeper(int search_ttl) {
   fprintf(stderr, "[INFO] Cache sweeper running hourly\n");
 }
 
-Config global_config;
+extern Config global_config;
 
 int handle_opensearch(UrlParams *params) {
   (void)params;

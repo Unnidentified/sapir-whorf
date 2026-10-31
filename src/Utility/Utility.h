@@ -29,6 +29,10 @@ int answers_mode_ok(const char *value);
 int answers_fanout_ok(const char *value);
 void get_answers_mode(const char *fallback, char *out, size_t size);
 void get_answers_fanout(const char *fallback, char *out, size_t size);
+/* J5.5 tier 3: contested providers. available = the server permits them at
+   all; allowed = the server permits it AND this browser opted in. */
+int opt_in_providers_available(void);
+int opt_in_providers_allowed(void);
 const char *get_title_font(void);
 const char *get_page_scale(void);
 /* the same value as a multiplier for CSS */

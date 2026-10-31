@@ -1972,3 +1972,64 @@ input[type="color"]:focus-visible {
     border-top: 1px solid var(--border);
     padding-top: 0.8rem;
 }
+
+/* ================================================================
+   legal / opt-in section (J5.5 tier 3)
+   ================================================================ */
+.settings-legal {
+    /* the disclaimer is not an emergency, but it must not read like a
+       preference toggle either */
+    border-color: var(--border);
+}
+
+.settings-locked {
+    color: var(--text-muted);
+}
+
+.settings-check {
+    align-items: center;
+    display: flex;
+    gap: 0.6rem;
+}
+
+.settings-check input[type="checkbox"] {
+    width: 1.05rem;
+    height: 1.05rem;
+    accent-color: var(--accent);
+}
+
+.settings-legal-details {
+    margin-top: 0.9rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.7rem;
+}
+
+.settings-legal-details > summary {
+    cursor: pointer;
+    color: var(--link);
+    font-size: 0.9rem;
+    list-style: none;
+}
+
+.settings-legal-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-legal-details > summary::after {
+    content: " ▼";
+}
+
+.settings-legal-details[open] > summary::after {
+    content: " ▲";
+}
+
+.settings-legal-text {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    max-width: 70ch;
+}
+
+.settings-legal-text p {
+    margin: 0.6rem 0 0;
+}

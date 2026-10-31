@@ -67,6 +67,7 @@ Defaults in `src/Config.h`.
 | server | host / port | 0.0.0.0 / 5000 | listen address (this install: 8087) |
 | server | locale | en_gb | default UI + result language |
 | server | answers | local | `all` \| `local` \| `off`. `local` answers from this server (arithmetic, units, colours, dates); `all` also asks Wikipedia and the lookups; `off` shows no answer box |
+| engines | allow_files | off | `on` \| `off`. The server-side half of the opt-in gate for file indexes, torrent indexes and shadow libraries (J5.5 tier 3). With `off` the switch does not appear on `/settings` at all and a crafted request cannot enable it; with `on` each browser must still opt in for itself. Both keys are required. No such provider is registered in this build |
 | server | answers_fanout | always | `always` \| `auto` \| `never`. What happens to the engine fan-out when a local answer is certain. `always` shows results under every answer, as Google does; `never` is the previous behaviour (no search at all); `auto` skips only when the answer is certain and the query has no words in it (`2+2`). Per-user override: the Answers section of `/settings` stores it in a cookie |
 | proxy | proxy / list_file | empty | outbound proxy or proxy pool |
 | proxy | max_retries | 3 | retries when a proxy is configured |
