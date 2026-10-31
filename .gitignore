@@ -24,3 +24,7 @@ tests/test_j5_searxng
 tests/test_j5_defs
 tests/test_j4_translate
 tests/test_j4_places_stocks
+
+# J1/J2: measured artefacts, reproducible with make layout-check / theme-shots
+docs/layout/*.png
+docs/themes/*.png
