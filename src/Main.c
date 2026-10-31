@@ -146,11 +146,8 @@ int main(int argc, char **argv) {
   if (check_only) {
     /* report the effective engine set, so resolve the list first */
     apply_engines_config(cfg.engines);
-  if (cfg.engine_weights[0]) {
-    int changed = apply_engine_weights(cfg.engine_weights);
-    fprintf(stderr, "[INFO] Applied %d engine weight override%s\n", changed,
-            changed == 1 ? "" : "s");
-  }
+    if (cfg.engine_weights[0])
+      apply_engine_weights(cfg.engine_weights);
     printf("config: %s\n", config_path);
     printf("  host=%s port=%d locale=%s\n", cfg.host, cfg.port,
            cfg.default_locale);
@@ -207,6 +204,11 @@ int main(int argc, char **argv) {
     fprintf(stderr, "[INFO] Loaded %d engine definitions\n", defined);
 
   apply_engines_config(cfg.engines);
+  if (cfg.engine_weights[0]) {
+    int changed = apply_engine_weights(cfg.engine_weights);
+    fprintf(stderr, "[INFO] Applied %d engine weight override%s\n", changed,
+            changed == 1 ? "" : "s");
+  }
 
   /* Google and SearXNG stay off until they are actually configured: a
      credential-less API engine would only add a failed source per query */
