@@ -68,6 +68,32 @@ results are under the coverage floor.
 | known-good | 8 | 0 | **0 %** |
 | all | 17 | 2 | 12 % |
 
+`baseline` (no extra parameters), 12 cells: 3 junk, 9 ok — 25 %. Aggregate
+percentages on this few cells mean little, so here is the comparison that
+decides it, query by query:
+
+| Query | baseline floored | adlt_off floored |
+|---|---|---|
+| `best budget mechanical keyboard` | **10/10** | **20/20** |
+| `best credit card for travel` | **9/10** | **18/20** |
+| `mechanical keyboard` | **10/10** | not measured |
+| `learn spanish fast` | 2/10 | 4/20 |
+| `cheap flights to lisbon` | 3/10 | 6/20 |
+| every other query in both runs | 0 | 0 |
+
+**The same two queries are junk in both cells, and every other query is clean
+in both.** `adlt=off` changes nothing about which queries Bing poisons. The one
+difference is `mechanical keyboard`, which is junk at baseline and simply was
+not measured under `adlt_off` inside this round.
+
+That is the answer to "find out why, don't only filter it": it is not a
+parameter we were failing to send, and it is not the Accept-Language, the UA,
+or the cookie jar. What the junk cells have in common is **commercial intent** —
+"best budget ...", "best credit card ...", "mechanical keyboard" — which fits a
+front end that has decided this client is a scraper and is serving a
+substitute page for queries with ad value. I cannot prove that mechanism from
+outside; I can only rule out the four variables the review proposed.
+
 Two things follow, and only two:
 
 1. **The junk-prone selection was right.** 2 of 9 junk-prone queries produced a
@@ -86,9 +112,10 @@ paced rather than eyeballed.
 
 ## What was adopted, and what was not
 
-- **`adlt=off` is not adopted.** It did not remove the junk: both junk cells
-  happened *with* the parameter. It is a SafeSearch parameter, so adding it
-  would be a change with no measured benefit and a behavioural side effect.
+- **`adlt=off` is not adopted.** The per-query table above is the reason: the
+  identical two queries are junk with and without it. It is a SafeSearch
+  parameter, so adding it would buy a behavioural side effect for no measured
+  benefit.
 - The junk is **not** an Accept-Language or cookie problem: it survives every
   header combination tried, which is consistent with the capture above where
   plain `curl` saw the same pages.
@@ -127,9 +154,12 @@ it is stated rather than papered over.
 
 ## Still open
 
-- The A/B did not finish every cell inside this round's time box. The run is
-  resumable (`tools/junk_rate.py` skips completed cells and refuses to start a
-  second copy), so the remaining variants are a matter of leaving it running.
+- The A/B did not finish every cell: `ensearch`, `es_accept` and `setlang` were
+  not run, and `baseline` reached 12 of 20 cells. The run is resumable
+  (`tools/junk_rate.py` skips completed cells and refuses to start a second
+  copy). The three unrun variants were deprioritised because the first two
+  already showed the parameter set is not the cause — running them would have
+  added cells, not information.
 - `Yahoo` and `DDG-html` on the same queries — the review's last row, which
   would distinguish "Bing's front end" from "the index or this IP". Not run.
 - The two junk cells are few. A 12 % rate on 16 cells is a signal, not a
