@@ -34,6 +34,11 @@ INI
 
 # "ever" is not a real answer-engine name: use ddg only so one engine line is
 # enough to prove the fan-out ran.
+# a previous crashed run can leave a server on these ports, and then this test
+# talks to the old binary instead of the one just built
+pkill -f 'j3b-' 2>/dev/null
+sleep 0.3
+
 start always 8096 always
 start never 8097 never
 start auto 8098 auto

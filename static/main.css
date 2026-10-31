@@ -2107,3 +2107,67 @@ input[type="color"]:focus-visible {
     color: var(--on-accent);
     border-color: var(--accent);
 }
+
+/* ================================================================
+   rich results (J5.2)
+   A thumbnail is only shown when the source provided one; the row otherwise
+   looks exactly as it did.
+   ================================================================ */
+.result {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+}
+
+.result.result-with-thumb {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.result-thumb img {
+    width: 96px;
+    height: 72px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    display: block;
+}
+
+.result-body {
+    min-width: 0;
+}
+
+.result-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 4px;
+}
+
+.result-meta .url {
+    margin-bottom: 0;
+}
+
+.result-source,
+.result-date,
+.result-author {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.result-source {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* the thumbnail column is the first thing to go when the row is narrow */
+@media (max-width: 600px) {
+    .result.result-with-thumb {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .result-thumb {
+        display: none;
+    }
+}

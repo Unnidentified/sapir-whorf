@@ -18,6 +18,14 @@ typedef struct {
      means "ask the engine entry", which is what every other source does.
      Zeroed by calloc in the allocator. */
   char index_group[24];
+  /* J5.2: rich results. Every field is optional and empty means "the source
+     does not provide it" - nothing here is invented to fill a slot. They are
+     borrowed pointers into the parsed result set, never owned by the ranker. */
+  char *thumbnail;   /* absolute http(s) URL, fetched through /image-proxy */
+  char *date;        /* as the source printed it */
+  char *author;      /* channel, uploader, organisation */
+  char *source;      /* the engine or site that published it */
+  char *kind;        /* "video", "news", "paper", "package", ... or empty */
 } SearchResult;
 
 typedef enum {

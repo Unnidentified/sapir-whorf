@@ -18,6 +18,12 @@ void xml_result_free(SearchResult *results, int count) {
     free(results[i].url);
     free(results[i].title);
     free(results[i].snippet);
+    /* J5.2: these are owned strings when a parser sets them */
+    free(results[i].thumbnail);
+    free(results[i].date);
+    free(results[i].author);
+    free(results[i].source);
+    free(results[i].kind);
   }
   free(results);
 }

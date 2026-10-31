@@ -39,18 +39,30 @@
                 {{endif}}
 
                 {{for result in results}}
-                <div class="result">
-                    <span class="url">
-                        {{result[1]}}
-                    </span>
-                    <div class="result-title-row">
-                        <a href="{{result[0]}}">
-                            {{result[2]}}
-                        </a>
+                <div class="result{{if result[6]}} result-with-thumb{{endif}}"{{if result[5]}} data-kind="{{result[5]}}"{{endif}}>
+                    {{if result[6]}}
+                    <!-- J5.2: fetched through this server, never by the
+                         browser, and never from a URL the user supplied -->
+                    <a class="result-thumb" href="{{result[0]}}" tabindex="-1">
+                        <img src="{{result[6]}}" alt="" loading="lazy" width="96" height="72">
+                    </a>
+                    {{endif}}
+                    <div class="result-body">
+                        <div class="result-meta">
+                            <span class="url">{{result[1]}}</span>
+                            {{if result[8]}}<span class="result-source">{{result[8]}}</span>{{endif}}
+                            {{if result[7]}}<span class="result-date">{{result[7]}}</span>{{endif}}
+                            {{if result[9]}}<span class="result-author">{{result[9]}}</span>{{endif}}
+                        </div>
+                        <div class="result-title-row">
+                            <a href="{{result[0]}}">
+                                {{result[2]}}
+                            </a>
+                        </div>
+                        <p class="desc">
+                            {{result[3]}}
+                        </p>
                     </div>
-                    <p class="desc">
-                        {{result[3]}}
-                    </p>
                 </div>
                 {{endfor}}
 

@@ -15,6 +15,12 @@ typedef struct {
   double coverage;        /* IDF-weighted share of query terms hit */
   int order;              /* first-seen order, tie breaker         */
   int engine_mask;        /* bit i set when engine i returned it   */
+  /* J5.2: borrowed from the parsed result set; NULL when absent */
+  const char *thumbnail;
+  const char *date;
+  const char *author;
+  const char *source;
+  const char *kind;
   const char *engine_groups[32]; /* index group of each contributing engine */
   double engine_weights[32];     /* routing weight of each contributing engine */
 } RankDoc;

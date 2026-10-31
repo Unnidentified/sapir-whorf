@@ -1,4 +1,5 @@
 #include "Search.h"
+#include "ImageProxy.h"
 #include "../Cache/Cache.h"
 #include "../Infobox/Calculator.h"
 #include "../Infobox/ColourCode.h"
@@ -48,7 +49,7 @@ typedef struct {
 } InfoBoxHandler;
 
 enum {
-  RESULT_FIELD_COUNT = 6,
+  RESULT_FIELD_COUNT = 10,
 };
 
 static InfoBox fetch_wiki_wrapper(char *query) {
@@ -1699,6 +1700,18 @@ int results_handler(UrlParams *params) {
         }
 
         if (existing >= 0) {
+          /* J5.2: the first source that provides a rich field wins; later ones
+             only fill a gap, so a duplicate row cannot blank a thumbnail. */
+          if (!cands[existing].thumbnail && all_results[i][j].thumbnail)
+            cands[existing].thumbnail = all_results[i][j].thumbnail;
+          if (!cands[existing].date && all_results[i][j].date)
+            cands[existing].date = all_results[i][j].date;
+          if (!cands[existing].author && all_results[i][j].author)
+            cands[existing].author = all_results[i][j].author;
+          if (!cands[existing].source && all_results[i][j].source)
+            cands[existing].source = all_results[i][j].source;
+          if (!cands[existing].kind && all_results[i][j].kind)
+            cands[existing].kind = all_results[i][j].kind;
           cands[existing].score += score;
           cands[existing].rrf += score;
           cands[existing].engine_mask |= (1u << i);
@@ -1736,6 +1749,11 @@ int results_handler(UrlParams *params) {
         cand->score = score;
         cand->rrf = score;
         cand->engine_mask = (1u << i);
+        cand->thumbnail = all_results[i][j].thumbnail;
+        cand->date = all_results[i][j].date;
+        cand->author = all_results[i][j].author;
+        cand->source = all_results[i][j].source;
+        cand->kind = all_results[i][j].kind;
         if (i < 32) {
           cand->engine_groups[i] =
               (all_results[i][j].index_group[0])
@@ -1963,18 +1981,31 @@ int results_handler(UrlParams *params) {
 
       char *pretty_url = pretty_display_url(cands[c].url);
       char *base_url = get_base_url(cands[c].url);
+      /* J5.2: the proxy only fetches URLs it signed itself, so the thumbnail
+         link is built here rather than in the template. The browser never
+         contacts the third party. */
+      char *thumb_href = NULL;
+      if (cands[c].thumbnail && cands[c].thumbnail[0])
+        thumb_href = image_proxy_sign_url(cands[c].thumbnail);
       const char *values[RESULT_FIELD_COUNT] = {
           cands[c].url,
           pretty_url,
           cands[c].title,
           cands[c].snippet,
           base_url,
-          is_media_result(cands[c].url) ? "media" : "",
+          cands[c].kind && cands[c].kind[0]
+              ? cands[c].kind
+              : (is_media_result(cands[c].url) ? "media" : ""),
+          thumb_href ? thumb_href : "",
+          cands[c].date ? cands[c].date : "",
+          cands[c].source ? cands[c].source : "",
+          cands[c].author ? cands[c].author : "",
       };
       string_matrix_append(&results_matrix, values, RESULT_FIELD_COUNT);
 
       free(pretty_url);
       free(base_url);
+      free(thumb_href);
       rank_doc_free(&cands[c]);
     }
 

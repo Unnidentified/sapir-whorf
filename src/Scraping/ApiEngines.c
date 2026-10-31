@@ -995,15 +995,39 @@ int api_parse_searxng(const char *body, size_t len, const char *lang,
         int before = count;
         add_result(*out, &count, max, link, title, snippet);
         if (count > before && *out) {
+          SearchResult *hit = &(*out)[before];
           /* the result's own engine, so the group is the index that answered.
              When the instance does not say, leave it empty: the caller then
              falls back to the engine entry's group rather than inheriting
              "other" for every hit. */
           const char *engine = json_string_value(json_object_get(item, "engine"));
-          if (engine && engine[0])
-            snprintf((*out)[before].index_group,
-                     sizeof((*out)[before].index_group), "%s",
+          if (engine && engine[0]) {
+            snprintf(hit->index_group, sizeof(hit->index_group), "%s",
                      searxng_group_for(engine));
+            hit->source = strdup(engine);
+          }
+          /* J5.2: the fields the instance really sends. A name that is absent
+             stays NULL rather than being filled with a guess. */
+          {
+            const char *thumb = json_string_value(
+                json_object_get(item, "thumbnail"));
+            if (!thumb)
+              thumb = json_string_value(json_object_get(item, "img_src"));
+            if (thumb && (strncmp(thumb, "http://", 7) == 0 ||
+                          strncmp(thumb, "https://", 8) == 0))
+              hit->thumbnail = strdup(thumb);
+            const char *date = json_string_value(
+                json_object_get(item, "publishedDate"));
+            if (!date)
+              date = json_string_value(json_object_get(item, "pubdate"));
+            if (date && date[0])
+              hit->date = strdup(date);
+            const char *category = json_string_value(
+                json_object_get(item, "category"));
+            if (category && category[0] &&
+                strcmp(category, "general") != 0)
+              hit->kind = strdup(category);
+          }
         }
       }
       free(title);

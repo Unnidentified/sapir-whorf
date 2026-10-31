@@ -9,6 +9,10 @@ cd "$(dirname "$0")/.." || exit 1
 PORT=8095
 CACHE=/tmp/j3d-cache
 INI=/tmp/j3d.ini
+# a previous crashed run can leave a server on this port, and then this test
+# talks to the old binary instead of the one just built
+pkill -f "$INI" 2>/dev/null
+sleep 0.3
 rm -rf "$CACHE"
 cat > "$INI" <<CONF
 [server]

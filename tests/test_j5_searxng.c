@@ -86,6 +86,49 @@ int main(void) {
     xml_result_free(out, n);
   }
 
+  /* J5.2: the rich fields the instance really sends, and nothing invented */
+  {
+    const char *json =
+        "{\"results\":["
+        "{\"title\":\"Video\",\"url\":\"https://v.example/1\","
+        "\"content\":\"c\",\"engine\":\"brave\","
+        "\"thumbnail\":\"https://img.example/t.jpg\","
+        "\"publishedDate\":\"2026-10-01T10:00:00\",\"category\":\"videos\"},"
+        "{\"title\":\"Bare\",\"url\":\"https://b.example/2\","
+        "\"content\":\"c\",\"engine\":\"google\"},"
+        "{\"title\":\"Bad thumb\",\"url\":\"https://t.example/3\","
+        "\"content\":\"c\",\"engine\":\"google\","
+        "\"thumbnail\":\"javascript:alert(1)\"}]}";
+    SearchResult *out = NULL;
+    int n = api_parse_searxng(json, strlen(json), "en", &out, 10);
+    if (n != 3) {
+      printf("FAIL rich: parsed %d, wanted 3\n", n);
+      failures++;
+    } else {
+      if (!out[0].thumbnail || !out[0].date || !out[0].kind || !out[0].source) {
+        printf("FAIL rich: first hit lost thumbnail/date/kind/source\n");
+        failures++;
+      }
+      if (strcmp(out[0].kind, "videos") != 0) {
+        printf("FAIL rich: kind \"%s\", wanted videos\n", out[0].kind);
+        failures++;
+      }
+      /* absent stays absent rather than being filled with a guess */
+      if (out[1].thumbnail || out[1].date || out[1].author || out[1].kind) {
+        printf("FAIL rich: a bare hit grew fields\n");
+        failures++;
+      }
+      /* a non-http thumbnail is dropped, not proxied */
+      if (out[2].thumbnail) {
+        printf("FAIL rich: javascript: thumbnail was kept\n");
+        failures++;
+      }
+      printf("ok   rich fields: thumbnail/date/kind/source, absent stays "
+             "absent, non-http refused\n");
+    }
+    xml_result_free(out, n);
+  }
+
   printf("\n%s: J5.6 searxng bridge\n", failures ? "FAIL" : "PASS");
   return failures ? 1 : 0;
 }
