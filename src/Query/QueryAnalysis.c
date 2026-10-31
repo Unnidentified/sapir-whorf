@@ -1,4 +1,5 @@
 #include "QueryAnalysis.h"
+#include "Tokens.h"
 #include "../Utility/Utility.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -98,6 +99,19 @@ static int has_word_kind(const char *word, WordKind kind) {
 
 static int is_stopword(const char *word) {
   return has_word_kind(word, WK_STOP);
+}
+
+/* A query term worth ranking on: something to match, not a stray sign. */
+static int term_is_indexable(const char *term) {
+  size_t len = 0;
+  int payload = 0;
+  for (const unsigned char *p = (const unsigned char *)term; *p; p++) {
+    len++;
+    if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+        (*p >= '0' && *p <= '9') || *p >= 0x80)
+      payload = 1;
+  }
+  return payload && len >= 2;
 }
 
 static void lower_copy(char *dst, size_t size, const char *src) {
@@ -365,7 +379,13 @@ void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
       out->has_operators = 1;
       continue;
     }
-    if (!quoted && len > 1 && start[0] == '-' && out->negative_count < 4) {
+    /* J6.6: the '-' is an exclusion operator only when a letter follows it.
+       "10 -3", "covid -19" and "vi -editor" were losing their second term
+       because any word of length > 1 starting with '-' was stripped. */
+    if (!quoted && len > 1 && start[0] == '-' &&
+        ((start[1] >= 'a' && start[1] <= 'z') ||
+         (start[1] >= 'A' && start[1] <= 'Z')) &&
+        out->negative_count < 4) {
       char neg[32];
       snprintf(neg, sizeof(neg), "%.*s", (int)(len - 1), start + 1);
       lower_copy(out->negatives[out->negative_count++], sizeof(neg), neg);
@@ -421,12 +441,21 @@ void query_analyze(const char *raw, const char *locale, SearchQuery *out) {
      containing "best", and a 10-result page rendered empty. */
   const char *term_source = out->engine_core[0] ? out->engine_core : clean;
   char lower[512];
-  lower_copy(lower, sizeof(lower), term_source);
+  snprintf(lower, sizeof(lower), "%s", term_source);
   char *saveptr = NULL;
   char *token = strtok_r(lower, " ", &saveptr);
+  out->has_alpha_term = 0;
   while (token && out->term_count < 8) {
-    if (strlen(token) >= 3 && !is_stopword(token))
-      snprintf(out->terms[out->term_count++], 32, "%s", token);
+    /* J3a: fold once, here, and let src/Query/Tokens.c be the only tokenizer.
+       The old rule (length >= 3, so "1+1" was one term but "c#", "3.14" and
+       "50%" were not) is replaced by: keep anything with a letter or a digit. */
+    char folded[64];
+    tokens_fold(folded, sizeof(folded), token);
+    if (term_is_indexable(folded) && !is_stopword(folded)) {
+      snprintf(out->terms[out->term_count++], 32, "%s", folded);
+      if (tokens_term_has_letter(folded))
+        out->has_alpha_term = 1;
+    }
     token = strtok_r(NULL, " ", &saveptr);
   }
 

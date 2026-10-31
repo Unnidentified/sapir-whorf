@@ -1,4 +1,5 @@
 #include "Ranker.h"
+#include "../Query/Tokens.h"
 #include <ctype.h>
 #include <math.h>
 #include <pthread.h>
@@ -346,36 +347,19 @@ static int is_spam_host(const char *domain) {
 
 /* ---------- tokens ---------- */
 
+/* J3a: the document side now uses the same tokenizer as the query side.
+   The old one split on every byte outside [A-Za-z0-9] and kept length >= 2,
+   so a document could never contain "1+1", "covid-19" or "españa" as a
+   token no matter what the query side did. */
 static int tokenize_into(const char *text, char tokens[][32], int max) {
-  int count = 0;
-  int len = 0;
-  char buf[32];
-  for (const char *p = text ? text : "";; p++) {
-    char c = *p;
-    int word = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-               (c >= '0' && c <= '9');
-    if (word) {
-      if (len < 31)
-        buf[len++] = (char)((c >= 'A' && c <= 'Z') ? c + 32 : c);
-    } else {
-      if (len >= 2 && count < max) {
-        buf[len] = '\0';
-        snprintf(tokens[count++], 32, "%s", buf);
-      }
-      len = 0;
-      if (c == '\0')
-        break;
-    }
-  }
-  return count;
+  return tokens_split(text, tokens, max, 0);
 }
 
-static int count_token(const char tokens[][32], int count, const char *needle) {
-  int hits = 0;
-  for (int i = 0; i < count; i++)
-    if (strcmp(tokens[i], needle) == 0)
-      hits++;
-  return hits;
+/* Presence, not frequency: a 126-character snippet rarely repeats a term, and
+   the field weights below are what actually separate title from body. */
+static int count_term(const char tokens[][32], int count, const char *term,
+                      const char *text) {
+  return tokens_term_matches(term, tokens, count, text) ? 1 : 0;
 }
 
 static int contains_ci(const char *haystack, const char *needle) {
@@ -518,21 +502,11 @@ static int snippet_ellipsis(const char *snippet) {
   return 0;
 }
 
-static int coverage_token_matches(const char *token, const char *term) {
-  if (strcmp(token, term) == 0)
-    return 1;
-  if (strlen(term) < 5)
-    return 0;
-  if (strstr(token, term))
-    return 1;
-  return edit_distance_at_most(token, term, 1);
-}
-
-static int coverage_has_term(char tokens[MAX_TOKENS][32], int n, const char *term) {
-  for (int i = 0; i < n; i++)
-    if (coverage_token_matches(tokens[i], term))
-      return 1;
-  return 0;
+/* The literal path needs the raw field, so text is passed alongside tokens:
+   "1+1" occurs in "1+1 - Wolfram|Alpha" but is not a token. */
+static int coverage_has_term(char tokens[MAX_TOKENS][32], int n, const char *term,
+                             const char *text) {
+  return tokens_term_matches(term, tokens, n, text);
 }
 
 static double url_quality(const RankDoc *doc) {
@@ -581,7 +555,7 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
                docs[i].snippet ? docs[i].snippet : "",
                docs[i].url ? docs[i].url : "");
       int n = tokenize_into(text, tokens, 32);
-      if (count_token(tokens, n, query->terms[t]) > 0)
+      if (coverage_has_term(tokens, n, query->terms[t], text))
         df[t]++;
 
       char tu[32][32];
@@ -590,7 +564,7 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
                docs[i].title ? docs[i].title : "",
                docs[i].url ? docs[i].url : "");
       int tun = tokenize_into(tu_text, tu, 32);
-      if (count_token(tu, tun, query->terms[t]) > 0)
+      if (coverage_has_term(tu, tun, query->terms[t], tu_text))
         in_title_or_url[t] = 1;
     }
   }
@@ -619,9 +593,9 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
 
     double bm25 = 0.0;
     for (int t = 0; t < query->term_count; t++) {
-      double tf = 3.0 * count_token(title_tokens, title_n, query->terms[t]) +
-                  1.0 * count_token(snippet_tokens, snippet_n, query->terms[t]) +
-                  0.5 * count_token(url_tokens, url_n, query->terms[t]);
+      double tf = 3.0 * count_term(title_tokens, title_n, query->terms[t], doc->title) +
+                  1.0 * count_term(snippet_tokens, snippet_n, query->terms[t], doc->snippet) +
+                  0.5 * count_term(url_tokens, url_n, query->terms[t], doc->url);
       if (tf <= 0)
         continue;
       double idf = log(1.0 + ((double)count - df[t] + 0.5) / (df[t] + 0.5));
@@ -690,9 +664,9 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
          it as missing would let one typo blank an otherwise good page */
       if (df[t] == 0)
         continue;
-      int hit = coverage_has_term(title_tokens, title_n, query->terms[t]) ||
-                coverage_has_term(snippet_tokens, snippet_n, query->terms[t]) ||
-                coverage_has_term(url_tokens, url_n, query->terms[t]);
+      int hit = coverage_has_term(title_tokens, title_n, query->terms[t], doc->title) ||
+                coverage_has_term(snippet_tokens, snippet_n, query->terms[t], doc->snippet) ||
+                coverage_has_term(url_tokens, url_n, query->terms[t], doc->url);
       double idf = log(1.0 + ((double)count - df[t] + 0.5) / (df[t] + 0.5));
       if (!hit && snippet_truncated) {
         /* Unknown, not absent: the engine cut the text, so half credit. Fully
@@ -717,6 +691,15 @@ void rank_score(RankDoc *docs, int count, const SearchQuery *query) {
     }
     /* nothing matched at all: every term was unknown to the result set */
     double coverage = idf_sum > 0.0 ? idf_hit / idf_sum : 0.0;
+
+    /* J3a task 3: never turn "no matchable term" into "everything is junk".
+       A query with no letter in any term (1+1, #123456, 50%) has nothing the
+       tokenizer is guaranteed to find in a document, and the engines already
+       judged its relevance, so the floor does not apply. Same for an explicit
+       "search the web for this". The nonsense-query guard still applies to
+       alphabetic terms that no candidate contains. */
+    if (!query->has_alpha_term || query->force_web)
+      coverage = 1.0;
 
     doc->coverage = coverage;
     doc->score = W_RRF * (doc->rrf / max_rrf) + W_BM25 * bm25 +

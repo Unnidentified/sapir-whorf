@@ -48,6 +48,19 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 	@echo "Compiled: $<"
 
+# VERSION reaches the compiler as -D, which make does not track: after a commit
+# the version string in /info stayed at the previous build's hash until someone
+# ran `make clean`. That is how a service can report a commit it is not running.
+# A stamp file holding the version gives make something to watch, and only the
+# three translation units that print it are rebuilt.
+VERSION_STAMP := $(OBJ_DIR)/.version
+$(VERSION_STAMP): FORCE
+	@mkdir -p $(OBJ_DIR)
+	@printf '%s' '$(VERSION)' | cmp -s - $@ 2>/dev/null || printf '%s' '$(VERSION)' > $@
+$(OBJ_DIR)/Routes/Home.o $(OBJ_DIR)/Routes/History.o $(OBJ_DIR)/Routes/Info.o: $(VERSION_STAMP)
+
+FORCE:
+
 # header dependencies: without these a struct change silently mixed old object
 # layouts with new ones
 DEPS := $(OBJS:.o=.d)
@@ -259,7 +272,8 @@ check-themes:
 # A1: registry lint + parser fixtures. Neither touches the network.
 # ApiEngines now fetches the Google CSE token itself, so the test builds need
 # the HTTP helper and everything it stands on.
-LINT_SRCS = src/Scraping/ScrapingParsers.c src/Scraping/BlockDetection.c \
+LINT_SRCS = src/Query/Tokens.c \
+            src/Scraping/ScrapingParsers.c src/Scraping/BlockDetection.c \
             src/Scraping/ApiEngines.c src/Utility/Utility.c \
             src/Utility/XmlHelper.c src/Utility/Unescape.c \
             src/Utility/JsonHelper.c src/Utility/HttpClient.c \
@@ -342,6 +356,16 @@ tests/test_h1_ua: tests/test_h1_ua.c src/Scraping/EngineHealth.c \
 ua-check: tests/test_h1_ua
 	@./tests/test_h1_ua
 
+# J3a: one tokenizer, and the queries it used to blank
+tests/test_j3_terms: tests/test_j3_terms.c src/Query/Tokens.c \
+                     src/Query/QueryAnalysis.c src/Ranking/Ranker.c \
+                     src/Utility/Display.c src/Cache/Cache.c $(LINT_SRCS)
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -I/usr/include/libxml2 -o $@ $^ \
+		$(LINT_LIBS)
+
+terms-check: tests/test_j3_terms
+	@./tests/test_j3_terms
+
 # H4: the answer modes and the fan-out skip (starts its own instances)
 answers-check:
 	@./tests/test_h4_answers.sh
@@ -399,6 +423,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check terms-check ua-check answers-check junk-check smoke
 
-.PHONY: all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: terms-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

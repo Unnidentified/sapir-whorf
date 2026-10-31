@@ -29,6 +29,13 @@ typedef struct {
   char lang[8];
   int is_question;
   int has_operators;
+  /* J3a: at least one term contains a letter. A query with none is a numeric
+     or symbolic expression (1+1, #123456, 50%), where the engines' own
+     relevance is all we have, so the coverage floor must not be applied. */
+  int has_alpha_term;
+  /* The user pressed "search the web for this" (web=1). Explicit intent, so
+     the coverage floor is not applied even to an alphabetic query. */
+  int force_web;
   /* F3: this is a discussion-shaped query, so the Reddit lane should run */
   int wants_discussion;
   /* r/<sub> or a bare "reddit" restricts the lane to site:reddit.com */

@@ -18,3 +18,5 @@ tests/offline_rank
 tests/test_g2_suspension
 tests/test_g3_cse_element
 tests/test_g4_answerbox
+tests/test_h1_ua
+tests/test_j3_terms

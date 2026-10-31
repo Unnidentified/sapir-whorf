@@ -10,6 +10,7 @@
 #include "../Scraping/EngineHealth.h"
 #include "../Infobox/AnswerBox.h"
 #include "../Query/QueryAnalysis.h"
+#include "../Query/Tokens.h"
 #include "../Ranking/Ranker.h"
 #include "../Scraping/Scraping.h"
 #include "../Utility/Display.h"
@@ -337,40 +338,16 @@ static int is_stopword(const char *word) {
   return 0;
 }
 
-/* split a query into distinct content words (lowercase, 3+ chars) */
+/* J3a: the third tokenizer is gone; this is the shared one plus the stopword
+   filter the infobox gate wants. */
 static int tokenize_query(const char *query, char tokens[][32], int max) {
+  char raw[16][TOKEN_LEN];
+  int n = tokens_split(query, raw, 16, 1);
   int count = 0;
-  char buf[32];
-  int len = 0;
-
-  if (!query)
-    return 0;
-
-  for (const char *p = query;; p++) {
-    char c = *p;
-    int is_word = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9');
-
-    if (is_word) {
-      if (len < 31)
-        buf[len++] = (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
-    } else {
-      if (len >= 3) {
-        buf[len] = '\0';
-        if (!is_stopword(buf)) {
-          int dup = 0;
-          for (int i = 0; i < count; i++) {
-            if (strcmp(tokens[i], buf) == 0)
-              dup = 1;
-          }
-          if (!dup && count < max)
-            snprintf(tokens[count++], 32, "%s", buf);
-        }
-      }
-      len = 0;
-      if (c == '\0')
-        break;
-    }
+  for (int i = 0; i < n && count < max; i++) {
+    if (is_stopword(raw[i]))
+      continue;
+    snprintf(tokens[count++], TOKEN_LEN, "%s", raw[i]);
   }
   return count;
 }
@@ -1057,8 +1034,13 @@ int results_handler(UrlParams *params) {
      this" link does - a confident answer must not be a dead end. */
   for (int i = 0; i < params->count; i++) {
     if (strcmp(params->params[i].key, "web") == 0 &&
-        strcmp(params->params[i].value, "1") == 0)
+        strcmp(params->params[i].value, "1") == 0) {
       skip_fanout = 0;
+      /* J3a: an explicit request for the web skips the relevance floor too.
+         This is the link on the answer card, so it exists precisely to
+         override "we already answered that". */
+      analysis.force_web = 1;
+    }
   }
 
   /* the answer box and the patient link both need it, on both branches */
