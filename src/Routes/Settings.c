@@ -1,5 +1,6 @@
 #include "Settings.h"
 #include "../Scraping/Scraping.h"
+#include "../Scraping/EngineHealth.h"
 #include "../Utility/Utility.h"
 #include <beaker.h>
 #include <stdlib.h>
@@ -141,6 +142,63 @@ int settings_handler(UrlParams *params) {
     context_set_array_of_arrays(&ctx, "enabled_engines", engine_data,
                                 enabled_count, engine_inner);
     context_set(&ctx, "has_enabled_engines", "1");
+  }
+
+  /* G2: what the breaker is actually doing, per engine. A pause the user cannot
+     see is indistinguishable from a broken search engine - that was the
+     complaint behind the rate-limit work. Row: name, state, why, resumes,
+     counters, quality. */
+  {
+    char ***status_rows = malloc(sizeof(char **) * enabled_count);
+    int *status_inner = malloc(sizeof(int) * enabled_count);
+    int status_count = 0;
+    for (int i = 0; i < ENGINE_COUNT && status_count < enabled_count; i++) {
+      if (!ENGINE_REGISTRY[i].enabled)
+        continue;
+      EngineHealthEntry *h = engine_health_get(ENGINE_REGISTRY[i].id);
+      int left = 0;
+      SuspendReason reason =
+          engine_health_suspension(ENGINE_REGISTRY[i].id, &left);
+      char *why = malloc(48), *resumes = malloc(48), *stats = malloc(96),
+           *quality = malloc(24);
+      if (!why || !resumes || !stats || !quality) {
+        free(why);
+        free(resumes);
+        free(stats);
+        free(quality);
+        break;
+      }
+      snprintf(why, 48, "%s", engine_health_suspend_name(reason));
+      if (reason == SUSPEND_NONE)
+        snprintf(resumes, 48, "-");
+      else if (left > 0)
+        snprintf(resumes, 48, "in %dm %02ds", left / 60, left % 60);
+      else
+        snprintf(resumes, 48, "ready to retry");
+      snprintf(stats, 96, "%lu ok / %lu blocked / %lu errors",
+               h ? h->total_ok : 0UL, h ? h->total_blocked : 0UL,
+               h ? h->total_errors : 0UL);
+      if (h && h->quality_samples > 0)
+        snprintf(quality, 24, "%.0f%%", h->quality_ewma * 100.0);
+      else
+        snprintf(quality, 24, "-");
+
+      char **row = malloc(sizeof(char *) * 6);
+      row[0] = (char *)ENGINE_REGISTRY[i].name;
+      row[1] = (char *)engine_health_state_name(h ? h->state : HEALTH_CLOSED);
+      row[2] = why;
+      row[3] = resumes;
+      row[4] = stats;
+      row[5] = quality;
+      status_rows[status_count] = row;
+      status_inner[status_count] = 6;
+      status_count++;
+    }
+    if (status_count > 0) {
+      context_set_array_of_arrays(&ctx, "engine_status", status_rows,
+                                  status_count, status_inner);
+      context_set(&ctx, "has_engine_status", "1");
+    }
   }
 
   /* the template engine keeps these pointers, so they are freed after render */

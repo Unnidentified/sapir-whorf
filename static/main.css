@@ -708,6 +708,32 @@ header .logo-link:hover {
     margin: 0;
 }
 
+/* G2: engine status panel. Plain table, no JS - it has to work with scripts
+   off like everything else here. */
+.settings-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+}
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.settings-table th,
+.settings-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border, #d8d8d8);
+  white-space: nowrap;
+}
+.settings-table th {
+  font-weight: 600;
+  opacity: 0.75;
+}
+.settings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .settings-engine-options {
     display: grid;
     gap: 8px;

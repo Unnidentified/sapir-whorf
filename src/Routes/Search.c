@@ -701,6 +701,43 @@ static int engine_id_matches(const char *left, const char *right) {
   return *left == *right;
 }
 
+/* G2: describe the engines the breaker has paused, so neither a thin page nor
+   an empty one leaves the user guessing. Returns how many are paused. */
+static int build_paused_note(char *note, size_t size) {
+  int paused = 0;
+  int soonest = 0;
+  const char *reason_txt = NULL;
+  int all_same = 1;
+  for (int i = 0; i < ENGINE_COUNT; i++) {
+    if (!ENGINE_REGISTRY[i].enabled)
+      continue;
+    int left = 0;
+    SuspendReason why =
+        engine_health_suspension(ENGINE_REGISTRY[i].id, &left);
+    if (why == SUSPEND_NONE)
+      continue;
+    paused++;
+    if (!reason_txt)
+      reason_txt = engine_health_suspend_name(why);
+    else if (strcmp(reason_txt, engine_health_suspend_name(why)) != 0)
+      all_same = 0;
+    if (soonest == 0 || (left > 0 && left < soonest))
+      soonest = left;
+  }
+  if (paused == 0)
+    return 0;
+  const char *why = all_same && reason_txt ? reason_txt : "several reasons";
+  if (soonest > 0)
+    snprintf(note, size,
+             "%d source%s paused (%s); earliest retry in %dm %02ds.", paused,
+             paused == 1 ? "" : "s", why, soonest / 60, soonest % 60);
+  else
+    snprintf(note, size,
+             "%d source%s paused (%s) and will be retried on the next search.",
+             paused, paused == 1 ? "" : "s", why);
+  return paused;
+}
+
 static const SearchEngine *find_enabled_engine(const char *engine_id) {
   if (!engine_id || engine_id[0] == '\0' || engine_id_matches(engine_id, "all"))
     return NULL;
@@ -1759,10 +1796,14 @@ int results_handler(UrlParams *params) {
     if (results_matrix.count == 0) {
       const char *reason = "none";
       int any_ok = 0;
+      char pause_note[320];
+      int paused_now = build_paused_note(pause_note, sizeof pause_note);
       for (int i = 0; i < enabled_engine_count; i++)
         if (jobs[i].status == SCRAPE_STATUS_OK)
           any_ok = 1;
-      if (any_ok || funnel_raw > 0)
+      if (paused_now > 0 && !any_ok)
+        reason = "paused";
+      else if (any_ok || funnel_raw > 0)
         reason = "filtered";
       else {
         int any_blocked = 0, any_failed = 0;
@@ -1778,6 +1819,29 @@ int results_handler(UrlParams *params) {
           reason = "unavailable";
       }
       context_set(&ctx, "empty_reason", reason);
+      context_set(&ctx, "empty_hint",
+                  strcmp(reason, "filtered") == 0
+                      ? "The sources answered, but none of what came back was "
+                        "relevant enough to show. Try rephrasing, or a more "
+                        "specific query."
+                  : strcmp(reason, "paused") == 0
+                      ? "Every source that could answer is paused; the note "
+                        "above says when the next one retries."
+                  : strcmp(reason, "blocked") == 0
+                      ? "Every source we asked refused the request. Waiting a "
+                        "few minutes usually clears it."
+                  : strcmp(reason, "unavailable") == 0
+                      ? "We could not reach the sources — your network may be "
+                        "down."
+                      : "The search engines may be busy — try again in a "
+                        "moment.");
+    }
+
+    /* G2: a paused engine is not an outage, and it is not invisible either. */
+    {
+      char note[320];
+      if (build_paused_note(note, sizeof note) > 0)
+        context_set(&ctx, "paused_note", note);
     }
 
     /* F1/F2: a thin page must say why it is thin, and offer the patient view.
@@ -1822,6 +1886,7 @@ int results_handler(UrlParams *params) {
        indistinguishable from a slow one or a blocked one. */
     {
       int cancelled = 0, blocked = 0, failed = 0, empty_eng = 0, ok_eng = 0;
+      int paced = 0;
       for (int i = 0; i < enabled_engine_count; i++) {
         switch (jobs[i].status) {
         case SCRAPE_STATUS_CANCELLED: cancelled++; break;
@@ -1829,6 +1894,7 @@ int results_handler(UrlParams *params) {
         case SCRAPE_STATUS_FETCH_ERROR: failed++; break;
         case SCRAPE_STATUS_EMPTY: empty_eng++; break;
         case SCRAPE_STATUS_OK: ok_eng++; break;
+        case SCRAPE_STATUS_SKIPPED: paced++; break;
         default: break;
         }
       }
@@ -1837,10 +1903,10 @@ int results_handler(UrlParams *params) {
         fprintf(stderr,
                 "[FUNNEL] raw=%d deduped=%d floored=%d capped=%d rendered=%d "
                 "engines=%d ok=%d empty=%d blocked=%d failed=%d cancelled=%d "
-                "stale=%d\n",
+                "paced=%d stale=%d\n",
                 funnel_raw, funnel_deduped, funnel_floored, total_results,
                 results_matrix.count, enabled_engine_count, ok_eng, empty_eng,
-                blocked, failed, cancelled, stale_count);
+                blocked, failed, cancelled, paced, stale_count);
         for (int i = 0; i < enabled_engine_count; i++) {
           fprintf(stderr, "[FUNNEL-E] %-14s status=%d results=%d http=%ld %.0fms%s\n",
                   jobs[i].engine->id, (int)jobs[i].status,
@@ -1906,6 +1972,24 @@ int results_handler(UrlParams *params) {
       else if (any_failed)
         reason = "unavailable";
       context_set(&ctx, "empty_reason", reason);
+      char pn[320];
+      int paused_now = build_paused_note(pn, sizeof pn);
+      if (paused_now > 0) {
+        context_set(&ctx, "paused_note", pn);
+        reason = "paused";
+      }
+      context_set(&ctx, "empty_hint",
+                  strcmp(reason, "paused") == 0
+                      ? "Every source that could answer is paused; the note "
+                        "above says when the next one retries."
+                  : strcmp(reason, "blocked") == 0
+                      ? "Every source we asked refused the request. Waiting a "
+                        "few minutes usually clears it."
+                  : strcmp(reason, "unavailable") == 0
+                      ? "We could not reach the sources — your network may be "
+                        "down."
+                      : "The search engines may be busy — try again in a "
+                        "moment.");
     }
     char *html = render_template("results.html", &ctx);
     if (html) {

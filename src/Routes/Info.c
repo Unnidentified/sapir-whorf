@@ -63,12 +63,15 @@ int info_handler(UrlParams *params) {
       continue;
     }
     EngineHealthEntry *health = engine_health_get(ENGINE_REGISTRY[i].id);
+    int paused_left = 0;
+    engine_health_suspension(ENGINE_REGISTRY[i].id, &paused_left);
     if (append_json(json, sizeof(json), &used,
                     "%s{\"id\":\"%s\",\"name\":\"%s\","
                     "\"health\":\"%s\",\"requests\":%lu,\"ok\":%lu,"
                     "\"blocked\":%lu,\"errors\":%lu,"
                     "\"quality\":%.2f,\"quality_samples\":%lu,"
-                    "\"never_succeeded\":%s,\"cancelled\":%lu}",
+                    "\"never_succeeded\":%s,\"cancelled\":%lu,"
+                    "\"suspend_reason\":\"%s\",\"paused_seconds_left\":%d}",
                     first ? "" : ",", ENGINE_REGISTRY[i].id,
                     ENGINE_REGISTRY[i].name,
                     health ? engine_health_state_name(health->state) : "unknown",
@@ -82,7 +85,10 @@ int info_handler(UrlParams *params) {
                      health->total_ok == 0)
                         ? "true"
                         : "false",
-                    health ? health->total_cancelled : 0UL) != 0) {
+                    health ? health->total_cancelled : 0UL,
+                    engine_health_suspend_name(
+                        health ? health->suspend_reason : SUSPEND_NONE),
+                    paused_left) != 0) {
       send_response("Failed to build instance info");
       return -1;
     }
