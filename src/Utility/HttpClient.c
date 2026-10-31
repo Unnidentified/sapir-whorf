@@ -42,6 +42,49 @@ static struct curl_slist *build_http_headers(void) {
   return headers;
 }
 
+/* J3b: the answer card must not wait on a slow panel. Same call, explicit
+   millisecond budget, so the page waits for the panel for at most that long
+   instead of for as long as the upstream takes. */
+HttpResponse http_get_budget(const char *url, const char *user_agent,
+                             long timeout_ms) {
+  HttpResponse resp = {.memory = NULL, .size = 0, .capacity = 0};
+  if (!url)
+    return resp;
+  resp.memory = malloc(INITIAL_BUFFER_SIZE);
+  if (!resp.memory)
+    return resp;
+  resp.capacity = INITIAL_BUFFER_SIZE;
+  CURL *curl = curl_easy_init();
+  if (!curl) {
+    free(resp.memory);
+    resp.memory = NULL;
+    return resp;
+  }
+  struct curl_slist *headers = build_http_headers();
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
+  curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                   user_agent ? user_agent : "libcurl-agent/1.0");
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
+  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, timeout_ms);
+  curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
+  curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, CURL_DNS_TIMEOUT_SECS);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+  apply_proxy_settings(curl);
+  if (curl_easy_perform(curl) != CURLE_OK) {
+    free(resp.memory);
+    resp.memory = NULL;
+    resp.size = 0;
+    resp.capacity = 0;
+  }
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
+  return resp;
+}
+
 HttpResponse http_get(const char *url, const char *user_agent) {
   HttpResponse resp = {.memory = NULL, .size = 0, .capacity = 0};
 

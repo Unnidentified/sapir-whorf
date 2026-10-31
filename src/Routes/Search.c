@@ -31,6 +31,11 @@ typedef struct {
   char lang[8];
   InfoBox result;
   int success;
+  /* J3b: the generic Wikipedia panel is only wanted when the query is about
+     something encyclopaedic. It used to be fetched for every query through
+     generator=search (the best fuzzy match for any text), so "1+1" got the
+     article "1+1" and "covid-19" got whatever matched best. */
+  int answered_locally;
 } InfoBoxThreadData;
 
 typedef struct {
@@ -352,30 +357,6 @@ static int tokenize_query(const char *query, char tokens[][32], int max) {
   return count;
 }
 
-static int contains_ci(const char *haystack, const char *needle) {
-  if (!haystack || !needle || !*needle)
-    return 0;
-
-  size_t n = strlen(needle);
-  for (const char *p = haystack; *p; p++) {
-    size_t i = 0;
-    while (i < n && p[i]) {
-      char a = p[i];
-      char b = needle[i];
-      if (a >= 'A' && a <= 'Z')
-        a += 32;
-      if (b >= 'A' && b <= 'Z')
-        b += 32;
-      if (a != b)
-        break;
-      i++;
-    }
-    if (i == n)
-      return 1;
-  }
-  return 0;
-}
-
 /* strip characters that break the scrapers and collapse whitespace */
 static void sanitize_query(const char *in, char *out, size_t size) {
   out[0] = '\0';
@@ -503,18 +484,61 @@ static void *infobox_thread_func(void *arg) {
   else
     data->result = h->fetch_fn((char *)data->query);
 
-  int relevant = 1;
-  {
-    char tokens[8][32];
+  /* J3b: a panel is relevant when the article title matches the query exactly,
+     or when the title and first sentence cover at least 60 % of the query's
+     normalised tokens. The old rule accepted any single token anywhere in the
+     extract, which is why a query that had already been answered locally still
+     got an article about something else in the rail. */
+  int relevant = 0;
+  if (h->fetch_fn == fetch_wiki_wrapper && data->answered_locally) {
+    relevant = 0; /* arithmetic, units, colours: this is not a reference query */
+  } else {
+    char tokens[8][TOKEN_LEN];
+    char folded_query[512];
+    tokens_fold(folded_query, sizeof(folded_query), data->query);
     int token_count = tokenize_query(data->query, tokens, 8);
-    if (token_count > 0) {
-      relevant = 0;
-      for (int t = 0; t < token_count; t++) {
-        if (contains_ci(data->result.title, tokens[t]) ||
-            contains_ci(data->result.extract, tokens[t])) {
-          relevant = 1;
+    if (token_count == 0) {
+      relevant = !tokens_term_has_letter(data->query);
+    } else {
+      /* the first sentence, not the whole extract */
+      char first_sentence[512];
+      size_t used = 0;
+      const char *p = data->result.extract ? data->result.extract : "";
+      while (*p && used + 1 < sizeof(first_sentence)) {
+        if (*p == '.' && (p[1] == ' ' || p[1] == '\0')) {
+          first_sentence[used++] = '.';
           break;
         }
+        first_sentence[used++] = *p++;
+      }
+      first_sentence[used] = '\0';
+
+      /* fold the article's own text once, so accent-folded query tokens
+         ("espana") match the article ("España") */
+      char folded_title[256];
+      char folded_lead[512];
+      tokens_fold(folded_title, sizeof(folded_title),
+                  data->result.title ? data->result.title : "");
+      tokens_fold(folded_lead, sizeof(folded_lead), first_sentence);
+      if (strcmp(folded_title, folded_query) == 0) {
+        relevant = 1;
+      } else {
+        int hits = 0;
+        for (int t = 0; t < token_count; t++)
+          if (strstr(folded_title, tokens[t]) ||
+              strstr(folded_lead, tokens[t]))
+            hits++;
+        relevant = (hits * 100 >= token_count * 60);
+        /* A one-word query is a lookup, and the article for it may carry a
+           translated title: es.wikipedia's best hit for "españa" is
+           "España" and en.wikipedia's is "Spain". A strict title match would
+           drop the correct panel whenever the detected language and the
+           edition disagree (measured). For a single word with letters, the
+           generator's own ranking is the evidence. Numeric and symbolic
+           queries never get here: they have no letter. */
+        if (!relevant && token_count == 1 &&
+            tokens_term_has_letter(data->query))
+          relevant = 1;
       }
     }
   }
@@ -695,7 +719,7 @@ static int engine_allowed_for_user(const SearchEngine *eng, char **user_ids,
 }
 
 static char *build_search_href(const char *query, const char *engine_id,
-                               int page) {
+                               int page, int web) {
   const char *safe_query = query ? query : "";
   int use_engine =
       engine_id && engine_id[0] != '\0' && !engine_id_matches(engine_id, "all");
@@ -708,6 +732,8 @@ static char *build_search_href(const char *query, const char *engine_id,
     needed += strlen("&engine=") + strlen(engine_id);
   if (page > 1)
     needed += strlen("&p=") + 16;
+  if (web)
+    needed += strlen("&web=1");
 
   char *href = (char *)malloc(needed);
   if (!href)
@@ -726,6 +752,10 @@ static char *build_search_href(const char *query, const char *engine_id,
     strcat(href, "&p=");
     strcat(href, page_buf);
   }
+  /* J3b: an explicit "search the web" must survive the pager, or page 2 goes
+     back to being an answer-only page. */
+  if (web)
+    strcat(href, "&web=1");
 
   return href;
 }
@@ -733,11 +763,12 @@ static char *build_search_href(const char *query, const char *engine_id,
 typedef struct {
   const char *query;
   const char *engine_id;
+  int web;
 } SearchHrefData;
 
 static char *search_href_builder(int page, void *data) {
   SearchHrefData *d = (SearchHrefData *)data;
-  return build_search_href(d->query, d->engine_id, page);
+  return build_search_href(d->query, d->engine_id, page, d->web);
 }
 
 static char *build_search_request_cache_key(const char *query,
@@ -802,6 +833,11 @@ int results_handler(UrlParams *params) {
   const char *rate_limit_msg = beaker_get_locale_value(locale, "rate_limit");
   if (!rate_limit_msg)
     rate_limit_msg = "Slow down! Too many searches from you!";
+  /* J3b: the note is rendered unconditionally by the template, so it must
+     always exist - a missing key printed the literal tag (measured: nine
+     "Key 'answer_source_note' not found in context" lines in the log). */
+  context_set(&ctx, "answer_source_note",
+              beaker_get_locale_value(locale, "answer_local"));
   const char *no_results_msg = beaker_get_locale_value(locale, "no_results");
   if (!no_results_msg)
     no_results_msg = "No results found";
@@ -828,7 +864,7 @@ int results_handler(UrlParams *params) {
     snprintf(selected_engine_id, sizeof(selected_engine_id), "all");
   }
 
-  char *search_href = build_search_href(raw_query, selected_engine_id, 1);
+  char *search_href = build_search_href(raw_query, selected_engine_id, 1, 0);
   context_set(&ctx, "chrome_action", "/search");
   context_set(&ctx, "chrome_active", "all");
   {
@@ -1048,6 +1084,9 @@ int results_handler(UrlParams *params) {
     have_local_answer =
         answer_box_resolve_local_lang(raw_query, lang, &local_answer);
   int skip_fanout = 0;
+  /* J3b: ?web=1 means "I asked for the web". The page must then say so, and
+     must not offer itself a link to do what it just did. */
+  int web_explicit = 0;
   if (have_local_answer && local_answer.confidence >= 0.95) {
     if (strcmp(answers_fanout, "never") == 0) {
       /* the H4 behaviour, kept as an option */
@@ -1065,11 +1104,24 @@ int results_handler(UrlParams *params) {
     if (strcmp(params->params[i].key, "web") == 0 &&
         strcmp(params->params[i].value, "1") == 0) {
       skip_fanout = 0;
+      web_explicit = 1;
       /* J3a: an explicit request for the web skips the relevance floor too.
          This is the link on the answer card, so it exists precisely to
          override "we already answered that". */
       analysis.force_web = 1;
     }
+  }
+
+  /* J3b: the card offers a way to ask for the web - unless this request *is*
+     that way. Keep ?web=1 on the links the page generates from here. */
+  context_set(&ctx, "show_web_link", web_explicit ? "" : "1");
+  {
+    char enc[BUFFER_SIZE_MEDIUM];
+    char href[BUFFER_SIZE_MEDIUM];
+    url_encode(raw_query, enc, sizeof(enc));
+    snprintf(href, sizeof(href), "/search?q=%s&web=1", enc);
+    context_set(&ctx, "web_href", href);
+    context_set(&ctx, "web_explicit", web_explicit ? "1" : "");
   }
 
   /* the answer box and the patient link both need it, on both branches */
@@ -1078,6 +1130,7 @@ int results_handler(UrlParams *params) {
 
   for (int i = 0; i < HANDLER_COUNT; i++) {
     infobox_data[i].query = raw_query;
+    infobox_data[i].answered_locally = have_local_answer;
     snprintf(infobox_data[i].lang, sizeof(infobox_data[i].lang), "%s", lang);
     infobox_data[i].success = i;
     infobox_data[i].result = (InfoBox){NULL};
@@ -1430,7 +1483,8 @@ int results_handler(UrlParams *params) {
                       ? infobox_data[idx].result.title
                       : net_ids[k]);
       context_set(&ctx, "answer_detail", infobox_data[idx].result.extract);
-      context_set(&ctx, "answer_source_note", "From the web");
+      context_set(&ctx, "answer_source_note",
+                  beaker_get_locale_value(locale, "answer_from_web"));
       context_set(&ctx, "answer_is_web", "1");
       break;
     }
@@ -1442,8 +1496,18 @@ int results_handler(UrlParams *params) {
       stale_count++;
   }
   if (stale_count > 0) {
-    char stale_label[32];
-    snprintf(stale_label, sizeof(stale_label), "%d", stale_count);
+    char stale_label[256];
+    const char *fmt = beaker_get_locale_value(locale, "results_cached_note");
+    char count[16];
+    snprintf(count, sizeof(count), "%d", stale_count);
+    if (fmt && strstr(fmt, "{count}")) {
+      const char *mark = strstr(fmt, "{count}");
+      snprintf(stale_label, sizeof(stale_label), "%.*s%s%s", (int)(mark - fmt),
+               fmt, count, mark + 7);
+    } else {
+      snprintf(stale_label, sizeof(stale_label), "%s %s",
+               fmt ? fmt : "", count);
+    }
     context_set(&ctx, "results_cached", stale_label);
   }
 
@@ -1823,7 +1887,8 @@ int results_handler(UrlParams *params) {
 
     StringMatrix pager_matrix;
     SearchHrefData href_data = {.query = raw_query,
-                                .engine_id = selected_engine_id};
+                                .engine_id = selected_engine_id,
+                                .web = web_explicit};
     int pagination_result = 0;
     if (results_matrix.count > 0)
       pagination_result = string_matrix_build_pagination(
@@ -1909,7 +1974,10 @@ int results_handler(UrlParams *params) {
       if (local_answer.detail[0])
         context_set(&ctx, "answer_detail", local_answer.detail);
       context_set(&ctx, "answer_source", local_answer.source);
-      context_set(&ctx, "answer_source_note", "Answered locally");
+      context_set(&ctx, "answer_source_note",
+                  beaker_get_locale_value(
+                      locale, web_explicit ? "answer_showing_web"
+                                           : "answer_local"));
       /* "2+2" answered 4: telling the user nothing was found on top of that
          would be silly. "answered" is not a state the empty block matches. */
       if (results_matrix.count == 0)
@@ -1935,11 +2003,20 @@ int results_handler(UrlParams *params) {
           groups[group_count++] = g;
       }
       if (group_count == 1) {
-        char note[192];
-        snprintf(note, sizeof(note),
-                 "Results from one index only (%s). No other independent "
-                 "source answered this search.",
-                 groups[0]);
+        char note[320];
+        snprintf(note, sizeof(note), "%s",
+                 beaker_get_locale_value(locale, "one_index_note"));
+        {
+          /* substitute {group} without a printf format from the locale file:
+             a stray % in a translation must not become a format string */
+          char filled[320];
+          const char *mark = strstr(note, "{group}");
+          if (mark) {
+            snprintf(filled, sizeof(filled), "%.*s%s%s",
+                     (int)(mark - note), note, groups[0], mark + 7);
+            snprintf(note, sizeof(note), "%s", filled);
+          }
+        }
         context_set(&ctx, "one_index_note", note);
       }
     }
@@ -2057,7 +2134,10 @@ int results_handler(UrlParams *params) {
       if (local_answer.detail[0])
         context_set(&ctx, "answer_detail", local_answer.detail);
       context_set(&ctx, "answer_source", local_answer.source);
-      context_set(&ctx, "answer_source_note", "Answered locally");
+      context_set(&ctx, "answer_source_note",
+                  beaker_get_locale_value(
+                      locale, web_explicit ? "answer_showing_web"
+                                           : "answer_local"));
       context_set(&ctx, "results_state", "answered");
     }
     {

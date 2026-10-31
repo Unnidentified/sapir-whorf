@@ -13,6 +13,9 @@ typedef struct {
 } HttpResponse;
 
 HttpResponse http_get(const char *url, const char *user_agent);
+/* same, with an explicit budget in milliseconds (used by the answer panels) */
+HttpResponse http_get_budget(const char *url, const char *user_agent,
+                             long timeout_ms);
 void http_response_free(HttpResponse *resp);
 
 typedef xmlDocPtr (*XmlParserFn)(const char *data, size_t size,

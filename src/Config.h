@@ -46,6 +46,9 @@
 #define MAX_RESULTS_PER_ENGINE 10
 
 #define CURL_TIMEOUT_SECS 15L
+/* J3b: how long the page waits for one answer panel before rendering
+   without it. The panel is a bonus; the results are the page. */
+#define INFOBOX_BUDGET_MS 700L
 #define CURL_DNS_TIMEOUT_SECS 300L
 
 #define BING_IMAGE_URL "https://www.bing.com/images/search"

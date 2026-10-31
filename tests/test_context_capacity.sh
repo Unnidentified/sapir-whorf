@@ -34,6 +34,18 @@ else
   ok "log not readable here; skipped the drop check"
 fi
 
+# J6.10: a template tag with no matching context key is printed literally
+# instead of rendering nothing, so a page can ship a visible "{{foo}}".
+# Nine such warnings were in the shipped log. Make them a failure.
+if [ "$have_log" = "1" ]; then
+  if printf '%s' "$new_lines" | grep -q "not found in context"; then
+    bad "a template tag had no context key:"
+    printf '%s\n' "$new_lines" | grep "not found in context" | head -3 | sed 's/^/       /'
+  else
+    ok "no template tag left without a context key"
+  fi
+fi
+
 n=$(grep -c 'class="result"' /tmp/cap1.html 2>/dev/null || echo 0)
 [ "$n" -gt 0 ] && ok "results rendered ($n)" || bad "page 1 rendered no results"
 

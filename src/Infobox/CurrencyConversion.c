@@ -1,3 +1,4 @@
+#include "../Config.h"
 #include "CurrencyConversion.h"
 #include "../Cache/Cache.h"
 #include "../Utility/HttpClient.h"
@@ -426,7 +427,8 @@ InfoBox fetch_currency_data(const char *query) {
                from_curr->code);
     }
 
-    HttpResponse resp = http_get(url, "libcurl-agent/1.0");
+    HttpResponse resp =
+        http_get_budget(url, "libcurl-agent/1.0", INFOBOX_BUDGET_MS);
     if (resp.memory && resp.size > 0) {
       if (is_crypto) {
         rate = json_get_float(resp.memory, to_curr->code);

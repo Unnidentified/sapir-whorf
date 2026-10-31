@@ -1,3 +1,4 @@
+#include "../Config.h"
 #include "Dictionary.h"
 #include "../Cache/Cache.h"
 #include "../Scraping/Scraping.h"
@@ -265,7 +266,7 @@ InfoBox fetch_dictionary_data(const char *query) {
   }
   free(cache_key);
 
-  HttpResponse resp = http_get(url, "Mozilla/5.0");
+  HttpResponse resp = http_get_budget(url, "Mozilla/5.0", INFOBOX_BUDGET_MS);
   if (resp.memory && resp.size > 0) {
     cache_key = cache_compute_key(url, 0, "dictionary");
     if (cache_key && get_cache_ttl_infobox() > 0) {

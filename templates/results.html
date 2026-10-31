@@ -38,12 +38,12 @@
             </aside>
             <main class="results-container">
                 {{if exists answer_text}}
-                <section class="answer-box" aria-label="Direct answer">
+                <section class="answer-box" aria-label="{{l("answer_box_label")}}">
                     <p class="answer-box-text">{{answer_text}}</p>
                     {{if exists answer_detail}}
                     <p class="answer-box-detail">{{answer_detail}}</p>
                     {{endif}}
-                    <p class="answer-box-source">{{answer_source_note}} — <a href="/search?q={{query_encoded}}&amp;web=1">search the web for this</a></p>
+                    <p class="answer-box-source">{{answer_source_note}}{{if show_web_link}} — <a href="{{web_href}}">{{l("answer_search_web")}}</a>{{endif}}</p>
                 </section>
                 {{endif}}
 
@@ -65,13 +65,13 @@
 
                 {{if results_state == "empty"}}
                 <div class="no-results">
-                    <p>No results found for <span class="no-results-query">{{query}}</span>.</p>
+                    <p>{{l("no_results_for")}} <span class="no-results-query">{{query}}</span>.</p>
                     <p class="no-results-hint">{{empty_hint}}</p>
                 </div>
                 {{endif}}
 
                 {{if exists results_cached}}
-                <p class="cached-note">Some sources were unavailable; {{results_cached}} answered from cache.</p>
+                <p class="cached-note">{{results_cached}}</p>
                 {{endif}}
 
                 {{if exists one_index_note}}
@@ -86,14 +86,14 @@
                 <div class="partial-note">
                     <p>{{partial_note}}</p>
                     <p class="partial-note-hint">
-                        <a href="/search?q={{query_encoded}}&amp;patient=1">Wait for all sources</a>
+                        <a href="/search?q={{query_encoded}}&amp;patient=1">{{l("wait_for_all")}}</a>
                     </p>
                 </div>
                 {{endif}}
 
                 {{if exists engine_warnings}}
                 <div class="engine-warnings">
-                    <p class="engine-warnings-title">Some sources did not answer</p>
+                    <p class="engine-warnings-title">{{l("partial_note_label")}}</p>
                     <ul>
                         {{for w in engine_warnings}}
                         <li><span class="engine-warning-name">{{w[0]}}</span> {{w[1]}}</li>

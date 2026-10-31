@@ -132,7 +132,8 @@ InfoBox fetch_wiki_data(char *api_url) {
   }
   free(cache_key);
 
-  HttpResponse resp = http_get(api_url, "libcurl-agent/1.0");
+  HttpResponse resp =
+      http_get_budget(api_url, "libcurl-agent/1.0", INFOBOX_BUDGET_MS);
   if (resp.memory && resp.size > 0) {
     cache_key = cache_compute_key(api_url, 0, "wikipedia");
     if (cache_key && get_cache_ttl_infobox() > 0) {
