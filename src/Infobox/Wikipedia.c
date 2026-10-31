@@ -116,7 +116,9 @@ InfoBox fetch_wiki_data(char *api_url) {
                   &cached_size) == 0 &&
         cached_data && cached_size > 0) {
       xmlDocPtr doc =
-          xmlReadMemory(cached_data, cached_size, "noname.xml", NULL, 0);
+          xmlReadMemory(cached_data, cached_size, NULL, NULL,
+                        XML_PARSE_RECOVER | XML_PARSE_NOERROR |
+                            XML_PARSE_NOWARNING);
       if (doc != NULL) {
         xmlNode *root_element = xmlDocGetRootElement(doc);
         extract_wiki_info(root_element, &info);
@@ -139,7 +141,9 @@ InfoBox fetch_wiki_data(char *api_url) {
     free(cache_key);
 
     xmlDocPtr doc =
-        xmlReadMemory(resp.memory, resp.size, "noname.xml", NULL, 0);
+        xmlReadMemory(resp.memory, resp.size, NULL, NULL,
+                      XML_PARSE_RECOVER | XML_PARSE_NOERROR |
+                          XML_PARSE_NOWARNING);
     if (doc != NULL) {
       xmlNode *root_element = xmlDocGetRootElement(doc);
       extract_wiki_info(root_element, &info);
