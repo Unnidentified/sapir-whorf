@@ -38,3 +38,6 @@ utc	engine	query	http	bytes	verdict	ua	headers	url
 2026-10-31T12:43:23Z	bing	world war 2 summary	200	53809	junk-ab:adlt_off	safari	adlt_off	https://www.bing.com/search?q=world%20war%202%20summary&adlt=off
 2026-10-31T12:44:43Z	brave	linux kernel	302	110	unknown	safari	plain	https://search.brave.com/search?q=linux%20kernel
 2026-10-31T12:45:54Z	brave	linux kernel	200	325978	results(html) +captcha-marker	safari	plain	https://search.brave.com/search?q=linux%20kernel
+2026-10-31T12:47:47Z	bing	mechanical keyboard	200	53376	junk-ab:baseline	safari	baseline	https://www.bing.com/search?q=mechanical%20keyboard
+2026-10-31T12:48:47Z	bing	python asyncio tutorial	200	53211	junk-ab:baseline	safari	baseline	https://www.bing.com/search?q=python%20asyncio%20tutorial
+2026-10-31T12:49:47Z	bing	best budget mechanical keyboard	200	53477	junk-ab:baseline	safari	baseline	https://www.bing.com/search?q=best%20budget%20mechanical%20keyboard

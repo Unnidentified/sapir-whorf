@@ -2,6 +2,7 @@
    must handle it. The local-only rows run offline and are the ones that matter
    most: a local answer must never lose to a network call. */
 #include "../src/Infobox/AnswerBox.h"
+#include "../src/Infobox/AnswerLocal.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -210,6 +211,74 @@ int main(void) {
                d.source, d.answer);
         failures++;
       }
+    }
+  }
+
+  /* H4 step 2b: locale numbers and Spanish aliases. Same answerers, different
+     notation. */
+  {
+    static const struct {
+      const char *query;
+      const char *lang;
+      const char *source;
+      const char *contains;
+    } localised[] = {
+        {"1.234,56 + 2", "es", "arithmetic", "1236.56"},
+        {"1,5 + 1", "es", "arithmetic", "2.5"},
+        {"10,25 * 2", "es", "arithmetic", "20.5"},
+        {"1.234 + 1", "es", "arithmetic", NULL}, /* ambiguous: leave alone */
+        {"1,234.56 + 2", "en", "arithmetic", "1236.56"},
+        {"10 millas a km", "es", "units", "16.09"},
+        {"1,5 km a millas", "es", "units", "0.93"},
+        {"100 grados f a c", "es", "units", "37.78"},
+        {"2 litros a galones", "es", "units", NULL},
+        {"5 pies a pulgadas", "es", "units", NULL},
+        {"30 kilos a libras", "es", "units", NULL},
+        {"10 pulgadas a centimetros", "es", "units", NULL},
+    };
+    for (size_t i = 0; i < sizeof(localised) / sizeof(localised[0]); i++) {
+      AnswerBoxResult r;
+      if (!answer_box_resolve_local_lang(localised[i].query, localised[i].lang,
+                                         &r)) {
+        printf("FAIL localised %-26s did not answer\n", localised[i].query);
+        failures++;
+        continue;
+      }
+      if (strcmp(r.source, localised[i].source) != 0) {
+        printf("FAIL localised %-26s source=%s want=%s\n", localised[i].query,
+               r.source, localised[i].source);
+        failures++;
+      }
+      if (localised[i].contains && !strstr(r.answer, localised[i].contains)) {
+        printf("FAIL localised %-26s answer \"%s\" lacks %s\n",
+               localised[i].query, r.answer, localised[i].contains);
+        failures++;
+      }
+    }
+
+    /* and the locale guard: the same text must NOT be reordered in English */
+    AnswerBoxResult en;
+    if (answer_box_resolve_local_lang("1.234,56 + 2", "en", &en) &&
+        strstr(en.answer, "1236")) {
+      printf("FAIL: comma-decimal text normalised under en\n");
+      failures++;
+    }
+    /* the normaliser itself, directly */
+    char out[64];
+    if (!answer_normalise_locale_numbers("1.234,56", "es", out, sizeof out) ||
+        strcmp(out, "1234.56") != 0) {
+      printf("FAIL: normalise 1.234,56 -> \"%s\"\n", out);
+      failures++;
+    }
+    answer_normalise_locale_numbers("1.234,56", "en", out, sizeof out);
+    if (strcmp(out, "1.234,56") != 0) {
+      printf("FAIL: en must be left alone, got \"%s\"\n", out);
+      failures++;
+    }
+    answer_normalise_locale_numbers("1.234.567", "es", out, sizeof out);
+    if (strcmp(out, "1234567") != 0) {
+      printf("FAIL: thousands grouping got \"%s\"\n", out);
+      failures++;
     }
   }
 

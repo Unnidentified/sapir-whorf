@@ -98,6 +98,88 @@ int answer_city_zone(const char *city, char *out, size_t size) {
   return 0;
 }
 
+/* ---- locale numbers ---------------------------------------------------- */
+
+int answer_lang_comma_decimal(const char *lang) {
+  if (!lang || !lang[0])
+    return 0;
+  static const char *COMMA[] = {"es", "it", "de", "fr", "pt", "nl", "ru",
+                                "pl", "tr", "id", "vi", "ca", "gl", "eu"};
+  char two[3] = {(char)tolower((unsigned char)lang[0]),
+                 (char)tolower((unsigned char)lang[1]), 0};
+  for (size_t i = 0; i < sizeof(COMMA) / sizeof(COMMA[0]); i++)
+    if (strcmp(two, COMMA[i]) == 0)
+      return 1;
+  return 0;
+}
+
+/* Rewrite "1.234,56" -> "1234.56" and "10,5" -> "10.5" inside number tokens.
+   Only called for comma-decimal locales, so a '.' inside a number is either a
+   thousands separator or noise, never a decimal point. */
+int answer_normalise_locale_numbers(const char *query, const char *lang,
+                                    char *out, size_t size) {
+  if (!query || !out || size == 0)
+    return 0;
+  if (!answer_lang_comma_decimal(lang)) {
+    snprintf(out, size, "%s", query);
+    return 0;
+  }
+  size_t n = 0;
+  int changed = 0;
+  const char *p = query;
+  while (*p && n + 1 < size) {
+    if (isdigit((unsigned char)*p)) {
+      const char *start = p;
+      while (*p && (isdigit((unsigned char)*p) || *p == '.' || *p == ','))
+        p++;
+      char token[64];
+      size_t len = (size_t)(p - start);
+      if (len >= sizeof(token))
+        len = sizeof(token) - 1;
+      memcpy(token, start, len);
+      token[len] = '\0';
+      char fixed[64];
+      size_t m = 0;
+      if (strchr(token, ',')) {
+        /* a comma makes it decimal: drop dots, comma becomes the point */
+        for (size_t i = 0; token[i] && m + 1 < sizeof(fixed); i++) {
+          if (token[i] == '.') {
+            changed = 1;
+            continue;
+          }
+          fixed[m++] = (token[i] == ',') ? '.' : token[i];
+          if (token[i] == ',')
+            changed = 1;
+        }
+      } else {
+        /* dots only: 1.234 is a thousands separator here, 1.2345 is not, and
+           we cannot tell 1.234 apart - so leave dotted-only tokens alone
+           unless there are two dots (1.234.567 is unambiguous). */
+        int dots = 0;
+        for (const char *q = token; *q; q++)
+          if (*q == '.')
+            dots++;
+        if (dots >= 2) {
+          for (size_t i = 0; token[i] && m + 1 < sizeof(fixed); i++)
+            if (token[i] != '.')
+              fixed[m++] = token[i];
+          changed = 1;
+        } else {
+          memcpy(fixed, token, len);
+          m = len;
+        }
+      }
+      fixed[m] = '\0';
+      for (size_t i = 0; fixed[i] && n + 1 < size; i++)
+        out[n++] = fixed[i];
+      continue;
+    }
+    out[n++] = *p++;
+  }
+  out[n] = '\0';
+  return changed;
+}
+
 /* ---- time in <city> ---------------------------------------------------- */
 
 /* setenv("TZ") is process-global, so the conversion is serialised. It takes

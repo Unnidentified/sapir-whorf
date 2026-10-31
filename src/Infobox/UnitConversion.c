@@ -25,45 +25,45 @@ typedef struct {
 } UnitDef;
 
 static const UnitDef UNITS[] = {
-    {"metre", {"m", "metres", "meter", "meters"}, UNIT_LENGTH, 1.0},
+    {"metre", {"m", "metros", "metro", "metres"}, UNIT_LENGTH, 1.0},
     {"kilometre",
-     {"km", "kilometres", "kilometer", "kilometers"},
+     {"km", "kilometros", "kilómetros", "km"},
      UNIT_LENGTH,
      1000.0},
     {"centimetre",
-     {"cm", "centimetres", "centimeter", "centimeters"},
+     {"cm", "centimetros", "centímetros", "centimeters"},
      UNIT_LENGTH,
      0.01},
     {"millimetre",
      {"mm", "millimetres", "millimeter", "millimeters"},
      UNIT_LENGTH,
      0.001},
-    {"mile", {"mi", "miles"}, UNIT_LENGTH, 1609.344},
+    {"mile", {"mi", "millas", "miles"}, UNIT_LENGTH, 1609.344},
     {"yard", {"yd", "yards"}, UNIT_LENGTH, 0.9144},
-    {"foot", {"ft", "feet", "'"}, UNIT_LENGTH, 0.3048},
-    {"inch", {"in", "inches", "\""}, UNIT_LENGTH, 0.0254},
+    {"foot", {"ft", "pies", "feet"}, UNIT_LENGTH, 0.3048},
+    {"inch", {"in", "pulgadas", "inches"}, UNIT_LENGTH, 0.0254},
 
-    {"kilogram", {"kg", "kilograms", "kilo", "kilos"}, UNIT_WEIGHT, 1.0},
+    {"kilogram", {"kg", "kilos", "kilogramos", "kilograms"}, UNIT_WEIGHT, 1.0},
     {"gram", {"g", "grams"}, UNIT_WEIGHT, 0.001},
     {"milligram", {"mg", "milligrams"}, UNIT_WEIGHT, 0.000001},
-    {"pound", {"lb", "lbs", "pounds"}, UNIT_WEIGHT, 0.453592},
-    {"ounce", {"oz", "ounces"}, UNIT_WEIGHT, 0.0283495},
+    {"pound", {"lb", "libras", "pounds", "lbs"}, UNIT_WEIGHT, 0.453592},
+    {"ounce", {"oz", "onzas", "ounces"}, UNIT_WEIGHT, 0.0283495},
     {"tonne", {"tonnes", "tons", "ton"}, UNIT_WEIGHT, 1000.0},
     {"stone", {"st", "stones"}, UNIT_WEIGHT, 6.35029},
 
-    {"celsius", {"c", "°c", "degrees celsius", "degrees c"}, UNIT_TEMP, 1.0},
+    {"celsius", {"c", "°c", "grados", "celsius"}, UNIT_TEMP, 1.0},
     {"fahrenheit",
-     {"f", "°f", "degrees fahrenheit", "degrees f"},
+     {"f", "°f", "fahrenheit", "grados f"},
      UNIT_TEMP,
      1.0},
     {"kelvin", {"k", "degrees kelvin", "degrees k"}, UNIT_TEMP, 1.0},
 
-    {"litre", {"l", "litres", "liter", "liters"}, UNIT_VOLUME, 1.0},
+    {"litre", {"l", "litros", "litres", "liters"}, UNIT_VOLUME, 1.0},
     {"millilitre",
      {"ml", "millilitres", "milliliter", "milliliters"},
      UNIT_VOLUME,
      0.001},
-    {"gallon", {"gal", "gallons"}, UNIT_VOLUME, 3.78541},
+    {"gallon", {"gal", "galones", "gallons"}, UNIT_VOLUME, 3.78541},
     {"quart", {"qt", "quarts"}, UNIT_VOLUME, 0.946353},
     {"pint", {"pt", "pints"}, UNIT_VOLUME, 0.473176},
     {"cup", {"cups"}, UNIT_VOLUME, 0.236588},
@@ -288,7 +288,7 @@ static int parse_conversion_query(const char *query, double *value,
     return 0;
 
   const char *to_keywords[] = {" to ", " in ", " into ", " -> ",
-                               " → ",  " = ",  NULL};
+                               " → ",  " = ",  " a ",  NULL};
   const char *to_pos = NULL;
   size_t keyword_len = 0;
   for (int i = 0; to_keywords[i]; i++) {

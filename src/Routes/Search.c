@@ -33,6 +33,9 @@ typedef struct {
 } InfoBoxThreadData;
 
 typedef struct {
+  /* H4: the id ties a rail handler to the answer-box table, so the priority
+     lives in one place instead of in a second hardcoded list here. */
+  const char *id;
   int (*check_fn)(const char *query);
   InfoBox (*fetch_fn)(char *query);
   char *(*url_construct_fn)(const char *query);
@@ -453,12 +456,12 @@ static InfoBox fetch_colour_wrapper(char *query) {
 }
 
 static InfoBoxHandler handlers[] = {
-    {is_dictionary_query, fetch_dict_wrapper, NULL},
-    {is_calculator_query, fetch_calc_wrapper, NULL},
-    {is_unit_conv_query, fetch_unit_wrapper, NULL},
-    {is_currency_query, fetch_currency_wrapper, NULL},
-    {is_colour_code_query, fetch_colour_wrapper, NULL},
-    {always_true, fetch_wiki_wrapper, construct_wiki_url},
+    {"dictionary", is_dictionary_query, fetch_dict_wrapper, NULL},
+    {"arithmetic", is_calculator_query, fetch_calc_wrapper, NULL},
+    {"units", is_unit_conv_query, fetch_unit_wrapper, NULL},
+    {"currency", is_currency_query, fetch_currency_wrapper, NULL},
+    {"colour", is_colour_code_query, fetch_colour_wrapper, NULL},
+    {"wikipedia", always_true, fetch_wiki_wrapper, construct_wiki_url},
 };
 enum { HANDLER_COUNT = sizeof(handlers) / sizeof(handlers[0]) };
 
@@ -1046,7 +1049,8 @@ int results_handler(UrlParams *params) {
   int have_local_answer = 0;
   int answers_off = strcmp(global_config.answers_mode, "off") == 0;
   if (!answers_off)
-    have_local_answer = answer_box_resolve_local(raw_query, &local_answer);
+    have_local_answer =
+        answer_box_resolve_local_lang(raw_query, lang, &local_answer);
   int skip_fanout = have_local_answer && local_answer.confidence >= 0.95;
 
   /* ?web=1 asks for the web explicitly, which is what the "search the web for
@@ -1406,10 +1410,17 @@ int results_handler(UrlParams *params) {
      make this slower than the rail it mirrors. */
   if (!have_local_answer && !answers_off && page == 1 &&
       strcmp(global_config.answers_mode, "all") == 0) {
-    static const int priority[] = {3, 0, 5}; /* currency, dictionary, wiki */
-    static const char *labels[] = {"currency", "dictionary", "wikipedia"};
-    for (size_t k = 0; k < sizeof(priority) / sizeof(priority[0]); k++) {
-      int idx = priority[k];
+    /* the priority comes from the answer-box table itself, so adding a network
+       kind is one edit, not two */
+    int net_count = 0;
+    const char *const *net_ids = answer_box_network_order(&net_count);
+    for (int k = 0; k < net_count; k++) {
+      int idx = -1;
+      for (int h = 0; h < HANDLER_COUNT; h++)
+        if (handlers[h].id && strcmp(handlers[h].id, net_ids[k]) == 0)
+          idx = h;
+      if (idx < 0)
+        continue;
       if (!infobox_data[idx].success || !infobox_data[idx].result.extract)
         continue;
       if (!infobox_text_is_meaningful(infobox_data[idx].result.extract))
@@ -1417,7 +1428,7 @@ int results_handler(UrlParams *params) {
       context_set(&ctx, "answer_text",
                   infobox_data[idx].result.title
                       ? infobox_data[idx].result.title
-                      : labels[k]);
+                      : net_ids[k]);
       context_set(&ctx, "answer_detail", infobox_data[idx].result.extract);
       context_set(&ctx, "answer_source_note", "From the web");
       context_set(&ctx, "answer_is_web", "1");

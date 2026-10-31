@@ -23,6 +23,30 @@ static int any_query(const char *query) {
    expression. "covid-19" passed the operator test (a '-' with a digit after
    it) and evaluated to 0, which is a confidently wrong answer - worse than no
    answer. Only digits, spaces, a decimal point and the operators may appear. */
+/* English writes 1,234.56. A comma is a thousands separator only when it is
+   followed by exactly three digits and then a non-digit; "2,5" is left alone so
+   it fails to evaluate rather than silently becoming 25. */
+static void strip_thousands_commas(const char *in, char *out, size_t size) {
+  size_t n = 0;
+  for (const char *p = in; *p && n + 1 < size; p++) {
+    if (*p == ',') {
+      int digits = 0;
+      const char *q = p + 1;
+      while (*q >= '0' && *q <= '9') {
+        digits++;
+        q++;
+      }
+      if (digits == 3 && !(*q >= '0' && *q <= '9')) {
+        if (*q == '\0' || *q == ' ' || *q == '+' || *q == '-' || *q == '*' ||
+            *q == '/' || *q == '^' || *q == ')' || *q == '.')
+          continue; /* drop the comma */
+      }
+    }
+    out[n++] = *p;
+  }
+  out[n] = '\0';
+}
+
 static int looks_like_expression(const char *query) {
   if (!query || !query[0])
     return 0;
@@ -31,7 +55,7 @@ static int looks_like_expression(const char *query) {
     if (*p >= '0' && *p <= '9')
       digits = 1;
     else if (*p == ' ' || *p == '.' || *p == '+' || *p == '-' || *p == '*' ||
-             *p == '/' || *p == '^' || *p == '(' || *p == ')')
+             *p == '/' || *p == '^' || *p == '(' || *p == ')' || *p == ',')
       continue;
     else
       return 0;
@@ -47,14 +71,16 @@ static int answer_arithmetic(const char *query, AnswerBoxResult *out) {
   /* the infobox extract is HTML for the card; the answer box wants the number.
      A confidently wrong answer is worse than none, so this is the same
      evaluator the card uses, just formatted. */
-  double value = evaluate(query);
+  char expression[512];
+  strip_thousands_commas(query, expression, sizeof(expression));
+  double value = evaluate(expression);
   if (value != value) /* NaN */
     return 0;
   if (value == (long long)value && value < 1e15 && value > -1e15)
     snprintf(out->answer, sizeof(out->answer), "%lld", (long long)value);
   else
     snprintf(out->answer, sizeof(out->answer), "%.10g", value);
-  snprintf(out->detail, sizeof(out->detail), "%s", query);
+  snprintf(out->detail, sizeof(out->detail), "%s", expression);
   out->confidence = 1.0; /* an evaluated expression is not a guess */
   return 1;
 }
@@ -188,20 +214,33 @@ const Answerer *answer_box_answerers(size_t *count) {
 }
 
 int answer_box_resolve_local(const char *query, AnswerBoxResult *out) {
+  return answer_box_resolve_local_lang(query, NULL, out);
+}
+
+int answer_box_resolve_local_lang(const char *query, const char *lang,
+                                  AnswerBoxResult *out) {
   if (!query || !out)
     return 0;
   memset(out, 0, sizeof(*out));
+  /* H4: normalise locale numbers once, here, so every answerer sees the same
+     canonical text. */
+  char canonical[512];
+  const char *q = query;
+  if (lang && answer_lang_comma_decimal(lang) &&
+      answer_normalise_locale_numbers(query, lang, canonical,
+                                      sizeof(canonical)))
+    q = canonical;
   size_t count = 0;
   const Answerer *table = answer_box_answerers(&count);
   for (size_t i = 0; i < count; i++) {
     const Answerer *a = &table[i];
     if (!a->local)
       continue;
-    if (a->matches && !a->matches(query))
+    if (a->matches && !a->matches(q))
       continue;
     AnswerBoxResult candidate;
     memset(&candidate, 0, sizeof(candidate));
-    if (!a->answer(query, &candidate) || !candidate.answer[0])
+    if (!a->answer(q, &candidate) || !candidate.answer[0])
       continue;
     *out = candidate;
     out->local = 1;
@@ -210,6 +249,23 @@ int answer_box_resolve_local(const char *query, AnswerBoxResult *out) {
     return 1;
   }
   return 0;
+}
+
+const char *const *answer_box_network_order(int *count) {
+  static const char *order[8];
+  static int built = 0;
+  static int n = 0;
+  if (!built) {
+    size_t total = 0;
+    const Answerer *table = answer_box_answerers(&total);
+    for (size_t i = 0; i < total && n < 8; i++)
+      if (!table[i].local)
+        order[n++] = table[i].id;
+    built = 1;
+  }
+  if (count)
+    *count = n;
+  return order;
 }
 
 int answer_box_resolve(const char *query, AnswerBoxResult *out) {

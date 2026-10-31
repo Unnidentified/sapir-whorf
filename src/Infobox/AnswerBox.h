@@ -40,7 +40,17 @@ int answer_box_resolve(const char *query, AnswerBoxResult *out);
    if there is none the existing infobox card carries the network answer. */
 int answer_box_resolve_local(const char *query, AnswerBoxResult *out);
 
+/* H4: locale-aware form. Comma-decimal locales ("1.234,56", "es") are
+   normalised before the answerers see the query. */
+int answer_box_resolve_local_lang(const char *query, const char *lang,
+                                  AnswerBoxResult *out);
+
 /* the table itself, exposed so the tests can assert its order */
 const Answerer *answer_box_answerers(size_t *count);
+
+/* H4: the network answerers in priority order, by id. The page uses this to
+   promote an already-fetched result into the card, so the priority is defined
+   once, in the table. */
+const char *const *answer_box_network_order(int *count);
 
 #endif
