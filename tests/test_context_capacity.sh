@@ -20,6 +20,9 @@ if [ -r "$LOG" ]; then have_log=1; before=$(wc -l < "$LOG"); fi
 
 curl -sS -o /tmp/cap1.html -m 40 "http://localhost:$PORT/search?q=linux+kernel" >/dev/null 2>&1
 curl -sS -o /tmp/cap2.html -m 40 "http://localhost:$PORT/search?q=linux+kernel&p=2" >/dev/null 2>&1
+# J4.0: the widget path is the widest one there is - answer, card, results,
+# panel and pager - and it is what overflowed the context twice.
+curl -sS -o /tmp/cap3.html -m 40 "http://localhost:$PORT/search?q=2%2B2" >/dev/null 2>&1
 sleep 0.6
 
 if [ "$have_log" = "1" ]; then
@@ -55,6 +58,8 @@ if [ -s /tmp/cap2.html ] && grep -q "results-container\|no-results" /tmp/cap2.ht
 else
   bad "page 2 did not render"
 fi
+
+grep -q 'widget-calc-result' /tmp/cap3.html && ok "answer card rendered" || ok "no card for 2+2 (answers=off?)"
 
 # an infobox on this query means the infoboxes key survived too
 grep -q 'class="infobox' /tmp/cap1.html && ok "infobox rendered" || ok "no infobox for this query"

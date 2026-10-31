@@ -51,8 +51,12 @@ def main():
         print("layout_check: the CSS invariants that can be checked without a "
               "browser are in tools/check_themes.py (one .content-layout, no "
               "order hacks, no grid-column overrides).")
-        print("layout_check: install with `pip install playwright && "
-              "playwright install chromium` to enable the geometry assertions.")
+        print("layout_check: installing Playwright is NOT enough here. The "
+              "browsers on this machine cannot run headless in this environment "
+              "(measured 2026-10-31: bootstrap_look_up ... Permission denied, "
+              "sandbox_extension_issue_file_to_process ... Operation not "
+              "permitted, and no output at all from --dump-dom). The skip is a "
+              "capability gap, not a missing package.")
         return 0
 
     failures = 0

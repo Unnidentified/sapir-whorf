@@ -32,6 +32,9 @@ def main():
         print(f"theme_shot: it would have shot {len(names)} themes: {' '.join(names)}")
         print("theme_shot: the token checks that do not need a browser are in "
               "tools/check_themes.py (tokens resolve, no literal colours, WCAG contrast).")
+        print("theme_shot: installing Playwright is not enough here -- the "
+              "browsers on this machine cannot run headless in this environment "
+              "(measured 2026-10-31). See tools/layout_check.py.")
         return 0
 
     shots = []
