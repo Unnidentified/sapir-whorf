@@ -85,6 +85,10 @@ typedef struct {
      directory, which is what a source install expects; empty means
      "static/engines.d". */
   char definitions_dir[512];
+  /* J5.5: per-engine routing weights, "id:weight,id:weight". Server-side
+     policy, applied once at startup to the registry - the UI editor is not
+     built, and this is the half that does not need a context slot. */
+  char engine_weights[512];
   /* J5.6: the owner's list is 20+ names; 128 bytes truncated it
      silently. */
   char searxng_engines[1024];

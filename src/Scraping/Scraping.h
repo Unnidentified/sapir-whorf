@@ -176,6 +176,8 @@ int engine_registry_add(const SearchEngine *engine);
 int engines_load_definitions(const char *dir);
 extern int ENGINE_COUNT;
 void apply_engines_config(const char *engines_str);
+/* J5.5: returns how many overrides were applied from "id:weight,id:weight" */
+int apply_engine_weights(const char *spec);
 void engine_set_enabled(const char *engine_id, int enabled);
 /* J5.5 tier 3: engines behind the opt-in gate, so the UI can be honest */
 int engine_count_opt_in(void);

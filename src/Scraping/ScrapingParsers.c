@@ -903,6 +903,46 @@ static void capture_shipped_enabled(void) {
   shipped_enabled_captured = 1;
 }
 
+/* J5.5: "id:weight,id:weight". A malformed entry is skipped rather than
+   aborting the list, and the count returned is what was actually applied - a
+   startup line that says "applied 0" is a configuration mistake, not a crash.
+   Weight is clamped to (0, 5]: a zero weight would quietly remove an engine
+   from routing without disabling it, which is not what the option says. */
+int apply_engine_weights(const char *spec) {
+  if (!spec || !spec[0])
+    return 0;
+  int applied = 0;
+  char *copy = strdup(spec);
+  if (!copy)
+    return 0;
+  char *saveptr = NULL;
+  for (char *token = strtok_r(copy, ",", &saveptr); token;
+       token = strtok_r(NULL, ",", &saveptr)) {
+    while (*token == ' ')
+      token++;
+    char *colon = strchr(token, ':');
+    if (!colon)
+      continue;
+    *colon = '\0';
+    const char *id = token;
+    char *end = NULL;
+    double weight = strtod(colon + 1, &end);
+    if (end == colon + 1)
+      continue;
+    if (weight <= 0.0 || weight > 5.0)
+      continue;
+    for (int i = 0; i < ENGINE_COUNT; i++) {
+      if (strcmp(ENGINE_REGISTRY[i].id, id) == 0) {
+        ENGINE_REGISTRY[i].weight = weight;
+        applied++;
+        break;
+      }
+    }
+  }
+  free(copy);
+  return applied;
+}
+
 void apply_engines_config(const char *engines_str) {
   capture_shipped_enabled();
   if (!engines_str || engines_str[0] == '\0') {

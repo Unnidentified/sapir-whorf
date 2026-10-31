@@ -209,6 +209,28 @@ int main(void) {
           "the seeded engines survive the growth");
   }
 
+  /* J5.5: weights from the config, with the refusals that matter */
+  {
+    const SearchEngine *bing = find("bing");
+    double before = bing ? bing->weight : 0;
+    check(apply_engine_weights("bing:2.5") == 1, "one override applies");
+    check(find("bing")->weight == 2.5, "the weight is set");
+    check(apply_engine_weights("bing:0") == 0, "a zero weight is refused");
+    check(find("bing")->weight == 2.5, "a refused weight leaves it alone");
+    check(apply_engine_weights("bing:9") == 0, "an absurd weight is refused");
+    check(apply_engine_weights("nosuch:1.5") == 0, "an unknown id applies nothing");
+    check(apply_engine_weights("garbage") == 0, "a malformed entry applies nothing");
+    check(apply_engine_weights("bing:2.5") == 1, "re-applying is fine");
+    check(apply_engine_weights("") == 0, "an empty spec applies nothing");
+    check(apply_engine_weights(NULL) == 0, "NULL is not a crash");
+    check(apply_engine_weights("bing:1.0,ddg:1.5") == 2,
+          "a list applies every entry");
+    check(find("ddg")->weight == 1.5, "the second entry applied too");
+    for (int i = 0; i < ENGINE_COUNT; i++)
+      if (bing && strcmp(ENGINE_REGISTRY[i].id, "bing") == 0)
+        ENGINE_REGISTRY[i].weight = before;
+  }
+
   printf("J5 engine definitions: %s\n", failures == 0 ? "PASS" : "FAIL");
   return failures == 0 ? 0 : 1;
 }

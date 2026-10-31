@@ -146,6 +146,11 @@ int main(int argc, char **argv) {
   if (check_only) {
     /* report the effective engine set, so resolve the list first */
     apply_engines_config(cfg.engines);
+  if (cfg.engine_weights[0]) {
+    int changed = apply_engine_weights(cfg.engine_weights);
+    fprintf(stderr, "[INFO] Applied %d engine weight override%s\n", changed,
+            changed == 1 ? "" : "s");
+  }
     printf("config: %s\n", config_path);
     printf("  host=%s port=%d locale=%s\n", cfg.host, cfg.port,
            cfg.default_locale);

@@ -45,6 +45,7 @@ static const ConfigOption CONFIG_OPTIONS[] = {
     INTEGER_OPTION("cache", "ttl_image", cache_ttl_image),
     STRING_OPTION("engines", "engines", engines),
     STRING_OPTION("engines", "definitions_dir", definitions_dir),
+    STRING_OPTION("engines", "weights", engine_weights),
     STRING_OPTION("engines", "yacy_instance", yacy_instance),
     STRING_OPTION("engines", "google_cse_key", google_cse_key),
     STRING_OPTION("engines", "google_cse_cx", google_cse_cx),
