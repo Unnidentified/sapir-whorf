@@ -1626,8 +1626,18 @@ int results_handler(UrlParams *params) {
      It joins the same parallel batch, so it costs no extra latency, and it is
      a separate job so its results merge and rank like any other source. */
   int reddit_lane_job = -1;
-  if (analysis.wants_discussion && page == 1 && engine_idx < ENGINE_COUNT &&
-      user_engine_count == 0) {
+  /* K5.4: the lane used to require user_engine_count == 0, so anyone who had
+     ever saved a provider choice never saw a Reddit thread - the likeliest
+     reason the owner's searches showed none. The provider toggle is the real
+     gate, and ENGINE_MAY_BE_CONTACTED already honours it. The triggers are the
+     discussion shape, the word "reddit", an r/<sub> token, and a typed
+     site:reddit.com operator (which is passed through unchanged). */
+  int reddit_wanted = analysis.wants_discussion;
+  if (!reddit_wanted && raw_query) {
+    if (strcasestr(raw_query, "reddit") || strcasestr(raw_query, "r/"))
+      reddit_wanted = 1;
+  }
+  if (reddit_wanted && page == 1 && engine_idx < ENGINE_COUNT) {
     /* Measured, not assumed (tools/queries-reddit.tsv): of the scraped
        engines only DuckDuckGo Lite actually honours site:reddit.com - it
        returns ~10 Reddit threads, while Yahoo returns a zero-byte body for the

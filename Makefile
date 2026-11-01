@@ -503,6 +503,10 @@ k6-check:
 k3-check:
 	@./tests/test_k3_resume.sh
 
+# K5.4: which queries start the Reddit lane, and what stops it (offline)
+k5check:
+	@./tests/test_k5_reddit_lane.sh
+
 # J3c: results under the answer, and the three fan-out modes
 answersfanout-check:
 	@./tests/test_j3_answers.sh
