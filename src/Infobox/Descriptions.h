@@ -21,6 +21,12 @@
    when a description was found. */
 int description_extract(const char *html, size_t len, char *out, size_t cap);
 
+/* The Wikipedia/Wiktionary shortcut, with no network: their REST summary
+   endpoint answers with one JSON object whose "extract" is exactly the first
+   paragraph. Their article HTML is heavy and mostly navigation, so asking for
+   the summary is both cheaper and more accurate. Returns 1 when it found one. */
+int description_from_summary_json(const char *json, char *out, size_t cap);
+
 /* Fetch and extract, with robots.txt obeyed and the answer cached. Returns 1
    with a description in out; 0 when the site disallows us, the fetch failed or
    there was nothing to extract (the negative answer is cached too). */

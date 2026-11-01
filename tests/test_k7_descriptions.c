@@ -91,6 +91,42 @@ int main(void) {
                "enough to be used, but max-snippet is zero here.\">"
                "<meta name=\"robots\" content=\"max-snippet:0\"></head></html>");
 
+  /* the MediaWiki summary endpoint: "extract" is the description, and a stub
+     of a few words is not */
+  {
+    char out[512];
+    checks++;
+    if (!description_from_summary_json(
+            "{\"extract\":\"Rust is a general-purpose programming language "
+            "emphasizing performance, type safety and concurrency.\"}",
+            out, sizeof(out)) ||
+        !strstr(out, "general-purpose")) {
+      printf("FAIL summary: no extract from the JSON ('%s')\n", out);
+      failures++;
+    }
+    checks++;
+    if (description_from_summary_json("{\"extract\":\"Stub.\"}", out,
+                                      sizeof(out))) {
+      printf("FAIL summary: a stub was accepted\n");
+      failures++;
+    }
+    checks++;
+    if (description_from_summary_json("not json", out, sizeof(out))) {
+      printf("FAIL summary: invalid JSON was accepted\n");
+      failures++;
+    }
+    /* the description field is the fallback when there is no extract */
+    checks++;
+    if (!description_from_summary_json(
+            "{\"description\":\"A systems programming language focused on "
+            "safety and speed, with no garbage collector.\"}",
+            out, sizeof(out)) ||
+        !strstr(out, "systems programming")) {
+      printf("FAIL summary: no description field fallback ('%s')\n", out);
+      failures++;
+    }
+  }
+
   robots("User-agent: *\nDisallow: /private\n", "/private/x", 0);
   robots("User-agent: *\nDisallow: /private\n", "/public/x", 1);
   robots("User-agent: omnisearch\nDisallow: /\n", "/anything", 0);

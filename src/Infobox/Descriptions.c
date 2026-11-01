@@ -5,6 +5,7 @@
 #include "../Utility/Unescape.h"
 #include "../Utility/Utility.h"
 #include <ctype.h>
+#include <jansson.h>
 #include <libxml/HTMLparser.h>
 #include <libxml/xpath.h>
 #include <stdio.h>
@@ -221,6 +222,48 @@ int robots_allows(const char *robots_txt, const char *path) {
   return 1;
 }
 
+int description_from_summary_json(const char *json, char *out, size_t cap) {
+  if (!json || !out || cap == 0)
+    return 0;
+  out[0] = '\0';
+  json_error_t error;
+  json_t *root = json_loads(json, 0, &error);
+  if (!root)
+    return 0;
+  const char *extract = json_string_value(json_object_get(root, "extract"));
+  if (!extract || !extract[0])
+    extract = json_string_value(json_object_get(root, "description"));
+  if (extract && extract[0]) {
+    char tidy[1024];
+    tidy_text(extract, tidy, sizeof(tidy));
+    /* a one-line stub is not a description */
+    if (strlen(tidy) >= 40)
+      snprintf(out, cap, "%s", tidy);
+  }
+  json_decref(root);
+  return out[0] ? 1 : 0;
+}
+
+/* "<host>/wiki/<title>" on a MediaWiki site: the summary endpoint wants the
+   title, not the path with its encoding */
+static int wikipedia_summary_url(const char *url, char *out, size_t cap) {
+  const char *marker = strstr(url, "/wiki/");
+  if (!marker)
+    return 0;
+  if (!strstr(url, "wikipedia.org") && !strstr(url, "wiktionary.org"))
+    return 0;
+  const char *host_start = strstr(url, "://");
+  host_start = host_start ? host_start + 3 : url;
+  const char *host_end = strchr(host_start, '/');
+  if (!host_end)
+    return 0;
+  char host[256];
+  snprintf(host, sizeof(host), "%.*s", (int)(host_end - host_start), host_start);
+  snprintf(out, cap, "https://%s/api/rest_v1/page/summary/%.200s", host,
+           marker + 6);
+  return 1;
+}
+
 int description_for_url(const char *url, char *out, size_t cap) {
   if (!url || !out || cap == 0)
     return 0;
@@ -289,6 +332,36 @@ int description_for_url(const char *url, char *out, size_t cap) {
   if (!allowed) {
     cache_set(cache_key, "0", 1);
     return 0;
+  }
+
+  /* K7: the MediaWiki shortcut. Their summary endpoint answers with the first
+     paragraph as JSON, which is both cheaper than the article and cleaner than
+     its navigation-heavy HTML. */
+  {
+    char summary_url[600];
+    if (wikipedia_summary_url(url, summary_url, sizeof(summary_url))) {
+      char *json = NULL;
+      size_t json_len = 0;
+      long json_status = 0;
+      if (proxy_guarded_get(summary_url, DESC_BUDGET_MS, DESC_MAX_BYTES, &json,
+                            &json_len, &json_status) == 0 &&
+          json && json_len > 0) {
+        int found = description_from_summary_json(json, out, cap);
+        free(json);
+        if (found) {
+          size_t need = strlen(out) + 3;
+          char *entry = malloc(need);
+          if (entry) {
+            snprintf(entry, need, "1 %s", out);
+            cache_set(cache_key, entry, strlen(entry));
+            free(entry);
+          }
+          return 1;
+        }
+      } else {
+        free(json);
+      }
+    }
   }
 
   char *body = NULL;
