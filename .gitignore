@@ -32,3 +32,6 @@ tests/test_k7_placeholders
 tests/test_k7_merge
 tests/test_k11_stocks
 tests/test_k7_descriptions
+# L3: the page-owned file of server settings and credentials
+secrets.ini
+omnisearch.err.old
