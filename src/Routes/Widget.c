@@ -14,6 +14,7 @@
 
 #include "../Infobox/AnswerBox.h"
 #include "../Infobox/CalcKeys.h"
+#include "../Infobox/Translate.h"
 #include "../Providers/Providers.h"
 #include "../Limiter/RateLimit.h"
 #include "../Utility/Utility.h"
@@ -53,11 +54,17 @@ static int widget_fragment(const char *kind, UrlParams *params) {
 
   const char *query = "";
   const char *key = "";
+  const char *from = "";
+  const char *to = "";
   for (int i = 0; i < params->count; i++) {
     if (strcmp(params->params[i].key, "q") == 0)
       query = params->params[i].value;
     else if (strcmp(params->params[i].key, "key") == 0)
       key = params->params[i].value;
+    else if (strcmp(params->params[i].key, "from") == 0)
+      from = params->params[i].value;
+    else if (strcmp(params->params[i].key, "to") == 0)
+      to = params->params[i].value;
   }
 
   /* get_locale() returns a heap string that may be NULL, and the fallback is
@@ -88,7 +95,14 @@ static int widget_fragment(const char *kind, UrlParams *params) {
 
   WidgetData widget;
   memset(&widget, 0, sizeof(widget));
-  int resolved = answer_box_widget_forced(kind, work, lang, &widget);
+  int resolved;
+  /* K10: the card's own form names both languages, so the endpoint takes them
+     from the query string - validated against the language table, never free
+     text. */
+  if (strcmp(kind, "translate") == 0 && to[0])
+    resolved = translate_widget_explicit(query, from, to, &widget, lang);
+  else
+    resolved = answer_box_widget_forced(kind, work, lang, &widget);
 
   if (!resolved) {
     send_status("204 No Content");

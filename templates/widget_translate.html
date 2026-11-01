@@ -1,21 +1,94 @@
-<div class="widget widget-translate">
+{{if widget_kind}}
+<section class="widget widget-translate" aria-label="{{l("translate_title")}}">
   <div class="widget-head">
     <span class="widget-title">{{l("translate_title")}}</span>
     <span class="widget-source">{{widget_note}}</span>
   </div>
-  <p class="widget-from">{{widget_expression}}</p>
-  {{if widget_ok == "1"}}
-  <p class="widget-to">{{widget_result}}</p>
-  {{else}}
-  <p class="widget-error">{{widget_result}}</p>
-  {{endif}}
-  {{if widget_ok == "1"}}
-  <p class="widget-note">{{l("translate_caveat")}}</p>
-  {{endif}}
-  <form action="/search" method="GET" class="widget-form">
-    <input name="w" type="hidden" value="translate">
-    <input name="q" type="text" class="widget-input" value="{{widget_expression}}"
-           aria-label="{{l("translate_title")}}" autocomplete="off">
-    <button type="submit" class="widget-button">{{l("translate_form")}}</button>
+
+  <!-- K10: two panes, like the card the owner compared it with. It is one GET
+       form, so it works with scripts off: the menus are the request, the
+       textarea is the text, and swap is a submit button the server reverses.
+       static/widgets.js adds the live update and preselects the menus from
+       data-selected. -->
+  <form action="/search" method="GET" class="translate-form">
+    <input type="hidden" name="w" value="translate">
+    <div class="translate-panes">
+      <div class="translate-pane">
+        <label class="translate-label" for="translate-from">{{l("translate_from")}}</label>
+        <select id="translate-from" name="from" class="translate-lang" data-code="{{translate_codes}}">
+          <option value="">{{l("translate_detect")}}</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="ru">Русский</option>
+          <option value="pl">Polski</option>
+          <option value="sv">Svenska</option>
+          <option value="da">Dansk</option>
+          <option value="fi">Suomi</option>
+          <option value="no">Norsk</option>
+          <option value="el">Ελληνικά</option>
+          <option value="tr">Türkçe</option>
+          <option value="ar">العربية</option>
+          <option value="hi">हिन्दी</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="zh">中文</option>
+          <option value="ca">Català</option>
+          <option value="uk">Українська</option>
+          <option value="ro">Română</option>
+          <option value="cs">Čeština</option>
+        </select>
+        <textarea id="translate-text" name="q" class="translate-text" rows="4"
+                  autocomplete="off" spellcheck="false"
+                  aria-label="{{l("translate_from")}}">{{widget_expression}}</textarea>
+      </div>
+
+      <div class="translate-middle">
+        <button type="submit" name="swap" value="1" class="translate-swap"
+                title="{{l("translate_swap")}}" aria-label="{{l("translate_swap")}}">⇄</button>
+      </div>
+
+      <div class="translate-pane">
+        <label class="translate-label" for="translate-to">{{l("translate_to")}}</label>
+        <select id="translate-to" name="to" class="translate-lang" data-code2="{{translate_codes}}">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="ru">Русский</option>
+          <option value="pl">Polski</option>
+          <option value="sv">Svenska</option>
+          <option value="da">Dansk</option>
+          <option value="fi">Suomi</option>
+          <option value="no">Norsk</option>
+          <option value="el">Ελληνικά</option>
+          <option value="tr">Türkçe</option>
+          <option value="ar">العربية</option>
+          <option value="hi">हिन्दी</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="zh">中文</option>
+          <option value="ca">Català</option>
+          <option value="uk">Українська</option>
+          <option value="ro">Română</option>
+          <option value="cs">Čeština</option>
+        </select>
+        <output class="translate-output" for="translate-text">{{widget_result}}</output>
+      </div>
+    </div>
+
+    <div class="translate-actions">
+      <button type="submit" class="widget-button">{{l("translate_button")}}</button>
+    </div>
   </form>
-</div>
+
+  <p class="widget-note">{{l("translate_caveat")}}</p>
+</section>
+{{endif}}

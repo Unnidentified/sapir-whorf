@@ -352,12 +352,14 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
   /* J4b: an explicit translate request. Checked before the calculator so
      "translate 2+2 to spanish" asks the translator, not the evaluator. */
   {
-    char text[256];
-    char target[8];
+    /* K10: the request parser knows more shapes than the old verb-only one
+       ("<text> in <language>", "how do you say ...", a bare "translate", and
+       "<language> to <language>" for an empty box) */
+    TranslateRequest request;
     if (!provider_denied("translate") &&
-        translate_parse(work, lang, text, sizeof(text), target,
-                        sizeof(target))) {
-      translate_widget(text, target, NULL, out, lang);
+        translate_parse_request(work, lang, &request)) {
+      translate_widget(request.text, request.to,
+                       request.from[0] ? request.from : NULL, out, lang);
       return 1;
     }
   }
@@ -399,11 +401,13 @@ int answer_box_widget_forced(const char *kind, const char *query,
   /* J4b: w=translate carries the text to translate in q, and the target is
      either "to <language>" inside it or the reader's own language. */
   if (strcmp(kind, "translate") == 0) {
-    char text[256];
-    char target[8];
-    if (translate_parse(query, lang, text, sizeof(text), target,
-                        sizeof(target)))
-      return translate_widget(text, target, NULL, out, lang);
+    TranslateRequest request;
+    if (translate_parse_request(query, lang, &request))
+      return translate_widget(request.text, request.to,
+                              request.from[0] ? request.from : NULL, out, lang);
+    /* raw text with no target is not a translation request; the card's own
+       form carries from/to and the caller resolves it with
+       translate_widget_explicit() before reaching here */
     return 0;
   }
   if (strcmp(kind, "place") == 0) {

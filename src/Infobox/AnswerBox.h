@@ -29,6 +29,7 @@ typedef struct {
    above the results, and the widget below it when the kind has one. */
 typedef struct {
   char kind[32];             /* "calculator"; also the template name */
+  char translate_codes[16];  /* K10: "fr|es" - the two menus, one key */
   char title[64];            /* "Calculation" */
   char expression[256];      /* what was evaluated, as the user typed it */
   char result[64];           /* the headline value */

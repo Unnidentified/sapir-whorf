@@ -60,3 +60,33 @@ language ends the sentence) and `make translate-check` runs it.
   through the `q` string.
 - results are not cached, so a repeat query asks the provider again. MyMemory's
   free tier is per-IP and generous, but this is the obvious next fix.
+
+## K10 (round 5)
+
+The card is two panes now: two menus, a swap button, a textarea and an output
+pane. Everything is one GET form, so it works with scripts off; the swap is a
+submit button the server reverses, not a link it cannot build.
+
+The parser gained the shapes the owner compared against Google:
+`furthermore in spanish`, `how do you say good morning in french`, a bare
+`translate` (empty box in the reader's language) and `english to spanish`
+(both menus pre-set). The false positives are tested: `meaning in tamil` and
+`1 in binary` stay searches, the first because tamil is not a language this
+build knows, the second because a digit makes it a query.
+
+Two rounds of guards came out of measuring the live provider:
+
+- the old code took `translatedText` whenever the status was 200. MyMemory
+  puts its error text there too, and the community memory sometimes answers
+  with the input plus emphasis. Exact equality was not enough: `bonjour tout le
+  monde` came back as `bonjour tout le monde !!!` and was shown as a
+  translation, so the echo check compares the normalised strings and looks for
+  the input inside the output.
+- the language pair the user asked for is an attempt, not a promise: `good
+  morning` en|de returned an empty `translatedText` while `Autodetect|de`
+  answered `guten morgen`. The card retries with detection once before it says
+  there is no translation.
+
+Not shipped: the Google `translate_a/single` rung. Probed on 2026-11-01 it
+answered a "Sorry..." challenge page, not JSON, so it would be dead code with a
+privacy cost. The LibreTranslate rung and the cache are still open.

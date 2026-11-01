@@ -2434,3 +2434,83 @@ input[type="color"]:focus-visible {
   width: 100%;
   max-width: none;
 }
+
+/* K10: two panes, like the card this replaces. One column below 720 px, where
+   two panes of half the width would each be too narrow to type in. */
+.translate-form {
+  margin: 0;
+}
+
+.translate-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.translate-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.translate-label {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.translate-lang {
+  width: 100%;
+}
+
+.translate-text,
+.translate-output {
+  width: 100%;
+  min-height: 7.5rem;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font: inherit;
+  resize: vertical;
+}
+
+.translate-output {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.translate-middle {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-top: 1.4rem;
+}
+
+.translate-swap {
+  font: inherit;
+  font-size: 1.1em;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.translate-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+@media (max-width: 720px) {
+  .translate-panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .translate-middle {
+    padding-top: 0;
+    justify-content: flex-end;
+  }
+}

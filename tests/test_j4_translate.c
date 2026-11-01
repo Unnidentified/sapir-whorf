@@ -74,6 +74,57 @@ int main(void) {
      part of the text */
   expect("translate hello world to klingon", 0, "", "");
 
+  /* K10: the shapes the two-pane card has to recognise */
+  {
+    struct {
+      const char *query;
+      const char *reader;
+      int want_ok;
+      const char *want_text;
+      const char *want_from;
+      const char *want_to;
+    } CASES[] = {
+        /* the owner's own example */
+        {"furthermore in spanish", "en", 1, "furthermore", "", "es"},
+        {"how do you say good morning in french", "en", 1, "good morning", "",
+         "fr"},
+        /* the bare verb: an empty box, in the reader's language */
+        {"translate", "es", 1, "", "", "es"},
+        {"translate", "en", 0, "", "", ""},
+        /* both menus pre-set, no text */
+        {"english to spanish", "en", 1, "", "en", "es"},
+        {"French to German", "en", 1, "", "fr", "de"},
+        /* a target we do not know is not a target */
+        {"meaning in tamil", "en", 0, "", "", ""},
+        {"the offside rule in spanish", "en", 1, "the offside rule", "", "es"},
+        /* a digit makes it a query, not a phrase */
+        {"1 in binary", "en", 0, "", "", ""},
+        {"1000 in spanish", "en", 0, "", "", ""},
+        /* too long to be a phrase */
+        {"what is the capital of france and its history in spanish", "en", 0,
+         "", "", ""},
+        /* the verb forms still parse, with the source now available */
+        {"translate hello to french", "en", 1, "hello", "", "fr"},
+        {"traduce buenos dias al frances", "en", 1, "buenos dias", "", "fr"},
+    };
+    for (size_t i = 0; i < sizeof(CASES) / sizeof(CASES[0]); i++) {
+      TranslateRequest req;
+      int ok = translate_parse_request(CASES[i].query, CASES[i].reader, &req);
+      int bad = (ok != CASES[i].want_ok) ||
+                (ok && strcmp(req.text, CASES[i].want_text) != 0) ||
+                (ok && strcmp(req.from, CASES[i].want_from) != 0) ||
+                (ok && strcmp(req.to, CASES[i].want_to) != 0);
+      if (bad) {
+        printf("FAIL(K10): '%s' -> ok=%d text='%s' from='%s' to='%s' "
+               "(wanted ok=%d '%s' '%s' '%s')\n",
+               CASES[i].query, ok, req.text, req.from, req.to,
+               CASES[i].want_ok, CASES[i].want_text, CASES[i].want_from,
+               CASES[i].want_to);
+        failures++;
+      }
+    }
+  }
+
   printf("J4b translate parser: %s\n", failures == 0 ? "PASS" : "FAIL");
   return failures == 0 ? 0 : 1;
 }

@@ -85,3 +85,52 @@
     refresh(card, key, form);
   });
 })();
+
+/* K10: the translate card. Two menus, one textarea, and a live output.
+ *
+ * The form works without this script (it is a GET to /search). What the script
+ * adds: the menus remember the choice that produced the translation, and the
+ * output updates 400 ms after typing stops instead of on submit.
+ */
+(function () {
+    var from = document.getElementById('translate-from');
+    var to = document.getElementById('translate-to');
+    var text = document.getElementById('translate-text');
+    var out = document.querySelector('.translate-output');
+    if (!from || !to || !text || !out) return;
+
+    var codes = (from.getAttribute('data-code') || '').split('|');
+    if (codes.length === 2) {
+        if (codes[0] && codes[0] !== 'Autodetect') from.value = codes[0];
+        if (codes[1]) to.value = codes[1];
+    }
+
+    var timer = null;
+    var seq = 0;
+
+    function refresh() {
+        var value = text.value.trim();
+        if (!value) { out.textContent = ''; return; }
+        var mine = ++seq;
+        var url = '/w/translate?q=' + encodeURIComponent(value) +
+                  '&from=' + encodeURIComponent(from.value) +
+                  '&to=' + encodeURIComponent(to.value);
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onload = function () {
+            if (mine !== seq) return;           /* a newer keystroke won */
+            if (xhr.status !== 200) return;
+            var doc = new DOMParser().parseFromString(xhr.responseText, 'text/html');
+            var got = doc.querySelector('.translate-output');
+            if (got) out.textContent = got.textContent;
+        };
+        xhr.send();
+    }
+
+    text.addEventListener('input', function () {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(refresh, 400);
+    });
+    from.addEventListener('change', refresh);
+    to.addEventListener('change', refresh);
+})();

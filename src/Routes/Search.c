@@ -2,6 +2,7 @@
 #include "ImageProxy.h"
 #include "../Cache/Cache.h"
 #include "../Infobox/Calculator.h"
+#include "../Infobox/Translate.h"
 #include "../Infobox/ColourCode.h"
 #include "../Infobox/CurrencyConversion.h"
 #include "../Infobox/Dictionary.h"
@@ -929,6 +930,10 @@ int results_handler(UrlParams *params) {
   char key_pressed[16] = "";
   char keyed_buffer[512] = "";
   char widget_mode[32] = "";
+  /* K10: the translate card's own form sends both menus explicitly */
+  char widget_from[8] = "";
+  char widget_to[8] = "";
+  int swap_panes = 0;
   char selected_engine_id[32];
   char *default_engine = get_default_search_engine();
   snprintf(selected_engine_id, sizeof(selected_engine_id), "%s",
@@ -958,6 +963,13 @@ int results_handler(UrlParams *params) {
       } else if (strcmp(params->params[i].key, "w") == 0) {
         snprintf(widget_mode, sizeof(widget_mode), "%s",
                  params->params[i].value);
+      } else if (strcmp(params->params[i].key, "from") == 0) {
+        snprintf(widget_from, sizeof(widget_from), "%s", params->params[i].value);
+      } else if (strcmp(params->params[i].key, "to") == 0) {
+        snprintf(widget_to, sizeof(widget_to), "%s", params->params[i].value);
+      } else if (strcmp(params->params[i].key, "swap") == 0 &&
+                 strcmp(params->params[i].value, "1") == 0) {
+        swap_panes = 1;
       } else if (strcmp(params->params[i].key, "key") == 0) {
         /* the calculator keypad: append one character, capped at 24, and only
            from the set the keypad actually offers. Anything else is dropped
@@ -1421,7 +1433,25 @@ int results_handler(UrlParams *params) {
     if (!answers_off) {
       WidgetData widget;
       answer_box_set_provider_gate(widget_provider_gate);
-      int wres = widget_mode[0]
+      int wres;
+      /* K10: "w=translate" with explicit menus is a direct request, not
+         something to parse out of the text */
+      /* K10: the swap button submits the same text with the menus reversed,
+         so the no-JS path needs no script and no second link */
+      if (swap_panes && widget_from[0] && widget_to[0]) {
+        char tmp[8];
+        snprintf(tmp, sizeof(tmp), "%s", widget_from);
+        snprintf(widget_from, sizeof(widget_from), "%s", widget_to);
+        snprintf(widget_to, sizeof(widget_to), "%s", tmp);
+        if (!widget_from[0])
+          snprintf(widget_from, sizeof(widget_from), "%s", "en");
+      }
+      if (widget_mode[0] && strcmp(widget_mode, "translate") == 0 &&
+          widget_to[0] && !widget_provider_gate("translate"))
+        wres = translate_widget_explicit(raw_query, widget_from, widget_to,
+                                         &widget, lang);
+      else
+        wres = widget_mode[0]
                      ? answer_box_widget_forced(widget_mode, raw_query, lang,
                                                 &widget)
                      : answer_box_widget(raw_query, lang, NULL, &widget);
@@ -1453,6 +1483,9 @@ int results_handler(UrlParams *params) {
         context_set(&ctx, "widget_expression", widget.expression);
         context_set(&ctx, "widget_note", widget.note);
         context_set(&ctx, "widget_href", widget.href);
+        /* K10: "from|to" for the translate card's two menus. One key, because
+           the page renders with 32 of beaker's 32 slots. */
+        context_set(&ctx, "translate_codes", widget.translate_codes);
         context_set(&ctx, "widget_ok", widget.ok ? "1" : "");
         if (getenv("OMNI_PERF"))
           fprintf(stderr, "[WIDGET] kind=%s ok=%d expr='%s' note='%s'\n",
