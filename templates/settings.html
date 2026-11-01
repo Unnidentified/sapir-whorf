@@ -277,7 +277,15 @@
                     {{endif}}
 
                     {{if has_engine_lists}}
-                    <section class="settings-section">
+                                        <div class="settings-actions">
+                        <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
+                    </div>
+                </form>
+
+                <!-- K1.2b: its own form, so the parameter count stays under beaker's 16 -->
+                <form action="/save_settings" method="GET" id="weights-form" class="settings-form" novalidate>
+                    <input type="hidden" name="q" value="{{query}}">
+<section class="settings-section">
                         <h3 class="settings-section-title">{{l("weights_label")}}</h3>
                         <p class="settings-section-desc">{{l("weights_desc")}}</p>
                         <input type="hidden" name="weights_present" value="1">
@@ -290,15 +298,36 @@
                             {{endfor}}
                         </div>
                     </section>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
+                    </div>
+                </form>
+
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
+                    </div>
+                </form>
+
+                <form action="/save_settings" method="GET" id="engines-form" class="settings-form" novalidate>
+                    <input type="hidden" name="q" value="{{query}}">
+                    <!-- K1.2b: one param per provider cannot work at scale.
+                         beaker keeps at most 16 URL parameters (MAX_URL_PARAMS)
+                         and stops parsing silently after that, so a form with
+                         30 fields reached the server with the ten checkboxes
+                         cut off - which is why "the toggles do not save".
+                         This form submits the providers that are OFF, which is
+                         normally none or one, plus a count so the server can
+                         tell a complete submission from a truncated one. -->
+                    <input type="hidden" name="engines_seen" value="{{engine_count}}">
                     <section class="settings-section">
                         <h3 class="settings-section-title">{{l("engines_label")}}</h3>
                         <p class="settings-section-desc">{{l("engines_desc")}}</p>
-                        <input type="hidden" name="engines_present" value="1">
+                        <p class="settings-section-desc">{{l("engines_off_explain")}}</p>
                         <div class="settings-fields">
                             {{for eng in enabled_engines}}
                             <label class="settings-field settings-engine-option" for="engine_{{eng[0]}}">
-                                <span class="settings-label">{{eng[1]}}</span>
-                                <input type="checkbox" id="engine_{{eng[0]}}" name="engine_{{eng[0]}}" value="1" class="settings-checkbox" {{eng[2]}}>
+                                <span class="settings-label">{{eng[1]}}<span class="settings-off-hint">{{l("provider_off_hint")}}</span></span>
+                                <input type="checkbox" id="engine_{{eng[0]}}" name="off_{{eng[0]}}" value="1" class="settings-checkbox" {{eng[2]}}>
                             </label>
                             {{endfor}}
                             <div class="settings-field">
@@ -316,11 +345,10 @@
                             </div>
                         </div>
                     </section>
-                    {{endif}}
-
                     <div class="settings-actions">
                         <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
                     </div>
+                    {{endif}}
                 </form>
             </main>
         </div>

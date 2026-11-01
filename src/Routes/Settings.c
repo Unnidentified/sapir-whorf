@@ -97,7 +97,11 @@ int settings_handler(UrlParams *params) {
       engine_data[idx] = malloc(sizeof(char *) * 4);
       engine_data[idx][0] = (char *)ENGINE_REGISTRY[i].id;
       engine_data[idx][1] = (char *)ENGINE_REGISTRY[i].name;
-      engine_data[idx][2] = is_selected ? "checked" : "";
+      /* K1.2b: the box is ticked when the provider is OFF, because the form
+         submits only the disabled set - one param for a provider that is off,
+         none for one that is on, which keeps the submission under beaker's
+         16-parameter limit however large the registry grows. */
+      engine_data[idx][2] = is_selected ? "" : "checked";
       engine_data[idx][3] =
           strcmp(default_engine, ENGINE_REGISTRY[i].id) == 0 ? "selected" : "";
       engine_inner[idx] = 4;
@@ -168,6 +172,9 @@ int settings_handler(UrlParams *params) {
   if (enabled_count > 0) {
     context_set_array_of_arrays(&ctx, "enabled_engines", engine_data,
                                 enabled_count, engine_inner);
+    char seen[16];
+    snprintf(seen, sizeof(seen), "%d", enabled_count);
+    context_set(&ctx, "engine_count", seen);
     /* beaker's {{if exists ...}} does not work for a 2-D array (measured: the
        engines section silently disappeared), so one flag guards both engine
        sections. Two flags for two lists was two slots; this is one. */

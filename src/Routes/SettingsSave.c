@@ -17,6 +17,7 @@ int settings_save_handler(UrlParams *params) {
   const char *default_engine = "all";
   int default_engine_present = 0;
   int engines_present = 0;
+  int engines_seen = 0;
   int answers_present = 0;
   int opt_in_present = 0;
   const char *opt_in = NULL;
@@ -82,9 +83,18 @@ int settings_save_handler(UrlParams *params) {
         answers_fanout = params->params[i].value;
       } else if (strcmp(params->params[i].key, "engines_present") == 0) {
         engines_present = 1;
-      } else if (strncmp(params->params[i].key, "engine_", 7) == 0 &&
+      } else if (strcmp(params->params[i].key, "engines_seen") == 0) {
+        /* K1.2b: how many rows the page rendered. If the number of parameters
+           reached beaker's limit the submission may have been truncated, and a
+           truncated submission would silently re-enable providers. */
+        engines_present = 1;
+        engines_seen = atoi(params->params[i].value);
+      } else if (strncmp(params->params[i].key, "off_", 4) == 0 &&
                  strcmp(params->params[i].value, "1") == 0) {
-        const char *engine_id = params->params[i].key + 7;
+        /* K1.2b: the engines form submits the providers that are OFF, so the
+           parameter count stays flat as the registry grows. beaker keeps only
+           MAX_URL_PARAMS (16) and stops parsing silently beyond that. */
+        const char *engine_id = params->params[i].key + 4;
         if (engine_id[0] != '\0' && is_engine_id_enabled(engine_id) &&
             selected_count < ENGINE_COUNT) {
           strncpy(selected_ids[selected_count], engine_id,
@@ -168,6 +178,22 @@ int settings_save_handler(UrlParams *params) {
     set_cookie("engine_weights", weight_spec, "Fri, 31 Dec 2038 23:59:59 GMT",
                "/", false, false);
 
+  if (engines_present && engines_seen > 0 && params &&
+      params->count >= 16 && engines_seen > params->count) {
+    /* the form was cut off by the server's parameter limit; refuse rather
+       than write a partial policy that turns providers back on */
+    fprintf(stderr,
+            "[WARN] engines save refused: %d parameters reached a limit of 16 "
+            "while %d providers were shown\n",
+            params->count, engines_seen);
+    send_status("500 Internal Server Error");
+    send_response(
+        "<h1>Too many settings at once</h1><p>The form exceeded the server's "
+        "parameter limit, so nothing was saved. Reload the settings page and "
+        "save fewer providers at a time.</p>");
+    return 0;
+  }
+
   if (engines_present) {
     /* K1.1: two changes, both of them consequences of the same report.
 
@@ -179,32 +205,22 @@ int settings_save_handler(UrlParams *params) {
        2. It stores the DISABLED set, not the enabled one. A provider added in
           a later release then defaults to on without the cookie having to know
           it exists, and the value stays short as the registry grows. */
+    /* selected_ids now carries the providers that were ticked OFF, so the
+       cookie is simply that list. */
     char cookie_value[1024];
     int written = snprintf(cookie_value, sizeof(cookie_value), "off=");
     int overflow = 0;
-    int disabled = 0;
-    for (int i = 0; i < ENGINE_COUNT && !overflow; i++) {
-      if (!ENGINE_REGISTRY[i].enabled)
-        continue; /* the server already decides this one; not ours to store */
-      int selected = 0;
-      for (int j = 0; j < selected_count; j++)
-        if (strcmp(selected_ids[j], ENGINE_REGISTRY[i].id) == 0) {
-          selected = 1;
-          break;
-        }
-      if (selected)
-        continue;
-      size_t need = strlen(ENGINE_REGISTRY[i].id) + 2; /* separator + NUL */
+    for (int i = 0; i < selected_count && !overflow; i++) {
+      size_t need = strlen(selected_ids[i]) + 2; /* separator + NUL */
       if ((size_t)written + need > sizeof(cookie_value)) {
         overflow = 1;
         break;
       }
-      if (disabled > 0)
+      if (i > 0)
         cookie_value[written++] = '|';
       written += (int)snprintf(cookie_value + written,
                                sizeof(cookie_value) - (size_t)written, "%s",
-                               ENGINE_REGISTRY[i].id);
-      disabled++;
+                               selected_ids[i]);
       if (written < 0)
         overflow = 1;
     }
@@ -214,7 +230,7 @@ int settings_save_handler(UrlParams *params) {
       fprintf(stderr,
               "[WARN] engines cookie would overflow (%d providers); not saved. "
               "Raise the buffer before adding more providers.\n",
-              disabled);
+              selected_count);
     } else {
       set_cookie("engines", cookie_value, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
                  false, false);
@@ -232,7 +248,7 @@ int settings_save_handler(UrlParams *params) {
       int selected = !engines_present;
       for (int j = 0; j < selected_count; j++) {
         if (strcmp(selected_ids[j], ENGINE_REGISTRY[i].id) == 0) {
-          selected = 1;
+          selected = 0; /* listed as off */
           break;
         }
       }
