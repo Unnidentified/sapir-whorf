@@ -1,5 +1,6 @@
 #include "Descriptions.h"
 #include "../Cache/Cache.h"
+#include "../Limiter/RateLimit.h"
 #include "../Routes/ImageProxy.h"
 #include "../Utility/Display.h"
 #include "../Utility/Unescape.h"
@@ -362,6 +363,20 @@ int description_for_url(const char *url, char *out, size_t cap) {
         free(json);
       }
     }
+  }
+
+  /* K7: per-host pacing, the same rule as any other upstream. Five rows on one
+     page can point at the same site, and five reads of one host in a second is
+     what a scraper does. Over the pace, the row keeps its breadcrumb. */
+  {
+    char scope[300];
+    snprintf(scope, sizeof(scope), "describe:%.250s", host);
+    RateLimitConfig pace = {.max_requests = 10, .interval_seconds = 60};
+    RateLimitResult allowed = rate_limit_check(scope, &pace);
+    /* a rate limit is temporary: it is not cached, or the row would never get
+       its description even after the pace recovered */
+    if (allowed.limited)
+      return 0;
   }
 
   char *body = NULL;
