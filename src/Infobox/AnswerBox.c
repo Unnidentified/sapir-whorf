@@ -380,17 +380,8 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
     char ticker[16];
     if (!provider_denied("stock") && stocks_parse(work, ticker, sizeof(ticker))) {
       /* K11: 0 means "no card", and then the query is a normal search */
-      if (!stocks_widget(ticker, stocks_symbol_was_explicit(work, ticker), lang,
-                         range, out))
-        return 0;
-      /* the range links carry the query the reader typed: a bare ticker has no
-         price keyword, so "q=NVDA" would answer nothing when clicked */
-      if (!range || !range[0]) {
-        char encoded[512];
-        url_encode(work, encoded, sizeof(encoded));
-        snprintf(out->href, sizeof(out->href), "/w/stock?q=%s&range=", encoded);
-      }
-      return 1;
+      return stocks_widget(ticker, stocks_symbol_was_explicit(work, ticker),
+                           lang, range, out);
     }
   }
 
@@ -432,15 +423,21 @@ int answer_box_widget_forced(const char *kind, const char *query,
   if (strcmp(kind, "stock") == 0) {
     char ticker[16];
     if (stocks_parse(query, ticker, sizeof(ticker)))
-      if (!stocks_widget(ticker, stocks_symbol_was_explicit(query, ticker),
-                         lang, range, out))
-        return 0;
-      if (!range || !range[0]) {
-        char encoded[512];
-        url_encode(query, encoded, sizeof(encoded));
-        snprintf(out->href, sizeof(out->href), "/w/stock?q=%s&range=", encoded);
+      if (stocks_widget(ticker, stocks_symbol_was_explicit(query, ticker),
+                        lang, range, out))
+        return 1;
+      /* "q=NVDA&range=1y" from the card's own links: asking for a window is
+         asking for a quote, so a bare ticker counts here even though it has no
+         price keyword */
+      if (range && range[0] && stocks_symbol_known(query)) {
+        char symbol[16];
+        snprintf(symbol, sizeof(symbol), "%s", query);
+        for (char *c = symbol; *c; c++)
+          if (*c >= 'a' && *c <= 'z')
+            *c = (char)(*c - 'a' + 'A');
+        return stocks_widget(symbol, 1, lang, range, out);
       }
-      return 1;
+      return 0;
     return 0;
   }
   if (strcmp(kind, "calculator") != 0)

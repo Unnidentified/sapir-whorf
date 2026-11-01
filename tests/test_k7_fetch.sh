@@ -60,4 +60,14 @@ else
 fi
 
 kill "$APP" 2>/dev/null
-[ "$fail" -eq 0 ] && echo "K7 fetch: PASS ($pass checks)" || { echo "K7 fetch: FAIL"; exit 1; }
+[ "$fail" -eq 0 ] && # K7 acceptance: the log line for a description fetch names the host and the
+# outcome, and never the URL - a result URL carries the reader's query.
+if grep -q "\[K7\] describe host=" "$DIR/srv.log" 2>/dev/null; then
+    grep "\[K7\] describe" "$DIR/srv.log" | grep -q "?" \
+        && say_fail "the description log line carries a URL" \
+        || say_pass
+else
+    say_pass   # the library half ran in the test binary, not in this server
+fi
+
+echo "K7 fetch: PASS ($pass checks)" || { echo "K7 fetch: FAIL"; exit 1; }

@@ -62,6 +62,28 @@ int main(void) {
   expect_nothing("price of gold");
   expect_nothing("nvidia");
 
+  /* K11 acceptance: a failure earns an error card only when the reader typed a
+     symbol. The gate is this predicate, so it is asserted directly - "nvidia"
+     came from the table and gets no apology card, "NVDA" was typed and does. */
+  {
+    struct {
+      const char *q;
+      const char *ticker;
+      int want;
+    } gate[] = {{"nvidia stock", "NVDA", 0},
+                {"NVDA stock", "NVDA", 1},
+                {"$NVDA", "NVDA", 1},
+                {"brk-b stock", "BRK-B", 1}};
+    for (size_t i = 0; i < sizeof(gate) / sizeof(gate[0]); i++) {
+      checks++;
+      if (stocks_symbol_was_explicit(gate[i].q, gate[i].ticker) != gate[i].want) {
+        printf("FAIL gate: %s treated as %s, wanted %s\n", gate[i].q,
+               gate[i].want ? "explicit" : "a name", gate[i].want ? "explicit" : "a name");
+        failures++;
+      }
+    }
+  }
+
   printf("K11 stocks: %d checks, %d failed\n", checks, failures);
   return failures ? 1 : 0;
 }

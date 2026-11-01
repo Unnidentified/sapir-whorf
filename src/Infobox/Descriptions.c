@@ -390,6 +390,10 @@ int description_for_url(const char *url, char *out, size_t cap) {
     return 0;
   }
   int found = description_extract(body, body_len, out, cap);
+  /* K7 acceptance: the log names the host and the outcome, never the URL - a
+     result URL carries the reader's query in many of them. */
+  fprintf(stderr, "[K7] describe host=%s status=%d bytes=%zu\n", host, found,
+          body_len);
   free(body);
   if (found) {
     size_t need = strlen(out) + 3;

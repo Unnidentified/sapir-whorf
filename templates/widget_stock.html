@@ -19,17 +19,17 @@
           stroke-width="2" vector-effect="non-scaling-stroke"/>
   </svg>
   {{endif}}
-  {{if exists widget_href}}
+  {{if exists widget_expression}}
   <!-- K11: the window links. Each is one request to this server; nothing runs
        in the browser. -->
   <nav class="stock-ranges" aria-label="{{l("stock_range_label")}}">
-    <a href="{{widget_href}}1d">{{l("range_1d")}}</a>
-    <a href="{{widget_href}}5d">{{l("range_5d")}}</a>
-    <a href="{{widget_href}}1mo">{{l("range_1mo")}}</a>
-    <a href="{{widget_href}}6mo">{{l("range_6mo")}}</a>
-    <a href="{{widget_href}}ytd">{{l("range_ytd")}}</a>
-    <a href="{{widget_href}}1y">{{l("range_1y")}}</a>
-    <a href="{{widget_href}}5y">{{l("range_5y")}}</a>
+    <a href="/w/stock?q={{widget_expression}}&range=1d">{{l("range_1d")}}</a>
+    <a href="/w/stock?q={{widget_expression}}&range=5d">{{l("range_5d")}}</a>
+    <a href="/w/stock?q={{widget_expression}}&range=1mo">{{l("range_1mo")}}</a>
+    <a href="/w/stock?q={{widget_expression}}&range=6mo">{{l("range_6mo")}}</a>
+    <a href="/w/stock?q={{widget_expression}}&range=ytd">{{l("range_ytd")}}</a>
+    <a href="/w/stock?q={{widget_expression}}&range=1y">{{l("range_1y")}}</a>
+    <a href="/w/stock?q={{widget_expression}}&range=5y">{{l("range_5y")}}</a>
   </nav>
   {{endif}}
   <p class="widget-note">{{l("stock_disclaimer")}}</p>
