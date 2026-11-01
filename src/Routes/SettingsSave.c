@@ -1,5 +1,6 @@
 #include "SettingsSave.h"
 #include "../Scraping/Scraping.h"
+#include "../Providers/Providers.h"
 #include "../Utility/Utility.h"
 #include <stdlib.h>
 #include <string.h>
@@ -18,12 +19,15 @@ int settings_save_handler(UrlParams *params) {
   int default_engine_present = 0;
   int engines_present = 0;
   int engines_seen = 0;
+  const char *off_list = NULL; /* K1.3: the single field settings.js writes */
   int answers_present = 0;
   int opt_in_present = 0;
   const char *opt_in = NULL;
   const char *answers = NULL;
   const char *answers_fanout = NULL;
-  char selected_ids[MAX_ENGINES][32];
+  /* must hold the union of engine ids and answer provider ids */
+  enum { SELECTED_CAPACITY = MAX_ENGINES + 32 };
+  char selected_ids[SELECTED_CAPACITY][32];
   int selected_count = 0;
   /* J5.5: per-engine weights from the form, as "id:weight,id:weight" */
   char weight_spec[512] = "";
@@ -89,14 +93,16 @@ int settings_save_handler(UrlParams *params) {
            truncated submission would silently re-enable providers. */
         engines_present = 1;
         engines_seen = atoi(params->params[i].value);
+      } else if (strcmp(params->params[i].key, "off") == 0) {
+        off_list = params->params[i].value;
       } else if (strncmp(params->params[i].key, "off_", 4) == 0 &&
                  strcmp(params->params[i].value, "1") == 0) {
         /* K1.2b: the engines form submits the providers that are OFF, so the
            parameter count stays flat as the registry grows. beaker keeps only
            MAX_URL_PARAMS (16) and stops parsing silently beyond that. */
         const char *engine_id = params->params[i].key + 4;
-        if (engine_id[0] != '\0' && is_engine_id_enabled(engine_id) &&
-            selected_count < ENGINE_COUNT) {
+        if (engine_id[0] != '\0' && provider_id_known(engine_id) &&
+            selected_count < SELECTED_CAPACITY) {
           strncpy(selected_ids[selected_count], engine_id,
                   sizeof(selected_ids[selected_count]) - 1);
           selected_ids[selected_count][sizeof(selected_ids[selected_count]) - 1] =
@@ -104,6 +110,46 @@ int settings_save_handler(UrlParams *params) {
           selected_count++;
         }
       }
+    }
+  }
+
+  /* K1.3: the single off= field. Same format the cookie uses, so the read path
+     is the same one. Parsed here rather than in the loop above because one
+     value carries the whole list. */
+  if (off_list && off_list[0]) {
+    char *copy = strdup(off_list);
+    if (copy) {
+      char *saveptr = NULL;
+      for (char *tok = strtok_r(copy, "|,", &saveptr); tok;
+           tok = strtok_r(NULL, "|,", &saveptr)) {
+        while (*tok == ' ' || *tok == '\t')
+          tok++;
+        if (tok[0] == '\0' || !provider_id_known(tok))
+          continue;
+        int already = 0;
+        for (int j = 0; j < selected_count; j++)
+          if (strcmp(selected_ids[j], tok) == 0)
+            already = 1;
+        if (already)
+          continue;
+        if (selected_count < SELECTED_CAPACITY) {
+          strncpy(selected_ids[selected_count], tok,
+                  sizeof(selected_ids[selected_count]) - 1);
+          selected_ids[selected_count][sizeof(selected_ids[selected_count]) - 1] = '\0';
+          selected_count++;
+        } else {
+          /* refuse to write a partial policy: the buffer sizes must grow with
+             the registry, not the other way round */
+          off_list = NULL;
+          selected_count = 0;
+          set_cookie("engines", "", "Fri, 31 Dec 2038 23:59:59 GMT", "/", false,
+                     false);
+          fprintf(stderr, "[WARN] engines save refused: more than %d providers "
+                          "disabled at once\n", SELECTED_CAPACITY);
+          break;
+        }
+      }
+      free(copy);
     }
   }
 

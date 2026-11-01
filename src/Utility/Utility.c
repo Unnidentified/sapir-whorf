@@ -201,17 +201,56 @@ void get_answers_fanout(const char *fallback, char *out, size_t size) {
    single place a provider must ask. */
 int opt_in_providers_available(void) { return config_allow_files(); }
 
-int opt_in_providers_allowed(void) {
-  char *cookie;
+/* K1.5: the owner's switch, per provider. Two cookies are accepted:
+     optin=reddit|torrentz   the current list, one entry per provider
+     opt_in=1                what a browser saved before this change, which
+                             meant "all of them" - kept so an old choice is not
+                             silently read as a refusal
+   The administrator's gate is the outer one and is never bypassed here. */
+int opt_in_enabled_for(const char *id) {
   if (!config_allow_files())
     return 0;
-  cookie = get_cookie("opt_in");
-  if (cookie && strcmp(cookie, "1") == 0) {
-    free(cookie);
-    return 1;
+
+  char *list = get_cookie("optin");
+  if (list) {
+    int found = 0;
+    char *copy = strdup(list);
+    if (copy) {
+      char *saveptr = NULL;
+      for (char *tok = strtok_r(copy, "|,", &saveptr); tok;
+           tok = strtok_r(NULL, "|,", &saveptr)) {
+        while (*tok == ' ' || *tok == '\t')
+          tok++;
+        if (id && strcasecmp(tok, id) == 0) {
+          found = 1;
+          break;
+        }
+      }
+      free(copy);
+    }
+    free(list);
+    if (found)
+      return 1;
   }
-  free(cookie);
-  return 0;
+
+  char *legacy = get_cookie("opt_in");
+  int all = legacy && strcmp(legacy, "1") == 0;
+  free(legacy);
+  return all;
+}
+
+int opt_in_providers_allowed(void) {
+  if (!config_allow_files())
+    return 0;
+  char *legacy = get_cookie("opt_in");
+  int all = legacy && strcmp(legacy, "1") == 0;
+  free(legacy);
+  if (all)
+    return 1;
+  char *list = get_cookie("optin");
+  int any = list && list[0] != '\0';
+  free(list);
+  return any;
 }
 
 /* ---------- user-defined palette ---------- */

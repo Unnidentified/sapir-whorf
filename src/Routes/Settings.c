@@ -2,6 +2,7 @@
 #include "../Config.h"
 #include "../Scraping/Scraping.h"
 #include "../Scraping/EngineHealth.h"
+#include "../Providers/Providers.h"
 #include "../Utility/Utility.h"
 #include <beaker.h>
 #include <stdlib.h>
@@ -110,6 +111,68 @@ int settings_handler(UrlParams *params) {
     }
   }
 
+  /* K1.3: one table, one row per provider - every entry in the registry plus
+     the answer providers that are not engines. The old list only showed what
+     the server had enabled, so "off by me", "off by the administrator" and
+     "not in this build" all looked the same: absent. */
+  ProviderRow provider_rows[MAX_ENGINES + 16];
+  int provider_row_count = providers_build(provider_rows, (int)(sizeof(provider_rows) / sizeof(provider_rows[0])));
+
+  int matrix_rows = 0;
+  for (int i = 0; i < provider_row_count; i++)
+    matrix_rows++; /* the row itself */
+  for (int i = 0; i < provider_row_count; i++)
+    if (i == 0 || provider_rows[i].group != provider_rows[i - 1].group)
+      matrix_rows++; /* a group heading */
+
+  char ***provider_data = malloc(sizeof(char **) * (size_t)matrix_rows);
+  int *provider_inner = malloc(sizeof(int) * (size_t)matrix_rows);
+  int prow = 0;
+  for (int i = 0; i < provider_row_count; i++) {
+    ProviderRow *r = &provider_rows[i];
+    if (i == 0 || r->group != provider_rows[i - 1].group) {
+      provider_data[prow] = malloc(sizeof(char *) * 11);
+      provider_data[prow][0] = strdup("group");
+      provider_data[prow][1] = strdup("group");
+      provider_data[prow][2] = strdup(provider_group_label(r->group));
+      for (int c = 3; c < 11; c++)
+        provider_data[prow][c] = strdup("");
+      /* a heading row draws no control: it is disabled so it never submits,
+         and the stylesheet hides the box */
+      provider_data[prow][4] = strdup("group");
+      provider_data[prow][6] = strdup("");
+      provider_data[prow][7] = strdup("disabled");
+      provider_inner[prow] = 11;
+      prow++;
+    }
+
+    ProviderState state = provider_state(r);
+    provider_data[prow] = malloc(sizeof(char *) * 11);
+    provider_data[prow][0] = strdup("row");
+    provider_data[prow][1] = strdup(r->id);
+    provider_data[prow][2] = strdup(r->label);
+    provider_data[prow][3] = strdup(r->host ? r->host : "");
+    /* the state kind, not the sentence: the words live in the locales, and
+       colour alone is not a state (the review asked for words) */
+    provider_data[prow][4] =
+        strdup(!r->toggleable ? "local"
+               : state == PS_ON ? "on"
+               : state == PS_OFF ? "off"
+               : provider_needs_config(r) ? "needs_config"
+                                          : "unavailable");
+    provider_data[prow][5] = strdup("");
+    /* the box is ticked when the provider is OFF, because the form submits the
+       disabled set - one param per provider that is off, none for one that is
+       on, and the script collapses even that into a single field */
+    provider_data[prow][6] = strdup(state == PS_OFF ? "checked" : "");
+    provider_data[prow][7] = strdup((state == PS_UNAVAILABLE || !r->toggleable) ? "disabled" : "");
+    provider_data[prow][8] = strdup(r->toggleable ? "" : "1");
+    provider_data[prow][9] = strdup(r->opt_in ? "1" : "");
+    provider_data[prow][10] = strdup(r->opt_in ? provider_opt_in_disclosure(r->id) : "");
+    provider_inner[prow] = 11;
+    prow++;
+  }
+
   TemplateContext ctx = new_context();
   beaker_set_locale(&ctx, locale);
   context_set(&ctx, "query", query);
@@ -169,12 +232,22 @@ int settings_handler(UrlParams *params) {
                                 theme_inner);
   }
 
+  /* one key: the whole provider table, grouped rows and headings together */
+  context_set_array_of_arrays(&ctx, "providers", provider_data, matrix_rows,
+                              provider_inner);
+  {
+    int toggleable = 0;
+    for (int i = 0; i < provider_row_count; i++)
+      if (provider_rows[i].toggleable)
+        toggleable++;
+    char seen[16];
+    snprintf(seen, sizeof(seen), "%d", toggleable);
+    context_set(&ctx, "provider_count", seen);
+  }
+
   if (enabled_count > 0) {
     context_set_array_of_arrays(&ctx, "enabled_engines", engine_data,
                                 enabled_count, engine_inner);
-    char seen[16];
-    snprintf(seen, sizeof(seen), "%d", enabled_count);
-    context_set(&ctx, "engine_count", seen);
     /* beaker's {{if exists ...}} does not work for a 2-D array (measured: the
        engines section silently disappeared), so one flag guards both engine
        sections. Two flags for two lists was two slots; this is one. */

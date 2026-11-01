@@ -11,6 +11,7 @@
 #include "../Scraping/EngineHealth.h"
 #include "../Infobox/AnswerBox.h"
 #include "../Query/Placeholders.h"
+#include "../Providers/Providers.h"
 #include "../Query/QueryAnalysis.h"
 #include "../Query/Tokens.h"
 #include "../Ranking/Ranker.h"
@@ -38,6 +39,11 @@ typedef struct {
      generator=search (the best fuzzy match for any text), so "1+1" got the
      article "1+1" and "covid-19" got whatever matched best. */
   int answered_locally;
+  /* K1.4: decided on the request thread. beaker's cookies are per request
+     thread, so reading them inside the worker found nothing and the gate
+     silently passed - which is why turning the dictionary off still fetched
+     it. */
+  int suppressed;
 } InfoBoxThreadData;
 
 typedef struct {
@@ -420,6 +426,12 @@ static InfoBox fetch_colour_wrapper(char *query) {
   return fetch_colour_data(query);
 }
 
+/* K1.4: the widget resolver asks this before contacting a provider */
+static int widget_provider_gate(const char *kind) {
+  const char *provider = provider_id_for_widget_kind(kind);
+  return provider && provider_is_off(provider);
+}
+
 static InfoBoxHandler handlers[] = {
     {"dictionary", is_dictionary_query, fetch_dict_wrapper, NULL},
     /* K8: there is no "arithmetic" handler. It was left behind when the
@@ -467,6 +479,15 @@ static void *infobox_thread_func(void *arg) {
 
   InfoBoxHandler *h = &handlers[handler_idx];
   if (h->check_fn && !h->check_fn(data->query)) {
+    data->success = 0;
+    return NULL;
+  }
+  /* K1.4: the same switch covers the infobox. Turning Wikipedia off must stop
+     the panel as well as the engine, because both are the same destination.
+     The answer was computed on the request thread; see the field's comment. */
+  if (data->suppressed) {
+    if (getenv("OMNI_PERF"))
+      fprintf(stderr, "[INFOBOX] suppressed id=%s\n", h->id);
     data->success = 0;
     return NULL;
   }
@@ -1047,6 +1068,12 @@ int results_handler(UrlParams *params) {
     if (!engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
                                  user_engine_count, has_user_pref))
       continue;
+    /* K1.5/J5 tiers: a provider that needs the owner's opt-in is never fanned
+       out. It is reachable only when it is the engine this request names, and
+       only when this browser has switched that provider on. */
+    if (ENGINE_REGISTRY[i].opt_in &&
+        (!selected_engine || !opt_in_enabled_for(ENGINE_REGISTRY[i].id)))
+      continue;
     eligible[eligible_count++] = &ENGINE_REGISTRY[i];
   }
 
@@ -1405,6 +1432,7 @@ int results_handler(UrlParams *params) {
     }
     if (!answers_off) {
       WidgetData widget;
+      answer_box_set_provider_gate(widget_provider_gate);
       int wres = widget_mode[0]
                      ? answer_box_widget_forced(widget_mode, raw_query, lang,
                                                 &widget)
@@ -1413,6 +1441,19 @@ int results_handler(UrlParams *params) {
         /* two keys, not four: the context is a fixed 32 slots. The expression
            is what the user typed, and the result slot doubles as the error
            slot because a card shows one big value either way. */
+        /* K1.4: a switch that only hides a card would still let the provider
+           be contacted, and the card is the only reason it is contacted. So
+           the gate is here, before anything is rendered or fetched. Local
+           kinds (calculator, units, colour) have no provider to switch. */
+        const char *widget_provider = provider_id_for_widget_kind(widget.kind);
+        int widget_denied = widget_provider && provider_is_off(widget_provider);
+        if (widget_denied) {
+          if (getenv("OMNI_PERF"))
+            fprintf(stderr, "[WIDGET] suppressed kind=%s provider=%s\n",
+                    widget.kind, widget_provider);
+          widget.ok = 0;
+          widget.kind[0] = '\0';
+        }
         context_set(&ctx, "show_answer_strip", "");
         context_set(&ctx, "widget_kind", widget.kind);
         /* four keys, and the context has 31 in use on this page: the result
@@ -1442,6 +1483,9 @@ int results_handler(UrlParams *params) {
     snprintf(infobox_data[i].lang, sizeof(infobox_data[i].lang), "%s", lang);
     infobox_data[i].success = i;
     infobox_data[i].result = (InfoBox){NULL};
+    /* K1.4: read the cookie here, on the request thread */
+    infobox_data[i].suppressed =
+        handlers[i].id && provider_is_off(provider_id_for_engine(handlers[i].id));
   }
 
   /* J5.1: sized by what this request will actually fire, on the heap. It used

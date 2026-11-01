@@ -664,6 +664,9 @@ header .logo-link:hover {
 
 .settings-container {
     max-width: 700px;
+    /* a flex item sizes to its content by default, so the wide status table
+       used to push the whole page wider than the viewport at 390 px */
+    min-width: 0;
 }
 
 .settings-title {
@@ -784,6 +787,7 @@ header .logo-link:hover {
 
 .settings-table-wrap {
   overflow-x: auto;
+  max-width: 100%;
   margin-top: 0.75rem;
 }
 .settings-table {
@@ -2300,4 +2304,107 @@ input[type="color"]:focus-visible {
 }
 .filter-tabs a.chip-eng.active {
   opacity: 1;
+}
+
+/* K1.3: the provider table. One row per provider, grouped by what it answers,
+   with the destination host on the right of the row. A row that is off says so
+   in words and in colour; a row the server cannot offer is dashed and its box
+   is disabled, because the owner must be able to see it and not change it. */
+.settings-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-provider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-provider-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.settings-provider-name {
+  color: var(--text-primary);
+}
+
+.settings-provider-host {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.settings-provider-state {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  /* the reason can be a sentence ("Unavailable: disabled by the server
+     administrator") and used to push the page wider than a 390 px viewport */
+  white-space: normal;
+}
+
+.kind-off .settings-provider-state {
+  color: var(--accent);
+}
+
+.kind-unavailable,
+.kind-needs_config {
+  border-bottom-style: dashed;
+}
+
+.kind-unavailable .settings-provider-name,
+.kind-needs_config .settings-provider-name {
+  color: var(--text-muted);
+}
+
+/* a heading row draws no control */
+.kind-group {
+  border-bottom: 1px solid var(--border);
+  margin-top: 14px;
+  padding-bottom: 4px;
+}
+
+.kind-group .settings-checkbox,
+.kind-group .settings-provider-state,
+.kind-group .settings-provider-host {
+  display: none;
+}
+
+.kind-group .settings-provider-name {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* the local-only row says why it has nothing to switch */
+.kind-local .settings-checkbox {
+  display: none;
+}
+
+.settings-provider-disclosure {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.settings-provider-disclosure:empty {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .settings-provider {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-provider-host {
+    text-align: left;
+  }
 }

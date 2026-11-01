@@ -12,6 +12,7 @@
 #include "Config.h"
 #include "Scraping/ApiEngines.h"
 #include "Infobox/Wikipedia.h"
+#include "Providers/Providers.h"
 #include "Proxy/Proxy.h"
 #include "Routes/History.h"
 #include "Routes/Home.h"
@@ -128,11 +129,16 @@ int main(int argc, char **argv) {
   /* --config PATH overrides the file, --check-config validates and exits */
   const char *config_path = getenv("OMNISEARCH_CONFIG");
   int check_only = 0;
+  int list_providers = 0;
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
       config_path = argv[++i];
     } else if (strcmp(argv[i], "--check-config") == 0) {
       check_only = 1;
+    } else if (strcmp(argv[i], "--providers") == 0) {
+      /* one line per provider, "id<TAB>host", so a test can loop over the
+         registry instead of hard-coding the list it is meant to check */
+      list_providers = 1;
     }
   }
   if (!config_path || !config_path[0])
@@ -141,6 +147,32 @@ int main(int argc, char **argv) {
   int config_rc = load_config(config_path, &cfg);
   if (config_rc != 0 && config_rc != 2) {
     fprintf(stderr, "[WARN] Could not load %s, using defaults\n", config_path);
+  }
+
+  if (list_providers) {
+    apply_engines_config(cfg.engines);
+    if (cfg.definitions_dir[0])
+      engines_load_definitions(cfg.definitions_dir);
+    ProviderRow rows[256];
+    int n = providers_build(rows, 256);
+    for (int i = 0; i < n; i++) {
+      /* pipe-separated: a shell read with tab IFS collapses the empty host
+         field and shifts every later column */
+      ProviderState st = provider_state(&rows[i]);
+      int is_engine = 0;
+      for (int e = 0; e < ENGINE_COUNT; e++)
+        if (strcmp(ENGINE_REGISTRY[e].id, rows[i].id) == 0)
+          is_engine = 1;
+      printf("%s|%s|%s|%s|%s\n", rows[i].id,
+             rows[i].host ? rows[i].host : "",
+             provider_group_label(rows[i].group),
+             !rows[i].toggleable ? "local"
+             : st == PS_ON      ? "on"
+             : st == PS_OFF     ? "off"
+                                : "unavailable",
+             is_engine ? "engine" : "widget");
+    }
+    return 0;
   }
 
   if (check_only) {

@@ -313,7 +313,13 @@ config-check:
 	@./tests/test_c15_config.sh
 
 render-check:
+	@./tests/test_template_balance.sh
 	@./tests/test_context_capacity.sh
+
+# K1.4: a toggle must change what leaves the machine. Needs a live server and
+# a proxy that makes no requests, so it is not in the default check chain.
+toggle-check:
+	@./tests/test_k1_toggle_effect.sh
 
 # G1: engines="*" must mean the registry default set, not "everything"
 engines-check:
@@ -524,6 +530,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check terms-check hrefs-check defs-check categories-check context-check translate-check places-check weights-check k7-check ua-check answers-check junk-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check toggle-check terms-check hrefs-check defs-check categories-check context-check translate-check places-check weights-check k7-check ua-check answers-check junk-check smoke
 
-.PHONY: terms-check hrefs-check answersfanout-check widget-check searxng-check optin-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
+.PHONY: toggle-check terms-check hrefs-check answersfanout-check widget-check searxng-check optin-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

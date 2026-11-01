@@ -67,6 +67,7 @@ void locale_parts(const char *locale, char *lang, size_t lang_size, char *region
 int is_engine_id_enabled(const char *engine_id);
 int get_user_engines(char ***out_ids, int *out_count);
 int user_engines_contains(const char *engine_id, char **ids, int count);
+int opt_in_enabled_for(const char *provider_id);
 char *get_default_search_engine(void);
 
 void free_string_matrix(char ***matrix, int *inner_counts, int row_count);

@@ -77,6 +77,13 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
    exist: "5" and "53" are not expressions, so the card would vanish mid-entry.
    Returns 1 whenever `kind` names a widget, with `out->ok` saying whether the
    expression evaluated. */
+/* K1.4: the caller owns the provider switch, so it installs this hook and the
+   resolver asks it before contacting anything. A widget that only hides its
+   card still fetches; this is checked before the request, not after.
+   NULL means "no gate", which is what the unit tests want. */
+typedef int (*AnswerProviderGate)(const char *kind);
+void answer_box_set_provider_gate(AnswerProviderGate gate);
+
 int answer_box_widget_forced(const char *kind, const char *query,
                              const char *lang, WidgetData *out);
 

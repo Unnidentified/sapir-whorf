@@ -13,6 +13,7 @@
    filter. The inbound limiter applies exactly as it does to /search. */
 
 #include "../Infobox/AnswerBox.h"
+#include "../Providers/Providers.h"
 #include "../Limiter/RateLimit.h"
 #include "../Utility/Utility.h"
 #include "Config.h"
@@ -26,6 +27,15 @@ extern Config global_config;
 static int widget_fragment(const char *kind, UrlParams *params) {
   if (!kind || !params)
     return 0;
+
+  /* K1.4: the endpoint is a second door to the same provider, so it takes the
+     same switch. A request that arrives here with the provider off gets the
+     same answer as one for a kind that does not exist. */
+  {
+    const char *provider = provider_id_for_widget_kind(kind);
+    if (provider && provider_is_off(provider))
+      return 0;
+  }
 
   /* the limiter, same budget as the search path: a card fetch is a page fetch
      as far as this server is concerned */

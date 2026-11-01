@@ -318,6 +318,17 @@ int answer_box_resolve(const char *query, AnswerBoxResult *out) {
    the same engine the answer box uses and hands the pieces to the template.
    Nothing here builds HTML, which is what made the old cards impossible to
    theme (see J2). */
+static AnswerProviderGate provider_gate;
+
+void answer_box_set_provider_gate(AnswerProviderGate gate) {
+  provider_gate = gate;
+}
+
+/* K1.4: asked before the request, never after */
+static int provider_denied(const char *kind) {
+  return provider_gate && provider_gate(kind);
+}
+
 int answer_box_widget(const char *query, const char *lang, const char *append,
                       WidgetData *out) {
   char work[320];
@@ -340,7 +351,8 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
   {
     char text[256];
     char target[8];
-    if (translate_parse(work, lang, text, sizeof(text), target,
+    if (!provider_denied("translate") &&
+        translate_parse(work, lang, text, sizeof(text), target,
                         sizeof(target))) {
       translate_widget(text, target, NULL, out, lang);
       return 1;
@@ -350,14 +362,15 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
   /* J4c/J4d: place and price requests, also before the calculator */
   {
     char place[256];
-    if (places_parse(work, place, sizeof(place))) {
+    if (!provider_denied("place") &&
+        places_parse(work, place, sizeof(place))) {
       places_widget(place, out);
       return 1;
     }
   }
   {
     char ticker[16];
-    if (stocks_parse(work, ticker, sizeof(ticker))) {
+    if (!provider_denied("stock") && stocks_parse(work, ticker, sizeof(ticker))) {
       /* K11: 0 means "no card", and then the query is a normal search */
       return stocks_widget(ticker,
                            stocks_symbol_was_explicit(work, ticker), out);
@@ -376,6 +389,10 @@ int answer_box_widget_forced(const char *kind, const char *query,
   if (!out || !kind)
     return 0;
   memset(out, 0, sizeof(*out));
+  /* K1.4: before the request, not after: a widget whose provider is off must
+     not be fetched and then hidden. */
+  if (provider_denied(kind))
+    return 0;
   /* J4b: w=translate carries the text to translate in q, and the target is
      either "to <language>" inside it or the reader's own language. */
   if (strcmp(kind, "translate") == 0) {
