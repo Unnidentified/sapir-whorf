@@ -2223,6 +2223,42 @@ int results_handler(UrlParams *params) {
          URL. Only the first page asks: a row on page 2 is rarely the one a
          reader studies. */
       char *desc_href = NULL;
+      /* K7: with no snippet at all, the URL's own path is a true description of
+         what the link is - the same thing other engines show when a site's
+         robots.txt stops them quoting it. The fetcher may replace it. */
+      char breadcrumb[256] = "";
+      if (!cands[c].snippet || !cands[c].snippet[0]) {
+        const char *p = strstr(cands[c].url, "://");
+        p = p ? p + 3 : cands[c].url;
+        const char *slash = strchr(p, '/');
+        size_t host_len = slash ? (size_t)(slash - p) : strlen(p);
+        size_t used = 0;
+        if (host_len > 0 && host_len < sizeof(breadcrumb)) {
+          memcpy(breadcrumb, p, host_len);
+          used = host_len;
+          if (strncmp(breadcrumb, "www.", 4) == 0) {
+            memmove(breadcrumb, breadcrumb + 4, used - 4 + 1);
+            used -= 4;
+          }
+          const char *seg = slash;
+          int taken = 0;
+          while (seg && *seg == '/' && taken < 3 && used + 3 < sizeof(breadcrumb)) {
+            const char *end = strchr(seg + 1, '/');
+            size_t seg_len = end ? (size_t)(end - seg - 1) : strlen(seg + 1);
+            if (seg_len == 0)
+              break;
+            if (used + seg_len + 8 >= sizeof(breadcrumb))
+              break;
+            memcpy(breadcrumb + used, " \xE2\x80\xBA ", 4);
+            used += 4;
+            memcpy(breadcrumb + used, seg + 1, seg_len);
+            used += seg_len;
+            breadcrumb[used] = '\0';
+            taken++;
+            seg = end;
+          }
+        }
+      }
       if (page == 1 && (!cands[c].snippet || !cands[c].snippet[0]) &&
           (strncmp(cands[c].url, "http://", 7) == 0 ||
            strncmp(cands[c].url, "https://", 8) == 0))
@@ -2231,7 +2267,8 @@ int results_handler(UrlParams *params) {
           cands[c].url,
           pretty_url,
           cands[c].title,
-          cands[c].snippet,
+          cands[c].snippet && cands[c].snippet[0] ? cands[c].snippet
+                                                  : breadcrumb,
           base_url,
           cands[c].kind && cands[c].kind[0]
               ? cands[c].kind

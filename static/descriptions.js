@@ -29,7 +29,9 @@
         return response.text();
       })
       .then(function (text) {
-        if (text && text.trim() && target && !target.textContent.trim()) {
+        /* the server may have filled a breadcrumb already; a real description
+           replaces it, which is the whole point of asking */
+        if (text && text.trim() && target) {
           target.textContent = text.trim();
           target.classList.add("desc-filled");
         }

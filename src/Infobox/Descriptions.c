@@ -85,6 +85,40 @@ int description_extract(const char *html, size_t len, char *out, size_t cap) {
   if (!doc)
     return 0;
 
+  /* a page can say "do not quote me": nosnippet, or max-snippet:0 */
+  {
+    xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
+    if (ctx) {
+      xmlXPathObjectPtr obj = xmlXPathEvalExpression(
+          (const xmlChar *)"//meta[@name='robots']/@content", ctx);
+      if (obj && obj->type == XPATH_NODESET && obj->nodesetval &&
+          obj->nodesetval->nodeNr > 0) {
+        xmlChar *content = xmlNodeGetContent(obj->nodesetval->nodeTab[0]);
+        if (content) {
+          char lowered[256];
+          snprintf(lowered, sizeof(lowered), "%s", (const char *)content);
+          for (char *c = lowered; *c; c++)
+            if (*c >= 'A' && *c <= 'Z')
+              *c = (char)(*c - 'A' + 'a');
+          int denied = strstr(lowered, "nosnippet") != NULL ||
+                       strstr(lowered, "max-snippet:0") != NULL ||
+                       strstr(lowered, "max-snippet: 0") != NULL;
+          xmlFree(content);
+          if (denied) {
+            if (obj)
+              xmlXPathFreeObject(obj);
+            xmlXPathFreeContext(ctx);
+            xmlFreeDoc(doc);
+            return 0;
+          }
+        }
+      }
+      if (obj)
+        xmlXPathFreeObject(obj);
+      xmlXPathFreeContext(ctx);
+    }
+  }
+
   /* the order is the one a reader would pick: what the site says it is for a
      social card, then its own description, then its opening paragraph */
   static const char *XPATH[] = {

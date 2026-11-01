@@ -83,6 +83,13 @@ int main(void) {
   expect_empty("");
   /* a short paragraph is not a description */
   expect_empty("<html><body><p>Short.</p></body></html>");
+  /* a page that says nosnippet gets no description, even with a good one */
+  expect_empty("<html><head><meta name=\"description\" content=\"This text is "
+               "long enough to be a description but the page said no.\">"
+               "<meta name=\"robots\" content=\"nosnippet\"></head></html>");
+  expect_empty("<html><head><meta name=\"description\" content=\"Also long "
+               "enough to be used, but max-snippet is zero here.\">"
+               "<meta name=\"robots\" content=\"max-snippet:0\"></head></html>");
 
   robots("User-agent: *\nDisallow: /private\n", "/private/x", 0);
   robots("User-agent: *\nDisallow: /private\n", "/public/x", 1);
