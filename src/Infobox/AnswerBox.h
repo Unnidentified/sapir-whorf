@@ -36,6 +36,8 @@ typedef struct {
   char note[96];             /* "Error", "Infinity", or a short caveat */
   char href[256];            /* optional "more" link, built in C so no template
                                 has to url-encode anything */
+  char trend[8];             /* K11: "up"/"down" for the card's colour; the
+                                arrow in the text is the same fact in words */
   char chart_path[2048];     /* K11: an SVG path for the sparkline, in a 240x60
                                 box. Path data, not markup: the template owns
                                 the <svg> element and every colour comes from a

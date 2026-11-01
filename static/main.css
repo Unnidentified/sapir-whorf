@@ -20,6 +20,11 @@
        Measured with tools/check_themes.py across all 16 themes. */
     --pos: color-mix(in srgb, #4fbf7b 55%, var(--text-primary));
     --neg: color-mix(in srgb, #e05a5a 55%, var(--text-primary));
+    /* K11: direction, named for what it means. Derived from the two semantic
+       colours above, so a theme inherits them; the arrow on the card is what
+       carries the meaning for anyone who cannot see the colour. */
+    --up: var(--pos);
+    --down: var(--neg);
     --focus: color-mix(in srgb, var(--accent) 70%, transparent);
     --map-filter: none;
 
@@ -2556,6 +2561,12 @@ input[type="color"]:focus-visible {
   height: 3.2rem;
   margin: 0.35rem 0 0.1rem;
   color: var(--accent);
+}
+.widget-chart.trend-up {
+  color: var(--up);
+}
+.widget-chart.trend-down {
+  color: var(--down);
 }
 /* K11: the chart window links. Quiet, because the card is about the number. */
 .stock-ranges {

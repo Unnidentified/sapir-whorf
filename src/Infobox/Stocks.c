@@ -661,6 +661,36 @@ int stocks_widget(const char *ticker, int explicit_symbol, const char *lang,
     }
   }
 
+  /* K11: which way the window went, so the chart can colour itself. The arrow
+     in the note is the same information in words. */
+  {
+    double first = 0, last = 0;
+    int have_first = 0;
+    json_t *indicators =
+        json_object_get(json_array_get(results, 0), "indicators");
+    json_t *quote = indicators ? json_object_get(indicators, "quote") : NULL;
+    json_t *series =
+        json_is_array(quote) ? json_object_get(json_array_get(quote, 0), "close")
+                             : NULL;
+    if (json_is_array(series)) {
+      size_t n = json_array_size(series);
+      for (size_t i = 0; i < n; i++) {
+        json_t *v = json_array_get(series, i);
+        if (!json_is_number(v))
+          continue;
+        if (!have_first) {
+          first = json_number_value(v);
+          have_first = 1;
+        }
+        last = json_number_value(v);
+      }
+    }
+    if (have_first && last > first)
+      snprintf(out->trend, sizeof(out->trend), "up");
+    else if (have_first && last < first)
+      snprintf(out->trend, sizeof(out->trend), "down");
+  }
+
   out->ok = 1;
   json_decref(root);
   return 1;

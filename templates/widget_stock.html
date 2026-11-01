@@ -12,7 +12,7 @@
   {{if exists widget_chart}}
   <!-- K11: drawn here, from path data the server computed: no script, no image
        request, and the colour comes from a token -->
-  <svg class="widget-chart" viewBox="0 0 240 60" role="img"
+  <svg class="widget-chart{{if widget_trend}} trend-{{widget_trend}}{{endif}}" viewBox="0 0 240 60" role="img"
        aria-label="{{l("stock_chart_label")}}" preserveAspectRatio="none">
     <title>{{l("stock_chart_label")}}</title>
     <path d="{{widget_chart}}" fill="none" stroke="currentColor"
