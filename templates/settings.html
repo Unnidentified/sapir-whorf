@@ -280,6 +280,11 @@
                          closes it. Secrets are write-only - the page renders
                          the last four characters only, and a blank field on
                          save keeps what is stored. -->
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
+                    </div>
+                </form>
+
                     <section class="settings-section" id="accounts">
                         <h3 class="settings-section-title">{{l("accounts_label")}}</h3>
                         <p class="settings-section-desc">{{l("accounts_desc")}}</p>
@@ -319,10 +324,6 @@
                         {{endif}}
                         {{endfor}}
                     </section>
-                    <div class="settings-actions">
-                        <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
-                    </div>
-                </form>
 
                 <!-- K1.2b: its own form, so the parameter count stays under beaker's 16 -->
                 <form action="/save_settings" method="GET" id="weights-form" class="settings-form" novalidate>
@@ -357,6 +358,9 @@
                          truncated one. -->
                     <input type="hidden" name="engines_seen" value="{{provider_count}}">
                     <input type="hidden" name="off" value="" id="off-field">
+                    {{if too_many_notice}}
+                    <p class="cached-note">{{l("too_many_settings")}}</p>
+                    {{endif}}
                     <section class="settings-section">
                         <h3 class="settings-section-title">{{l("engines_label")}}</h3>
                         <p class="settings-section-desc">{{l("engines_desc_all")}}</p>

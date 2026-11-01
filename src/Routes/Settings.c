@@ -33,10 +33,13 @@ static char *format_theme_name(const char *theme) {
 
 int settings_handler(UrlParams *params) {
   const char *query = "";
+  const char *toomany = "";
   if (params) {
     for (int i = 0; i < params->count; i++) {
       if (strcmp(params->params[i].key, "q") == 0) {
         query = params->params[i].value;
+      } else if (strcmp(params->params[i].key, "toomany") == 0) {
+        toomany = params->params[i].value;
       }
     }
   }
@@ -269,6 +272,10 @@ int settings_handler(UrlParams *params) {
   TemplateContext ctx = new_context();
   beaker_set_locale(&ctx, locale);
   context_set(&ctx, "query", query);
+  /* L1/K1.2b: the save refused because the submission was cut off by the
+     server's parameter limit. Say so on the page the owner is sent back to,
+     instead of the blank 500 they used to get. */
+  context_set(&ctx, "too_many_notice", (toomany && toomany[0]) ? "1" : "");
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "title_font", get_title_font());
   /* one key: the templates want the multiplier, and nothing else read the

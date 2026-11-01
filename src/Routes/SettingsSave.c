@@ -351,12 +351,11 @@ int settings_save_handler(UrlParams *params) {
             "[WARN] engines save refused: %d parameters reached a limit of 16 "
             "while %d providers were shown\n",
             params->count, engines_seen);
-    send_status("500 Internal Server Error");
-    send_response(
-        "<h1>Too many settings at once</h1><p>The form exceeded the server's "
-        "parameter limit, so nothing was saved. Reload the settings page and "
-        "save fewer providers at a time.</p>");
-    return 0;
+    /* A 500 with an empty body is what the owner actually saw: send_status and
+       send_response do not stack here, the response went out with
+       Content-Length: 0 and the explanation was lost. Nothing was saved, so the
+       honest outcome is "go back to the page and say why", not a blank error. */
+    send_redirect("/settings?toomany=1");
   }
 
   if (engines_present) {

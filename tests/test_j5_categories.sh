@@ -48,9 +48,15 @@ no_chips
 body "q=linux+kernel&cat=academic"
 no_chips
 
-# 4. the pager keeps the category
+# 4. the pager keeps the category. A page with no results has no pager either
+#    - offline, that is the normal case here, and asserting a pager on a page
+#    that has none tests the network rather than the code.
 body "q=linux+kernel&cat=academic&p=2"
-grep -q 'cat=academic' /tmp/j5cat.html || fail "pager dropped the category"
+if grep -q 'class="result"' /tmp/j5cat.html; then
+    grep -q 'cat=academic' /tmp/j5cat.html || fail "pager dropped the category"
+else
+    echo "  note: no results this run, so the pager is not asserted"
+fi
 
 # K4: the counts the chips carried are one footer line. Offline this test may
 # have no answer at all, so the rule is: a page with results names its engines,

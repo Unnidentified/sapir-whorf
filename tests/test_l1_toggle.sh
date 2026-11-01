@@ -120,5 +120,19 @@ done
 curl -sS -o /dev/null -m 20 -b "$JAR" -c "$JAR" \
      "http://127.0.0.1:$PORT/save_settings?engines_seen=40&off=" 2>/dev/null
 
+# K1.2b: a submission past beaker's sixteen parameters must not save anything
+# silently - and must not answer with a blank 500 either, which is what the
+# owner actually saw. It redirects to the page with the reason on it.
+Q="engines_seen=23&q=linux"
+for id in reddit bing yahoo brave wikipedia openalex crossref arxiv stackexchange hn openlibrary translate stocks places; do
+    Q="$Q&off_$id=1"
+done
+code=$(curl -sS -o /dev/null -m 20 -w "%{http_code}" "http://127.0.0.1:$PORT/save_settings?$Q")
+[ "$code" = "302" ] && say_pass || say_fail "the over-limit save did not redirect ($code)"
+loc=$(curl -sS -o /dev/null -m 20 -D - "http://127.0.0.1:$PORT/save_settings?$Q" 2>/dev/null | grep -i "^location:" | tr -d '\r')
+echo "$loc" | grep -q "toomany=1" && say_pass || say_fail "the refusal did not carry toomany=1"
+curl -sS -L -o /tmp/l1toomany.html -m 20 "http://127.0.0.1:$PORT/save_settings?$Q"
+grep -q "cached-note" /tmp/l1toomany.html && say_pass || say_fail "the page the refusal lands on says nothing"
+
 echo "L1 toggle: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
