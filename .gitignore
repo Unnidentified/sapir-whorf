@@ -35,3 +35,4 @@ tests/test_k7_descriptions
 # L3: the page-owned file of server settings and credentials
 secrets.ini
 omnisearch.err.old
+tests/test_l3_secrets
