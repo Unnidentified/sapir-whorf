@@ -14,6 +14,7 @@
 #include "../Infobox/CalcKeys.h"
 #include "../Query/Placeholders.h"
 #include "../Providers/Providers.h"
+#include "../Scraping/Reddit.h"
 #include "../Infobox/Descriptions.h"
 #include "../Query/QueryAnalysis.h"
 #include "../Query/Tokens.h"
@@ -62,7 +63,7 @@ enum {
   /* K7: the eleventh field is the link the page uses to ask for a real
      description when the engines gave none - empty when there is nothing to
      ask for */
-  RESULT_FIELD_COUNT = 11,
+  RESULT_FIELD_COUNT = 12,
 };
 
 static InfoBox fetch_wiki_wrapper(char *query) {
@@ -1533,8 +1534,123 @@ int results_handler(UrlParams *params) {
     if (strcasestr(raw_query, "reddit") || strcasestr(raw_query, "r/"))
       reddit_wanted = 1;
   }
-  if (reddit_wanted && page == 1 && engine_idx < ENGINE_COUNT &&
-      !provider_is_off("reddit")) {
+  /* L5: Reddit's own API first, when the owner's app is configured.
+   *
+   * This is the rung that returns Reddit's ranking with real scores, comment
+   * counts and subreddits. It needs the owner's registered client id and the
+   * username Reddit's rules require in the User-Agent; with either missing,
+   * Reddit.makes no request at all and the lane below carries the query as it
+   * always has.
+   *
+   * The lane is skipped when this answered, because two more requests to two
+   * rate-limited engines for the same threads is waste. */
+  int reddit_oauth_results = 0;
+  SearchResult *oauth_results_area = NULL;
+  int oauth_result_count = 0;
+  int oauth_job_index = -1;
+  /* The OAuth rows are a real source but not a scraped one, so the job needs an
+     engine behind it: every loop below reads jobs[i].engine->id, and leaving it
+     NULL crashed the debug line, the health recorder and the group tally. This
+     is a description of a source, not something scrape_engines_parallel is ever
+     asked to build a URL for. */
+  static const SearchEngine reddit_oauth_engine = {
+      .id = "reddit",
+      .name = "Reddit",
+      .base_url = "https://oauth.reddit.com",
+      .index_group = "reddit",
+      .weight = 1.0,
+      .enabled = 1,
+  };
+  if (reddit_wanted && page == 1 && !provider_is_off("reddit") &&
+      reddit_configured()) {
+    RedditPost *posts = NULL;
+    int post_count = 0;
+    char why[192] = "";
+    /* the r/<sub> token is a destination, not a search term: Reddit's own
+       search is already narrowed by /r/<sub>/, so asking for it again finds
+       nothing */
+    char terms_buf[512];
+    snprintf(terms_buf, sizeof(terms_buf), "%s",
+             analysis.engine_core[0] ? analysis.engine_core : raw_query);
+    if (analysis.discussion_site[0]) {
+      const char *tok = analysis.discussion_site; /* "r/<sub>" */
+      char *at = strstr(terms_buf, tok);
+      if (at) {
+        memmove(at, at + strlen(tok), strlen(at + strlen(tok)) + 1);
+        /* collapse the space the removal left behind */
+        char *w = at;
+        while (*w == ' ')
+          w++;
+        if (w != at)
+          memmove(at, w, strlen(w) + 1);
+        if (!*terms_buf)
+          snprintf(terms_buf, sizeof(terms_buf), "reddit");
+        /* trim what the removal left at either end */
+        size_t tlen = strlen(terms_buf);
+        while (tlen > 0 && terms_buf[tlen - 1] == ' ')
+          terms_buf[--tlen] = '\0';
+      }
+    }
+    const char *terms = terms_buf;
+    /* discussion_site is either "r/<sub>" or the literal "reddit.com" (F3):
+       skipping two bytes unconditionally turned the second into "ddit.com" */
+    const char *sub = NULL;
+    if (strncmp(analysis.discussion_site, "r/", 2) == 0 &&
+        analysis.discussion_site[2])
+      sub = analysis.discussion_site + 2;
+    if (reddit_search(terms, sub, &posts, &post_count, why, sizeof(why)) == 0 &&
+        post_count > 0) {
+      /* one job's worth of results, merged like any other source */
+      all_results[engine_idx] = calloc((size_t)post_count, sizeof(SearchResult));
+      if (all_results[engine_idx]) {
+        for (int r = 0; r < post_count; r++) {
+          SearchResult *hit = &all_results[engine_idx][r];
+          hit->url = strdup(posts[r].permalink);
+          hit->title = strdup(posts[r].title);
+          /* a link post has no selftext: the linked domain is what describes
+             it, and an empty snippet is better than a fabricated one */
+          char snippet[600];
+          if (posts[r].selftext[0]) {
+            snprintf(snippet, sizeof(snippet), "%.300s", posts[r].selftext);
+          } else if (posts[r].link_domain[0]) {
+            snprintf(snippet, sizeof(snippet), "Link post on %s",
+                     posts[r].link_domain);
+          } else {
+            snippet[0] = '\0';
+          }
+          hit->snippet = snippet[0] ? strdup(snippet) : NULL;
+          hit->source = strdup(posts[r].subreddit);
+          hit->author = posts[r].author[0] ? strdup(posts[r].author) : NULL;
+          if (posts[r].created_utc > 0) {
+            char when[32];
+            struct tm tm_utc;
+            gmtime_r(&posts[r].created_utc, &tm_utc);
+            strftime(when, sizeof(when), "%d %b %Y", &tm_utc);
+            hit->date = strdup(when);
+          }
+          hit->kind = strdup("discussion");
+          snprintf(hit->index_group, sizeof(hit->index_group), "reddit");
+          hit->score = posts[r].score;
+          hit->comments = posts[r].comments;
+        }
+        /* NOT a job: there is nothing to fetch, and scrape_engines_parallel
+           would try to build a URL for it (it dereferences query and engine).
+           The results are handed to the merge loop through a side slot. */
+        oauth_results_area = all_results[engine_idx];
+        oauth_result_count = post_count;
+        all_results[engine_idx] = NULL;  /* moved, not copied: do not free */
+        reddit_oauth_results = post_count;
+        if (getenv("OMNI_PERF"))
+          fprintf(stderr, "[L5] reddit oauth delivered %d rows\n", post_count);
+      }
+    } else if (getenv("OMNI_PERF")) {
+      fprintf(stderr, "[L5] reddit oauth declined: %s\n", why);
+    }
+    reddit_free_posts(posts, post_count);
+  }
+
+  if (!reddit_oauth_results && reddit_wanted && page == 1 &&
+      engine_idx < ENGINE_COUNT && !provider_is_off("reddit")) {
     /* K5.2 problem 2: one engine wide. DuckDuckGo is the most rate-limited
        engine in the set, and the two measurements on record disagree about
        who honours the operator (tools/queries-reddit.tsv: Yahoo 12 plain / 89
@@ -1613,6 +1729,24 @@ int results_handler(UrlParams *params) {
 
   if (engine_idx > 0) {
     scrape_engines_parallel(jobs, engine_idx);
+  }
+
+  /* L5: the OAuth rows join the merge as a pseudo-engine at the end. They were
+     never a job - there is nothing to fetch - so they are attached here, after
+     the fan-out, and the merge loop below treats them like any other source. */
+  if (oauth_results_area && oauth_result_count > 0 && engine_idx < ENGINE_COUNT) {
+    all_results[engine_idx] = oauth_results_area;
+    memset(&jobs[engine_idx], 0, sizeof(jobs[engine_idx]));
+    jobs[engine_idx].engine = (SearchEngine *)&reddit_oauth_engine;
+    jobs[engine_idx].results_count = oauth_result_count;
+    jobs[engine_idx].status = SCRAPE_STATUS_OK;
+    jobs[engine_idx].http_status = 200;
+    oauth_job_index = engine_idx;
+    engine_idx++;
+    /* the merge loops below stop at enabled_engine_count, which was taken
+       before this append: without this the OAuth rows would be fetched,
+       counted and then silently dropped */
+    enabled_engine_count = engine_idx;
   }
 
   /* F2 recovery, bounded to one extra round: if the batch under-delivered and
@@ -1842,14 +1976,18 @@ int results_handler(UrlParams *params) {
       if (!warning_message)
         continue;
 
+      /* the OAuth pseudo-job has no engine definition behind it */
+      const char *source_name =
+          jobs[i].engine ? jobs[i].engine->name :
+          (i == oauth_job_index ? "reddit" : "unknown");
       if (jobs[i].http_status >= 400) {
         char warning_with_status[BUFFER_SIZE_LARGE];
         snprintf(warning_with_status, sizeof(warning_with_status),
                  "%s (HTTP %ld)", warning_message, jobs[i].http_status);
-        add_warning_to_collection(jobs[i].engine->name, warning_with_status,
+        add_warning_to_collection(source_name, warning_with_status,
                                   &warning_matrix);
       } else {
-        add_warning_to_collection(jobs[i].engine->name, warning_message,
+        add_warning_to_collection(source_name, warning_message,
                                   &warning_matrix);
       }
     }
@@ -1934,6 +2072,12 @@ int results_handler(UrlParams *params) {
             cands[existing].source = all_results[i][j].source;
           if (!cands[existing].kind && all_results[i][j].kind)
             cands[existing].kind = all_results[i][j].kind;
+          /* L5: the counters follow the same rule - a row that has them keeps
+             them, and a source that knows them fills a gap */
+          if (!cands[existing].score_points && all_results[i][j].score)
+            cands[existing].score_points = all_results[i][j].score;
+          if (!cands[existing].comment_count && all_results[i][j].comments)
+            cands[existing].comment_count = all_results[i][j].comments;
           cands[existing].score += score;
           cands[existing].rrf += score;
           cands[existing].engine_mask |= (1u << i);
@@ -1989,6 +2133,8 @@ int results_handler(UrlParams *params) {
         cand->author = all_results[i][j].author;
         cand->source = all_results[i][j].source;
         cand->kind = all_results[i][j].kind;
+        cand->score_points = all_results[i][j].score;
+        cand->comment_count = all_results[i][j].comments;
         if (i < 32) {
           cand->engine_groups[i] =
               (all_results[i][j].index_group[0])
@@ -2226,6 +2372,19 @@ int results_handler(UrlParams *params) {
          link is signed so the endpoint cannot be used to fetch an arbitrary
          URL. Only the first page asks: a row on page 2 is rarely the one a
          reader studies. */
+      char score_line[96] = "";
+      if (cands[c].score_points > 0 || cands[c].comment_count > 0) {
+        char points[32] = "", comments[32] = "";
+        if (cands[c].score_points > 0)
+          snprintf(points, sizeof(points), "%d point%s", cands[c].score_points,
+                   cands[c].score_points == 1 ? "" : "s");
+        if (cands[c].comment_count > 0)
+          snprintf(comments, sizeof(comments), "%d comment%s",
+                   cands[c].comment_count,
+                   cands[c].comment_count == 1 ? "" : "s");
+        snprintf(score_line, sizeof(score_line), "%s%s%s", points,
+                 points[0] && comments[0] ? " · " : "", comments);
+      }
       char *desc_href = NULL;
       /* K7: with no snippet at all, the URL's own path is a true description of
          what the link is - the same thing other engines show when a site's
@@ -2282,6 +2441,9 @@ int results_handler(UrlParams *params) {
           cands[c].source ? cands[c].source : "",
           cands[c].author ? cands[c].author : "",
           desc_href ? desc_href : "",
+          /* L5: "1.2k points · 340 comments" for a discussion row, empty for
+             everything else. Built here so the template needs no arithmetic. */
+          score_line,
       };
       string_matrix_append(&results_matrix, values, RESULT_FIELD_COUNT);
 

@@ -26,6 +26,11 @@ typedef struct {
   char *author;      /* channel, uploader, organisation */
   char *source;      /* the engine or site that published it */
   char *kind;        /* "video", "news", "paper", "package", ... or empty */
+  /* L5: a discussion result carries what makes it worth reading - a score and
+     a comment count. 0 means the source did not say, and the row shows nothing
+     rather than "0 points", which would be a claim. */
+  int score;
+  int comments;
 } SearchResult;
 
 typedef enum {

@@ -6,6 +6,7 @@
 #include <strings.h>
 
 #include "Cache/Cache.h"
+#include "Scraping/Reddit.h"
 #include "Config.h"
 #include "Scraping/Scraping.h"
 #include "Utility/Utility.h"
@@ -244,8 +245,16 @@ ProviderState provider_state(const ProviderRow *row) {
 
 int provider_needs_config(const ProviderRow *row) {
   extern Config global_config;
-  return row && strcmp(row->id, "searxng") == 0 &&
-         global_config.searxng_url[0] == '\0';
+  if (!row)
+    return 0;
+  if (strcmp(row->id, "searxng") == 0)
+    return global_config.searxng_url[0] == '\0';
+  /* L5: Reddit's lane works without credentials (the site: operators), so the
+     row is genuinely on. The OAuth path is the better one and cannot start
+     without a client id - the state says which of the two is running. */
+  if (strcmp(row->id, "reddit") == 0)
+    return !reddit_configured();
+  return 0;
 }
 
 /* L4: which field a row is waiting for. SearXNG needs a URL, YaCy an instance,
@@ -260,6 +269,8 @@ const char *provider_reason_field(const ProviderRow *row) {
     return "yacy_instance";
   if (strcmp(row->id, "google_cse") == 0 || strcmp(row->id, "google") == 0)
     return "google_cse_cx";
+  if (strcmp(row->id, "reddit") == 0)
+    return "reddit_client_id";
   return "";
 }
 
@@ -291,6 +302,11 @@ ProviderReason provider_reason(const ProviderRow *row) {
 }
 
 const char *provider_state_note(const ProviderRow *row) {
+  /* Reddit without credentials still works: the lane uses site: operators.
+     Saying "On" alone would hide that a better path is one field away. */
+  if (row && strcmp(row->id, "reddit") == 0 && provider_state(row) == PS_ON &&
+      !reddit_configured())
+    return "On, through search engines";
   switch (provider_state(row)) {
   case PS_OFF:
     return "Off (by you)";

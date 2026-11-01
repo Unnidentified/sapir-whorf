@@ -9,8 +9,21 @@
 #include <string.h>
 #include <strings.h>
 
-#define REDDIT_TOKEN_URL "https://www.reddit.com/api/v1/access_token"
-#define REDDIT_API "https://oauth.reddit.com"
+/* The two hosts, overridable so a test can point them at a local stand-in. The
+   override is read per call and the shipped configuration never sets it; a
+   value here is a test harness's choice, not a default anyone can inherit. */
+#define REDDIT_TOKEN_URL_DEFAULT "https://www.reddit.com/api/v1/access_token"
+#define REDDIT_API_DEFAULT "https://oauth.reddit.com"
+
+static const char *token_url(void) {
+  const char *override = getenv("OMNI_REDDIT_TOKEN_URL");
+  return (override && override[0]) ? override : REDDIT_TOKEN_URL_DEFAULT;
+}
+
+static const char *api_base(void) {
+  const char *override = getenv("OMNI_REDDIT_API");
+  return (override && override[0]) ? override : REDDIT_API_DEFAULT;
+}
 #define REDDIT_TIMEOUT_MS 6000L
 #define REDDIT_VERSION "1.0"
 
@@ -180,7 +193,7 @@ static int fetch_token_locked(char *why, size_t why_cap) {
   struct curl_slist *headers = NULL;
   headers = curl_slist_append(headers, auth_header); /* never logged */
   headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
-  curl_easy_setopt(curl, CURLOPT_URL, REDDIT_TOKEN_URL);
+  curl_easy_setopt(curl, CURLOPT_URL, token_url());
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -297,14 +310,15 @@ int reddit_search(const char *terms, const char *subreddit, RedditPost **out,
   char url[1600];
   if (subreddit && subreddit[0])
     snprintf(url, sizeof(url),
-             REDDIT_API "/r/%s/search?q=%s&restrict_sr=1&type=link"
+             "%s/r/%s/search?q=%s&restrict_sr=1&type=link"
                         "&sort=relevance&t=all&limit=25&raw_json=1",
+             api_base(),
              subreddit, encoded);
   else
     snprintf(url, sizeof(url),
-             REDDIT_API "/search?q=%s&type=link&sort=relevance&t=all"
+             "%s/search?q=%s&type=link&sort=relevance&t=all"
                         "&limit=25&raw_json=1",
-             encoded);
+             api_base(), encoded);
 
   char auth_header[600];
   snprintf(auth_header, sizeof(auth_header), "Authorization: bearer %s", access);

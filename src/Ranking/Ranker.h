@@ -21,6 +21,10 @@ typedef struct {
   const char *author;
   const char *source;
   const char *kind;
+  /* L5: a discussion's two counters, carried through the merge so the row can
+     show them. 0 means the source did not say. */
+  int score_points;
+  int comment_count;
   const char *engine_groups[32]; /* index group of each contributing engine */
   double engine_weights[32];     /* routing weight of each contributing engine */
 } RankDoc;

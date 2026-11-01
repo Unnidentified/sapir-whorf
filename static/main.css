@@ -2604,3 +2604,9 @@ input[type="color"]:focus-visible {
 .settings-provider-toggle:focus-visible {
   text-decoration: underline;
 }
+/* L5: a discussion result's counters. Quiet - the title is the result. */
+.result-score {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}

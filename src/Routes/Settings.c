@@ -227,9 +227,16 @@ int settings_handler(UrlParams *params) {
       ProviderReason reason = provider_reason(r);
       const char *word = provider_state_note(r);
       char sentence[320];
-      if (state == PS_ON)
+      if (state == PS_ON && word && strcmp(word, "On") != 0) {
+        /* on, but not by the best route. The state column stays one word; the
+           sentence the reader sees under the label says which route runs. */
+        snprintf(sentence, sizeof(sentence),
+                 "%s (%s)", beaker_get_locale_value(locale, "provider_state_on"),
+                 word + 4 /* skip "On, " */);
+      } else if (state == PS_ON) {
         snprintf(sentence, sizeof(sentence), "%s",
                  beaker_get_locale_value(locale, "provider_state_on"));
+      }
       else if (state == PS_OFF)
         snprintf(sentence, sizeof(sentence), "%s",
                  beaker_get_locale_value(locale, "provider_state_off"));
@@ -241,6 +248,19 @@ int settings_handler(UrlParams *params) {
                  beaker_get_locale_value(locale, "provider_state_unavailable"),
                  word ? word : "");
       provider_data[prow][14] = strdup(sentence);
+      /* the state column is a word, not a sentence: the template has one slot
+         for it and a paragraph does not fit */
+      if (state == PS_ON && word && strcmp(word, "On") != 0) {
+        char short_state[160];
+        snprintf(short_state, sizeof(short_state), "%s",
+                 beaker_get_locale_value(locale, "provider_state_on"));
+        free(provider_data[prow][14]);
+        provider_data[prow][14] = strdup(short_state);
+        if (provider_data[prow][10] && provider_data[prow][10][0] == '\0') {
+          free(provider_data[prow][10]);
+          provider_data[prow][10] = strdup(sentence);
+        }
+      }
     }
     provider_inner[prow] = 15;
     prow++;
