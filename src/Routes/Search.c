@@ -10,6 +10,7 @@
 #include "../Limiter/RateLimit.h"
 #include "../Scraping/EngineHealth.h"
 #include "../Infobox/AnswerBox.h"
+#include "../Infobox/CalcKeys.h"
 #include "../Query/Placeholders.h"
 #include "../Providers/Providers.h"
 #include "../Query/QueryAnalysis.h"
@@ -967,29 +968,11 @@ int results_handler(UrlParams *params) {
     }
   }
 
+  /* K9: one implementation of the keypad protocol, shared with /w/<kind> */
   if (key_pressed[0] && raw_query[0]) {
-    static const char *const ALLOWED[] = {
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".",
-        "+", "-", "*", "/", "(", ")", "^",
-        "Ã·", /* ÷ */
-        "Ã", /* × */
-        "â", /* − */
-        "Ï", /* π */
-        "e", "AC", "ln(", "log(", "sqrt(", "abs(", "="};
-    int allowed = 0;
-    size_t used = strlen(raw_query);
-    for (size_t a = 0; a < sizeof(ALLOWED) / sizeof(ALLOWED[0]); a++)
-      if (strcmp(key_pressed, ALLOWED[a]) == 0)
-        allowed = 1;
-    if (strcmp(key_pressed, "AC") == 0) {
-      /* a calculator shows 0 after AC. An empty q would redirect to the home
-         page and take the card with it. */
-      raw_query = "0";
-    } else if (allowed && strcmp(key_pressed, "=") != 0 && used < 480) {
-      snprintf(keyed_buffer, sizeof(keyed_buffer), "%s%s", raw_query,
-               key_pressed);
+    if (calc_apply_key(raw_query, key_pressed, keyed_buffer,
+                       sizeof(keyed_buffer)))
       raw_query = keyed_buffer;
-    }
   }
 
   context_set(&ctx, "query", raw_query);

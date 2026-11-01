@@ -13,6 +13,7 @@
    filter. The inbound limiter applies exactly as it does to /search. */
 
 #include "../Infobox/AnswerBox.h"
+#include "../Infobox/CalcKeys.h"
 #include "../Providers/Providers.h"
 #include "../Limiter/RateLimit.h"
 #include "../Utility/Utility.h"
@@ -80,11 +81,10 @@ static int widget_fragment(const char *kind, UrlParams *params) {
      protocol and the fragment has to honour it exactly as the page does */
   char work[320];
   snprintf(work, sizeof(work), "%s", query);
-  if (key[0] && strcmp(kind, "calculator") == 0) {
-    size_t used = strlen(work);
-    if (used + strlen(key) + 1 < sizeof(work))
-      snprintf(work + used, sizeof(work) - used, "%s", key);
-  }
+  /* K9: the same key protocol as the page. This used to append the raw key,
+     so AC produced the expression "2+27AC" and the card said "Error". */
+  if (key[0] && strcmp(kind, "calculator") == 0)
+    calc_apply_key(query, key, work, sizeof(work));
 
   WidgetData widget;
   memset(&widget, 0, sizeof(widget));

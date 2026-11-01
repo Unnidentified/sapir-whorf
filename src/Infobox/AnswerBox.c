@@ -1,5 +1,7 @@
 #include "AnswerBox.h"
+#include <beaker.h>
 #include <math.h>
+#include <stdlib.h>
 #include "AnswerLocal.h"
 #include "Calculator.h"
 #include "Translate.h"
@@ -59,7 +61,8 @@ static int looks_like_expression(const char *query) {
     if (*p >= '0' && *p <= '9')
       digits = 1;
     else if (*p == ' ' || *p == '.' || *p == '+' || *p == '-' || *p == '*' ||
-             *p == '/' || *p == '^' || *p == '(' || *p == ')' || *p == ',')
+             *p == '/' || *p == '^' || *p == '(' || *p == ')' || *p == ',' ||
+             *p == '%' /* K9: postfix percent is part of an expression */)
       continue;
     else
       return 0;
@@ -422,6 +425,20 @@ int answer_box_widget_forced(const char *kind, const char *query,
     query = "";
   answer_normalise_locale_numbers(query, lang && lang[0] ? lang : "en",
                                   expression, sizeof(expression));
+  /* K9: "Ans" is the last result this browser saw. It lives in a cookie so it
+     survives the round trip and works with the keypad's no-JS form. */
+  {
+    double previous = 0.0;
+    char *saved = get_cookie("calc_ans");
+    if (saved && saved[0]) {
+      char *end = NULL;
+      double parsed = strtod(saved, &end);
+      if (end && *end == '\0' && parsed == parsed)
+        previous = parsed;
+    }
+    free(saved);
+    calculator_set_ans(previous);
+  }
   snprintf(out->kind, sizeof(out->kind), "calculator");
   snprintf(out->title, sizeof(out->title), "Calculation");
   snprintf(out->expression, sizeof(out->expression), "%s", expression);
@@ -466,6 +483,9 @@ int answer_box_widget_forced(const char *kind, const char *query,
   }
   format_number(value, out->result, sizeof(out->result));
   out->ok = 1;
+  /* remember it for "Ans"; only a real number is stored, never an error */
+  set_cookie("calc_ans", out->result, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
+             false, false);
   return 1;
 }
 

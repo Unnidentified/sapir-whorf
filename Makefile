@@ -406,6 +406,10 @@ layout-check:
 theme-shots:
 	@$(PYTHON) tools/theme_shot.py
 
+# K9: the card is as wide as the keypad, at four widths
+calc-card-check:
+	@$(PYTHON) tools/calc_card_check.py
+
 # the template context has 32 slots and beaker drops the 33rd silently
 context-check:
 	@./tests/test_context_budget.sh

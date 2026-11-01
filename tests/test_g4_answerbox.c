@@ -69,6 +69,10 @@ int main(void) {
       {"2^10", "arithmetic", "1024", 1},
       {"7-3", "arithmetic", "4", 1},
       {"100 / 4", "arithmetic", "25", 1},
+      /* K9: the % key is postfix, the way a calculator means it */
+      {"50%", "arithmetic", "0.5", 1},
+      {"200*10%", "arithmetic", "20", 1},
+      {"100-25%", "arithmetic", "99.75", 1},
       {"3.5 * 2", "arithmetic", "7", 1},
       {"(2+3)*4", "arithmetic", "20", 1},
       {"2 ^ 3 ^ 2", "arithmetic", "512", 1},

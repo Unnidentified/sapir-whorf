@@ -36,6 +36,13 @@
             <button type="submit" name="key" value="+" class="key key-op">+</button>
             <button type="submit" name="key" value="π" class="key">π</button>
             <button type="submit" name="key" value="=" class="key key-eq">=</button>
+            <!-- K9: the three keys people reach for first. Each one is
+                 understood by the parser, and each works without JavaScript:
+                 backspace trims the last codepoint server-side, % is postfix,
+                 Ans is the last result (kept in a cookie). -->
+            <button type="submit" name="key" value="%" class="key key-fn">%</button>
+            <button type="submit" name="key" value="Ans" class="key key-fn">Ans</button>
+            <button type="submit" name="key" value="back" class="key key-fn" aria-label="{{l("key_backspace")}}">⌫</button>
         </div>
     </form>
 </section>

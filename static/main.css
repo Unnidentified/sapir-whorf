@@ -2134,7 +2134,8 @@ input[type="color"]:focus-visible {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
-    max-width: 320px;
+    /* K9: the keypad defines the card's width, so it has no cap of its own */
+    width: 100%;
 }
 
 .widget-calc-keypad .key {
@@ -2407,4 +2408,29 @@ input[type="color"]:focus-visible {
   .settings-provider-host {
     text-align: left;
   }
+}
+
+/* K9: the card is as wide as its keypad, not as wide as the column. A
+   calculator that is 900 px wide with a 320 px keypad in the corner reads as
+   a broken layout; Google's fills its own box and nothing more. */
+.widget-calculator {
+  width: fit-content;
+  max-width: 100%;
+  min-width: min(100%, 18rem);
+  /* the keypad is the card's width, so the only thing between them is this
+     padding - 1.2rem would be 19 px at the 100% scale, and the card then reads
+     as having a margin on the right that the left does not share */
+  padding-inline: 10px;
+}
+
+.widget-calculator .widget-calc-form,
+.widget-calculator .widget-calc-expr,
+.widget-calculator .widget-calc-result {
+  width: 100%;
+  text-align: right;
+}
+
+.widget-calculator .widget-calc-keypad {
+  width: 100%;
+  max-width: none;
 }

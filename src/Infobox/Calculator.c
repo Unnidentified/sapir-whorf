@@ -37,7 +37,15 @@ static double parse_unary(Parser *p) {
     p->pos++;
     return parse_unary(p);
   }
-  return parse_power(p);
+  double value = parse_power(p);
+  /* K9: postfix percent, the way a calculator keypad means it: "50%" is 0.5
+     and "200*10%" is 20. Only one suffix is allowed; "50%%" is an error, not
+     a silent 0.0005. */
+  if (p->buffer[p->pos] == '%') {
+    p->pos++;
+    value /= 100.0;
+  }
+  return value;
 }
 
 /* J4a: the keypad offers ln, log, sqrt and ^, so the parser has to understand
@@ -58,6 +66,12 @@ static double fn_abs(double x) { return fabs(x); }
 
 static const CalcFunc CALC_FUNCS[] = {
     {"ln", fn_ln}, {"log", fn_log10}, {"sqrt", fn_sqrt}, {"abs", fn_abs}};
+
+/* K9: "Ans" is the previous result, supplied by the caller from its own
+   cookie. A calculator keypad without it is a calculator you cannot chain. */
+static double calc_ans;
+
+void calculator_set_ans(double value) { calc_ans = value; }
 
 static double parse_factor(Parser *p) {
   skip_ws(p);
@@ -94,6 +108,13 @@ static double parse_factor(Parser *p) {
       !isalpha((unsigned char)p->buffer[p->pos + 2])) {
     p->pos += 2;
     return 3.14159265358979323846;
+  }
+  if ((p->buffer[p->pos] == 'a' || p->buffer[p->pos] == 'A') &&
+      (p->buffer[p->pos + 1] == 'n' || p->buffer[p->pos + 1] == 'N') &&
+      (p->buffer[p->pos + 2] == 's' || p->buffer[p->pos + 2] == 'S') &&
+      !isalpha((unsigned char)p->buffer[p->pos + 3])) {
+    p->pos += 3;
+    return calc_ans;
   }
   if ((p->buffer[p->pos] == 'e' || p->buffer[p->pos] == 'E') &&
       !isdigit((unsigned char)p->buffer[p->pos + 1])) {
@@ -311,7 +332,8 @@ int is_calculator_query(const char *query) {
     if (isdigit(*p) || *p == '.') {
       has_digit = 1;
     }
-    if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '^') {
+    if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '^' ||
+        *p == '%') {
       has_math_operator = 1;
     }
   }
@@ -322,7 +344,7 @@ int is_calculator_query(const char *query) {
   int len = strlen(query);
   for (int i = 0; i < len; i++) {
     char c = query[i];
-    if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^') {
+    if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '%') {
       int has_num_before = 0;
       int has_num_after = 0;
 
