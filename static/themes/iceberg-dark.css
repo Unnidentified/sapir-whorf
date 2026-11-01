@@ -1,6 +1,7 @@
 /* iceberg-dark — palette imported from a terminal colour scheme */
 
 :root {
+    color-scheme: dark;
     --bg-main: #161821;
     --bg-card: #22242d;
     --border: #393b44;

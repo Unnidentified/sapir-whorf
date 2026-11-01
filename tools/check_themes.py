@@ -162,6 +162,55 @@ def check_no_literal_colour(root):
 ROOT_TOKENS = {}
 
 
+def check_form_control_tokens(root):
+    """Lint (c): form controls use theme tokens (K2).
+
+    A number input with no rule is drawn white by the browser on every dark
+    theme, and `background: white`/`#fff`/`Canvas` paints the same box
+    regardless of the palette. Require the global rule in main.css and reject
+    those literals anywhere under static/."""
+    problems = []
+    css = strip_comments((root / "static" / "main.css").read_text(encoding="utf-8"), "css")
+    m = re.search(r"(?m)^\s*input\s*,\s*select\s*,\s*textarea\s*\{([^}]*)\}", css)
+    if not m:
+        problems.append("main.css: missing the global `input, select, textarea` rule (K2)")
+    else:
+        for prop, want in (
+                ("background", "var(--surface-2)"),
+                ("color", "var(--text-primary)"),
+                ("border", "1px solid var(--border)"),
+                ("border-radius", "0"),
+                ("color-scheme", "inherit")):
+            if not re.search(rf"(?m)^\s*{re.escape(prop)}\s*:\s*{re.escape(want)}\s*;",
+                             m.group(1)):
+                problems.append(
+                    f"main.css: global input rule needs `{prop}: {want}` (K2)")
+
+    for path in sorted((root / "static").rglob("*")):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if path.suffix == ".css":
+            text = strip_comments(text, "css")
+        for i, line in enumerate(text.splitlines(), 1):
+            s = line.strip()
+            if not s:
+                continue
+            # one declaration at a time: `background: #fff`, `background: white`
+            literal_bg = re.search(
+                r"background(?:-color)?\s*:[^;{}]*(?:#fff(?:fff)?\b|\bwhite\b)", s,
+                re.IGNORECASE)
+            # `Canvas` is a system colour whatever property it appears on
+            canvas = re.search(r"\bCanvas\b", s)
+            if literal_bg or canvas:
+                problems.append(
+                    f"{path.relative_to(root)}:{i} hard-coded white/Canvas: {s[:70]}")
+    return problems
+
+
 def check_layout_once(root):
     """J1: .content-layout must be defined in one place.
 
@@ -281,6 +330,7 @@ def main():
     for name, problems in (
             ("tokens referenced", check_tokens_referenced(root)),
             ("no literal colours", check_no_literal_colour(root)),
+            ("form controls", check_form_control_tokens(root)),
             ("one layout", check_layout_once(root)),
             ("contrast", check_contrast(root))):
         if problems:

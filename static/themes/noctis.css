@@ -1,6 +1,7 @@
 /* noctis — palette imported from a terminal colour scheme */
 
 :root {
+    color-scheme: dark;
     --bg-main: #0a1a17;
     --bg-card: #142420;
     --border: #2b3a36;

@@ -1,6 +1,7 @@
 /* apprentice — palette imported from a terminal colour scheme */
 
 :root {
+    color-scheme: dark;
     --bg-main: #262626;
     --bg-card: #303030;
     --border: #444444;

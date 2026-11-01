@@ -3,6 +3,7 @@
    selector and so every --token is defined if the cookie is missing. */
 
 :root {
+    color-scheme: dark;
     --bg-main: #0f0f0f;
     --bg-card: #272a27;
     --border: #333633;

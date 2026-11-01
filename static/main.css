@@ -23,6 +23,10 @@
     --focus: color-mix(in srgb, var(--accent) 70%, transparent);
     --map-filter: none;
 
+    /* K2: native widgets (checkbox, radio, range) follow the palette instead
+       of the browser's blue. Inherited, so every control gets it. */
+    accent-color: var(--accent);
+
     /* one breakpoint token: the rail sits beside the results above it, and
        above them below it */
     --rail-breakpoint: 1241px;
@@ -951,6 +955,19 @@ input, button, select, textarea {
     font-variant-ligatures: inherit;
 }
 
+/* K2: every form control takes its colours from the theme. Without this the
+   browser draws a number input white with dark text on a dark palette, and
+   the spinner in the browser's light colours. `color-scheme` is set once per
+   theme file so the native parts (spinner, date picker, scrollbar) follow.
+   Later, more specific rules may still override a single property. */
+input, select, textarea {
+    background: var(--surface-2);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    color-scheme: inherit;
+}
+
 body {
     background-image: none;
     background-color: var(--bg-main);
@@ -1435,6 +1452,14 @@ input:focus-visible,
     outline-offset: 2px;
 }
 
+/* K2: form controls use the softer --focus ring (the accent at 70%); links
+   and buttons keep the solid --accent above. Equal specificity, later wins. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--focus);
+}
+
 .search-box:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
@@ -1532,6 +1557,35 @@ html.title-blackout .view-home .hero-logo {
 
 .settings-field:first-child {
     border-top: 0;
+}
+
+/* K2: the weights list. The template puts the <input> before the label, so
+   place both explicitly: engine name in the wide column, a compact number
+   box (about 5rem) on the right. Higher specificity than the single-column
+   rule in the narrow-screen media query, so the row stays readable there
+   instead of stretching the box to the full width. */
+.settings-weights .settings-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 5rem;
+    gap: 16px;
+    padding: 8px 0;
+}
+
+.settings-weights .settings-field > .settings-label {
+    grid-row: 1;
+    grid-column: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.settings-weights .settings-field > input[type="number"] {
+    grid-row: 1;
+    grid-column: 2;
+    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .settings-label {

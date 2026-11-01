@@ -1,4 +1,7 @@
 :root {
+    /* system is the one theme that switches with the OS, so both schemes are
+       allowed and the UA follows prefers-color-scheme like the tokens do */
+    color-scheme: light dark;
     --bg-main: #ffffff;
     --bg-card: #f8f9fa;
     --border: #e0e0e0;

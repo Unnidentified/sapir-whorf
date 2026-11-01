@@ -1,6 +1,7 @@
 /* srcery — palette imported from a terminal colour scheme */
 
 :root {
+    color-scheme: dark;
     --bg-main: #1c1b19;
     --bg-card: #2c2925;
     --border: #49443b;

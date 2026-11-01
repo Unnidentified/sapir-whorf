@@ -1,6 +1,7 @@
 /* gruvbox-dark — palette imported from a terminal colour scheme */
 
 :root {
+    color-scheme: dark;
     --bg-main: #282828;
     --bg-card: #363532;
     --border: #4f4c44;

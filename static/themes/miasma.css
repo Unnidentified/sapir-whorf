@@ -1,6 +1,7 @@
 /* miasma — palette imported from a terminal colour scheme */
 
 :root {
+    color-scheme: dark;
     --bg-main: #222222;
     --bg-card: #2d2d2c;
     --border: #42423e;
