@@ -30,3 +30,5 @@ docs/layout/*.png
 docs/themes/*.png
 tests/test_k7_placeholders
 tests/test_k7_merge
+tests/test_k11_stocks
+tests/test_k7_descriptions
