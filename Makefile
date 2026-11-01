@@ -371,6 +371,11 @@ tests/test_g4_answerbox: tests/test_g4_answerbox.c $(LINT_SRCS) \
                          src/Infobox/Infobox.c
 	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto -lm
 
+# K7: the fetch path against a local server - robots, the signed link, and the
+# refusals (used by test_k7_fetch.sh, which owns the server)
+k7fetch-check:
+	@./tests/test_k7_fetch.sh
+
 # K7: the description extractor and the robots reader, with no network
 tests/test_k7_descriptions: tests/test_k7_descriptions.c \
                             src/Infobox/Descriptions.c src/Routes/ImageProxy.c \

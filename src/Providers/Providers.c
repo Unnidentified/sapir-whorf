@@ -29,6 +29,9 @@ static const ProviderRow EXTRA[] = {
     /* K4: video providers are their own group, because a reader may want
        videos on and every other vertical off. */
     {"dailymotion", "Dailymotion", "api.dailymotion.com", PG_VIDEOS, 0, 1},
+    /* K7: this one contacts the result sites themselves, so its disclosure is
+       the sentence that matters most in the table. */
+    {"descriptions", "Page descriptions", "result sites", PG_ANSWERS, 0, 1},
 };
 enum { EXTRA_COUNT = sizeof(EXTRA) / sizeof(EXTRA[0]) };
 

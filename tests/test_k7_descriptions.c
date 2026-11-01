@@ -7,6 +7,7 @@
  * path instead. */
 #include "Infobox/Descriptions.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int checks, failures;
@@ -88,6 +89,60 @@ int main(void) {
   robots("User-agent: omnisearch\nDisallow: /\n", "/anything", 0);
   robots("User-agent: googlebot\nDisallow: /\n", "/anything", 1);
   robots("", "/anything", 1);
+
+  /* the live half: a local server stands in for a result site. It runs only
+     when the shell test passes a base URL, so the unit half stays network-free. */
+  const char *base = getenv("K7_LIVE_BASE");
+  if (base && base[0]) {
+    char url[512], out[512];
+    snprintf(url, sizeof(url), "%s/meta.html", base);
+    checks++;
+    if (!description_for_url(url, out, sizeof(out)) ||
+        !strstr(out, "real description")) {
+      printf("FAIL live: no description from %s ('%s')\n", url, out);
+      failures++;
+    }
+    /* robots says no: the page must not be read, so no text at all */
+    snprintf(url, sizeof(url), "%s/private/page", base);
+    checks++;
+    if (description_for_url(url, out, sizeof(out))) {
+      printf("FAIL live: robots-disallowed page was read ('%s')\n", out);
+      failures++;
+    }
+    /* the signed link round-trip: the endpoint accepts what it signed and
+       refuses a forged signature */
+    snprintf(url, sizeof(url), "%s/meta.html", base);
+    char *href = description_href(url);
+    checks++;
+    if (!href) {
+      printf("FAIL live: no signed link\n");
+      failures++;
+    } else {
+      char *u = strstr(href, "u=");
+      char *amp = u ? strchr(u, '&') : NULL;
+      char *sig = strstr(href, "s=");
+      checks++;
+      if (u && amp && sig) {
+        char enc[512];
+        snprintf(enc, sizeof(enc), "%.*s", (int)(amp - (u + 2)), u + 2);
+        if (!description_from_token(enc, sig + 2, out, sizeof(out)) ||
+            !strstr(out, "real description")) {
+          printf("FAIL live: the signed link did not resolve\n");
+          failures++;
+        } else {
+          checks++;
+          if (description_from_token(enc, "forged", out, sizeof(out))) {
+            printf("FAIL live: a forged signature was accepted\n");
+            failures++;
+          }
+        }
+      } else {
+        printf("FAIL live: the link has no u=/s= pair ('%s')\n", href);
+        failures++;
+      }
+      free(href);
+    }
+  }
 
   printf("K7 descriptions: %d checks, %d failed\n", checks, failures);
   return failures ? 1 : 0;

@@ -1,6 +1,7 @@
 #include "Descriptions.h"
 #include "../Cache/Cache.h"
 #include "../Routes/ImageProxy.h"
+#include "../Utility/Display.h"
 #include "../Utility/Unescape.h"
 #include "../Utility/Utility.h"
 #include <ctype.h>
@@ -280,4 +281,90 @@ int description_for_url(const char *url, char *out, size_t cap) {
     cache_set(cache_key, "0", 1);
   }
   return found;
+}
+
+/* base64url without padding: the URL travels in a query parameter, so it must
+   not contain anything a browser would escape */
+static void b64url_encode(const char *in, char *out, size_t cap) {
+  static const char *ALPHABET =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  size_t o = 0;
+  const unsigned char *p = (const unsigned char *)in;
+  size_t len = strlen(in);
+  for (size_t i = 0; i + 2 < len && o + 5 < cap; i += 3) {
+    out[o++] = ALPHABET[p[i] >> 2];
+    out[o++] = ALPHABET[((p[i] & 3) << 4) | (p[i + 1] >> 4)];
+    out[o++] = ALPHABET[((p[i + 1] & 15) << 2) | (p[i + 2] >> 6)];
+    out[o++] = ALPHABET[p[i + 2] & 63];
+  }
+  size_t rem = len % 3;
+  if (rem == 1 && o + 3 < cap) {
+    out[o++] = ALPHABET[p[len - 1] >> 2];
+    out[o++] = ALPHABET[(p[len - 1] & 3) << 4];
+  } else if (rem == 2 && o + 4 < cap) {
+    const unsigned char *t = p + len - 2;
+    out[o++] = ALPHABET[t[0] >> 2];
+    out[o++] = ALPHABET[((t[0] & 3) << 4) | (t[1] >> 4)];
+    out[o++] = ALPHABET[(t[1] & 15) << 2];
+  }
+  out[o] = '\0';
+}
+
+static int b64url_decode(const char *in, char *out, size_t cap) {
+  static const char ALPHABET[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  int lookup[256];
+  for (int i = 0; i < 256; i++)
+    lookup[i] = -1;
+  for (int i = 0; i < 64; i++)
+    lookup[(unsigned char)ALPHABET[i]] = i;
+  size_t o = 0;
+  int bits = 0, value = 0;
+  for (const char *c = in; *c; c++) {
+    int v = lookup[(unsigned char)*c];
+    if (v < 0)
+      return 0;
+    value = (value << 6) | v;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      if (o + 1 >= cap)
+        return 0;
+      out[o++] = (char)((value >> bits) & 0xFF);
+    }
+  }
+  out[o] = '\0';
+  return o > 0;
+}
+
+char *description_href(const char *url) {
+  if (!url || !url[0])
+    return NULL;
+  char encoded[1024];
+  b64url_encode(url, encoded, sizeof(encoded));
+  if (!encoded[0])
+    return NULL;
+  char *signature = proxy_sign_token(encoded);
+  if (!signature)
+    return NULL;
+  size_t need = strlen("/d?u=") + strlen(encoded) + strlen("&s=") +
+                strlen(signature) + 1;
+  char *href = malloc(need);
+  if (href)
+    snprintf(href, need, "/d?u=%s&s=%s", encoded, signature);
+  free(signature);
+  return href;
+}
+
+int description_from_token(const char *encoded_url, const char *signature,
+                           char *out, size_t cap) {
+  if (!encoded_url || !signature || !out || cap == 0)
+    return 0;
+  out[0] = '\0';
+  if (!proxy_verify_token(encoded_url, signature))
+    return 0;
+  char url[1024];
+  if (!b64url_decode(encoded_url, url, sizeof(url)))
+    return 0;
+  return description_for_url(url, out, cap);
 }

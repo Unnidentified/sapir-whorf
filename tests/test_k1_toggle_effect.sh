@@ -140,6 +140,14 @@ while IFS='|' read -r id host group state kind; do
         ;;
     esac
 
+    # K7: a page-description fetch happens only when a result has no snippet, so
+    # there is no query that "asks" for it - the switch is asserted where the
+    # fetches are: test_k7_fetch.sh. Here only the state has to be sane.
+    if [ "$kind" = "on_demand" ]; then
+        [ -n "$host" ] && say_pass || say_fail "$id: no host listed"
+        continue
+    fi
+
     # K4: a video provider is reached by /videos only, so the probe asks there.
     if [ "$kind" = "video" ]; then
         before=$(count_host "$host")

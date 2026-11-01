@@ -29,6 +29,12 @@ static int is_private_ip(const char *ip_str);
    public URL that 302s to 127.0.0.1 was fetched happily. This callback runs on
    the real socket for every hop (including redirects), so the address that is
    about to be connected to is the address that gets checked. */
+int proxy_loopback_allowed(void) {
+  /* a test-only switch; nothing in the shipped configuration sets it */
+  const char *v = getenv("OMNI_FETCH_ALLOW_LOOPBACK");
+  return v && strcmp(v, "1") == 0;
+}
+
 static curl_socket_t guard_opensocket(void *clientp, curlsocktype purpose,
                                       struct curl_sockaddr *address) {
   (void)clientp;
@@ -45,7 +51,9 @@ static curl_socket_t guard_opensocket(void *clientp, curlsocktype purpose,
     return CURL_SOCKET_BAD;
   }
 
-  if (is_private_ip(ip)) {
+  /* the test harness may fetch its own local server; nothing else can turn
+     this on, and the shipped configuration never sets it */
+  if (is_private_ip(ip) && !proxy_loopback_allowed()) {
     return CURL_SOCKET_BAD;
   }
 
@@ -679,6 +687,28 @@ int image_proxy_handler(UrlParams *params) {
   free(buf.data);
   free(cache_key);
   return 0;
+}
+
+char *proxy_sign_token(const char *payload) {
+  if (!payload)
+    return NULL;
+  char sig[64] = {0};
+  proxy_hmac_hex(payload, sig, sizeof(sig));
+  if (!sig[0])
+    return NULL;
+  return strdup(sig);
+}
+
+int proxy_verify_token(const char *payload, const char *signature) {
+  if (!payload || !signature)
+    return 0;
+  char sig[64] = {0};
+  proxy_hmac_hex(payload, sig, sizeof(sig));
+  size_t a = strlen(sig), b = strlen(signature);
+  int diff = a == b ? 0 : 1;
+  for (size_t i = 0; i < a && i < b; i++)
+    diff |= (unsigned char)sig[i] ^ (unsigned char)signature[i];
+  return diff == 0;
 }
 
 /* K7: the description fetcher's one request. It reuses this file's socket

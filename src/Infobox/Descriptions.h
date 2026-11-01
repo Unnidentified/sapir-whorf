@@ -26,6 +26,15 @@ int description_extract(const char *html, size_t len, char *out, size_t cap);
    there was nothing to extract (the negative answer is cached too). */
 int description_for_url(const char *url, char *out, size_t cap);
 
+/* The signed link the results page carries for a row with no snippet:
+   "/d?u=<base64url>&s=<hmac>". Returns malloc'd, or NULL when it cannot sign. */
+char *description_href(const char *url);
+
+/* The endpoint's side: verify the signature and fetch. Returns 1 with the text,
+   0 when the signature is wrong or the site says no. */
+int description_from_token(const char *encoded_url, const char *signature,
+                           char *out, size_t cap);
+
 /* Exposed for the test: does this robots.txt allow a path for our agent? */
 int robots_allows(const char *robots_txt, const char *path);
 #endif

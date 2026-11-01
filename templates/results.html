@@ -48,7 +48,7 @@
                 {{endif}}
 
                 {{for result in results}}
-                <div class="result{{if result[6]}} result-with-thumb{{endif}}"{{if result[5]}} data-kind="{{result[5]}}"{{endif}}>
+                <div class="result{{if result[6]}} result-with-thumb{{endif}}"{{if result[5]}} data-kind="{{result[5]}}"{{endif}}{{if result[10]}} data-desc="{{result[10]}}"{{endif}}>
                     {{if result[6]}}
                     <!-- J5.2: fetched through this server, never by the
                          browser, and never from a URL the user supplied -->
@@ -68,9 +68,7 @@
                                 {{result[2]}}
                             </a>
                         </div>
-                        <p class="desc">
-                            {{result[3]}}
-                        </p>
+                        <p class="desc" data-snippet>{{result[3]}}</p>
                     </div>
                 </div>
                 {{endfor}}
@@ -163,6 +161,7 @@
         </div>
         <script src="/static/autocomplete.js" defer></script>
         <script src="/static/widgets.js" defer></script>
-    </body>
+        <script src="/static/descriptions.js" defer></script>
+</body>
 
 </html>

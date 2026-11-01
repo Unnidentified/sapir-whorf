@@ -14,6 +14,7 @@
 #include "../Infobox/CalcKeys.h"
 #include "../Query/Placeholders.h"
 #include "../Providers/Providers.h"
+#include "../Infobox/Descriptions.h"
 #include "../Query/QueryAnalysis.h"
 #include "../Query/Tokens.h"
 #include "../Ranking/Ranker.h"
@@ -58,7 +59,10 @@ typedef struct {
 } InfoBoxHandler;
 
 enum {
-  RESULT_FIELD_COUNT = 10,
+  /* K7: the eleventh field is the link the page uses to ask for a real
+     description when the engines gave none - empty when there is nothing to
+     ask for */
+  RESULT_FIELD_COUNT = 11,
 };
 
 static InfoBox fetch_wiki_wrapper(char *query) {
@@ -2214,6 +2218,15 @@ int results_handler(UrlParams *params) {
       char *thumb_href = NULL;
       if (cands[c].thumbnail && cands[c].thumbnail[0])
         thumb_href = image_proxy_sign_url(cands[c].thumbnail);
+      /* K7: a blank snippet is the one case worth a second request, and the
+         link is signed so the endpoint cannot be used to fetch an arbitrary
+         URL. Only the first page asks: a row on page 2 is rarely the one a
+         reader studies. */
+      char *desc_href = NULL;
+      if (page == 1 && (!cands[c].snippet || !cands[c].snippet[0]) &&
+          (strncmp(cands[c].url, "http://", 7) == 0 ||
+           strncmp(cands[c].url, "https://", 8) == 0))
+        desc_href = description_href(cands[c].url);
       const char *values[RESULT_FIELD_COUNT] = {
           cands[c].url,
           pretty_url,
@@ -2227,12 +2240,14 @@ int results_handler(UrlParams *params) {
           cands[c].date ? cands[c].date : "",
           cands[c].source ? cands[c].source : "",
           cands[c].author ? cands[c].author : "",
+          desc_href ? desc_href : "",
       };
       string_matrix_append(&results_matrix, values, RESULT_FIELD_COUNT);
 
       free(pretty_url);
       free(base_url);
       free(thumb_href);
+      free(desc_href);
       rank_doc_free(&cands[c]);
     }
 
