@@ -42,6 +42,12 @@ a shell. `html.` — the endpoint SearXNG uses — returns results consistently 
 `Sec-Fetch-*` navigation headers, an `Accept-Language`, the DDG locale cookies and
 a cookie jar. Its markup also differs (`class="result__a"`, not `result-link`).
 
+**Removed in Round 6 (L2).** The owner's rule was "if it doesn't serve us
+anything, remove it", and it did not: `lite.` is gone from the registry, from the
+code and from `/settings`. An old cookie or config line naming `ddg-lite` still
+works - it maps to `ddg` through the one legacy table in `Utility.c` - and
+`engines = *, -ddg-lite` is accepted as a no-op with one startup note.
+
 **Action taken:** a `ddg-html` engine replaces `ddg` at the `html.` endpoint with
 a parser for `result__a`/`result__snippet`, browser navigation headers and the
 locale cookies. The old `lite.` parser is kept for reference.

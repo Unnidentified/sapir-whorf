@@ -21,7 +21,6 @@ UA_PLAIN="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (
 UA_BROWSER="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 case "$ENGINE" in
-  ddg-lite) URL="https://lite.duckduckgo.com/lite/?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$QUERY")" ;;
   ddg-html) URL="https://html.duckduckgo.com/html/?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$QUERY")" ;;
   brave)    URL="https://search.brave.com/search?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$QUERY")" ;;
   bing)     URL="https://www.bing.com/search?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$QUERY")" ;;
@@ -92,7 +91,7 @@ if [ "$COOKIEMODE" = "engine" ]; then
   case "$ENGINE" in
     brave)
       ARGS+=(-b "safesearch=0; useLocation=0; summarizer=0; country=gb; ui_lang=en-gb") ;;
-    ddg-lite|ddg-html)
+    ddg-html)
       ARGS+=(-c "$JAR" -b "$JAR" -b "kl=gb-en; df=en-GB; ad=0; ah=0; l=en-GB")
       ARGS+=(-H "Referer: https://duckduckgo.com/") ;;
     bing)
@@ -111,7 +110,7 @@ contains() { grep -qi -- "$1" "$OUT.body" 2>/dev/null; }
 VERDICT="unknown"
 case "$ENGINE" in
   bing)     contains "b_algo" && VERDICT="results(b_algo)" || { contains "b_results" && VERDICT="shell(b_results, no b_algo)"; }; ;;
-  ddg-lite|ddg-html) contains "result-link\|result__a" && VERDICT="results" || { contains "anomaly\|challenge" && VERDICT="challenge"; }; ;;
+  ddg-html) contains "result__a\|result__snippet" && VERDICT="results" || { contains "anomaly\|challenge" && VERDICT="challenge"; }; ;;
   brave)    contains "snippet" && VERDICT="results(html)" || { contains "challengeSet\|challenge" && VERDICT="challenge"; }; ;;
   yahoo)    contains "compTitle" && VERDICT="results" || { contains "captcha\|challenge" && VERDICT="challenge"; }; ;;
 esac

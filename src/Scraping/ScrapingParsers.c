@@ -1,4 +1,5 @@
 #include "../Utility/Unescape.h"
+#include "../Utility/Utility.h"
 #include "../Utility/XmlHelper.h"
 #include "Config.h"
 #include "ApiEngines.h"
@@ -133,67 +134,6 @@ static int parse_ddg_html(const char *engine_name, xmlDocPtr doc,
 
   free_xpath_objects(ctx, obj);
   return count;
-}
-
-static int parse_ddg_lite(const char *engine_name, xmlDocPtr doc,
-                          SearchResult **out_results, int max_results) {
-  (void)engine_name;
-  int found_count = 0;
-
-  xmlXPathContextPtr ctx = create_xpath_context(doc);
-  if (!ctx)
-    return 0;
-
-  xmlXPathObjectPtr obj =
-      xml_xpath_eval(ctx, "//tr[not(contains(@class, "
-                          "'result-sponsored'))]//a[@class='result-link']");
-
-  if (!obj || !obj->nodesetval || obj->nodesetval->nodeNr == 0) {
-    free_xpath_objects(ctx, obj);
-    return 0;
-  }
-
-  int num_links = obj->nodesetval->nodeNr;
-  *out_results = alloc_results_array(num_links, max_results);
-  if (!*out_results) {
-    free_xpath_objects(ctx, obj);
-    return 0;
-  }
-
-  for (int i = 0; i < num_links && found_count < max_results; i++) {
-    xmlNodePtr link_node = obj->nodesetval->nodeTab[i];
-    char *title = xml_node_content(link_node);
-    char *url = (char *)xmlGetProp(link_node, (xmlChar *)"href");
-    char *snippet_text = NULL;
-
-    xmlNodePtr current = link_node->parent;
-    while (current && xmlStrcasecmp(current->name, (const xmlChar *)"tr") != 0)
-      current = current->parent;
-
-    if (current && current->next) {
-      xmlNodePtr snippet_row = current->next;
-      while (snippet_row &&
-             xmlStrcasecmp(snippet_row->name, (const xmlChar *)"tr") != 0)
-        snippet_row = snippet_row->next;
-      if (snippet_row) {
-        ctx->node = snippet_row;
-        xmlXPathObjectPtr s_obj =
-            xml_xpath_eval(ctx, ".//td[@class='result-snippet']");
-        if (s_obj && s_obj->nodesetval && s_obj->nodesetval->nodeNr > 0)
-          snippet_text = xml_node_content(s_obj->nodesetval->nodeTab[0]);
-        if (s_obj)
-          xmlXPathFreeObject(s_obj);
-        ctx->node = NULL;
-      }
-    }
-
-    if (assign_result(&(*out_results)[found_count], url, title, snippet_text, 1))
-      found_count++;
-    free_xml_node_list(title, url, snippet_text);
-  }
-
-  free_xpath_objects(ctx, obj);
-  return found_count;
 }
 
 static int parse_yahoo(const char *engine_name, xmlDocPtr doc,
@@ -568,21 +508,6 @@ static const SearchEngine SEED_ENGINES[] = {
      .index_group = "bing", .user_agent = "safari",
      .browser_headers = 1,
      .init_cookies = "kl=gb-en; df=en-GB; ad=0; ah=0" },
-    /* kept for reference and for anyone who has a good experience with it;
-       disabled because it stopped answering from this host. */
-    {.id = "ddg-lite",
-     .name = "DuckDuckGo Lite (old endpoint)",
-     .base_url = "https://lite.duckduckgo.com/lite/?q=",
-     .host_header = "lite.duckduckgo.com",
-     .referer = "https://lite.duckduckgo.com/",
-     .page_param = "s",
-     .page_multiplier = 30,
-     .page_base = 0,
-     .parser = parse_ddg_lite,
-     .enabled = 0,
-     .timeout_secs = 5,
-     .supports_site = 1, .verticals = V_WEB, .weight = 1.0,
-     .index_group = "bing" },
     {.id = "bing",
      .name = "Bing",
      .base_url = "https://www.bing.com/search?q=",
@@ -971,6 +896,25 @@ void apply_engines_config(const char *engines_str) {
         ENGINE_REGISTRY[i].enabled = shipped_enabled[i];
     } else if (token[0] == '-' && token[1] != '\0') {
       char *engine_id = token + 1;
+      /* L2: an exclusion of an id that no longer exists is a no-op, and it must
+         NOT be mapped - "-ddg-lite" means "ddg-lite", and mapping it to ddg
+         would switch off the engine that replaced it. That was the bug this
+         branch had for one build. */
+      if (found_old_name(engine_id)) {
+        const char *modern = legacy_engine_id(engine_id);
+        int still_exists = 0;
+        for (int i = 0; i < ENGINE_COUNT; i++)
+          if (engine_id_compare(ENGINE_REGISTRY[i].id, modern))
+            still_exists = 1;
+        if (!still_exists) {
+          fprintf(stderr,
+                  "[NOTE] %s is no longer in this build; excluding it does "
+                  "nothing.\n",
+                  engine_id);
+          token = strtok_r(NULL, ",", &saveptr);
+          continue;
+        }
+      }
       int found = 0;
       for (int i = 0; i < ENGINE_COUNT; i++) {
         if (engine_id_compare(ENGINE_REGISTRY[i].id, engine_id)) {
@@ -980,19 +924,32 @@ void apply_engines_config(const char *engines_str) {
         }
       }
       if (!found) {
-        fprintf(stderr, "[WARN] Unknown engine: %s\n", engine_id);
+        if (found_old_name(engine_id))
+          fprintf(stderr,
+                  "[NOTE] %s is no longer in this build; it now maps to %s "
+                  "or to nothing. Nothing to do.\n",
+                  engine_id, legacy_engine_id(engine_id));
+        else
+          fprintf(stderr, "[WARN] Unknown engine: %s\n", engine_id);
       }
     } else {
+      const char *modern = legacy_engine_id(token);
       int found = 0;
       for (int i = 0; i < ENGINE_COUNT; i++) {
-        if (engine_id_compare(ENGINE_REGISTRY[i].id, token)) {
+        if (engine_id_compare(ENGINE_REGISTRY[i].id, modern)) {
           ENGINE_REGISTRY[i].enabled = 1;
           found = 1;
           break;
         }
       }
       if (!found) {
-        fprintf(stderr, "[WARN] Unknown engine: %s\n", token);
+        if (found_old_name(token))
+          fprintf(stderr,
+                  "[NOTE] %s is no longer in this build; it now maps to %s or "
+                  "to nothing. Nothing to do.\n",
+                  token, legacy_engine_id(token));
+        else
+          fprintf(stderr, "[WARN] Unknown engine: %s\n", token);
       }
     }
 

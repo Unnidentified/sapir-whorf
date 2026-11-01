@@ -129,7 +129,7 @@ priority and for the batch's "trusted source" test.
 | yahoo | web | 1.20 | yes | needs a cookie jar: 307 → bot-check gif sets `YBV` |
 | brave | web | 1.15 | yes | 429s under load; keeps cookies |
 | bing | web | 0.95 | yes | **no locale params** (setlang/cc/mkt → empty shell); stateless |
-| ddg | web | 1.00 | yes | lite endpoint; 202 challenge when hammered |
+| ddg | web | 1.00 | yes | html endpoint; 202 challenge when hammered |
 | google | web | 1.30 | no | CSE JSON API only; needs key + cx |
 | searxng | web | 1.25 | no | self-hosted bridge, relays Google etc. |
 | openalex | academic | 1.30 | yes | JSON API |

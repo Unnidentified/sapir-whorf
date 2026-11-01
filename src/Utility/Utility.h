@@ -65,6 +65,13 @@ void locale_parts(const char *locale, char *lang, size_t lang_size, char *region
                   size_t region_size);
 
 int is_engine_id_enabled(const char *engine_id);
+
+/* L2/L6.10: the one table of ids this project has shipped and what each became.
+   Returns the current id, or the input unchanged when it is not an old name. */
+const char *legacy_engine_id(const char *id);
+
+/* 1 when the id is an old name in that table, whatever it maps to now */
+int found_old_name(const char *id);
 int get_user_engines(char ***out_ids, int *out_count);
 int user_engines_contains(const char *engine_id, char **ids, int count);
 int opt_in_enabled_for(const char *provider_id);

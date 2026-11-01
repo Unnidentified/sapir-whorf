@@ -495,6 +495,49 @@ void locale_parts(const char *locale, char *lang, size_t lang_size, char *region
   }
 }
 
+/* L2/L6.10: every id this project has ever shipped, and what it is now.
+ *
+ * A cookie or a config line written by an older release must keep working: the
+ * reader maps the old name to the current one, and that is the only place the
+ * mapping lives. An id that maps to nothing means "no longer in the build",
+ * which the caller skips without a warning - a stale cookie is not an error the
+ * owner can act on.
+ *
+ * startpage -> bing and mojeek -> brave: the engines were swapped in the F round.
+ * ddg-lite  -> ddg:  removed in round 6; the lite endpoint stopped answering. */
+typedef struct {
+  const char *was;
+  const char *now;
+} LegacyEngine;
+
+static const LegacyEngine LEGACY_ENGINES[] = {
+    {"startpage", "bing"},
+    {"mojeek", "brave"},
+    {"ddg-lite", "ddg"},
+    {"ddg_lite", "ddg"},
+};
+
+int found_old_name(const char *id) {
+  if (!id || !id[0])
+    return 0;
+  for (size_t i = 0; i < sizeof(LEGACY_ENGINES) / sizeof(LEGACY_ENGINES[0]);
+       i++)
+    if (strcasecmp(id, LEGACY_ENGINES[i].was) == 0)
+      return 1;
+  return 0;
+}
+
+/* the current id for an old name, or the name unchanged */
+const char *legacy_engine_id(const char *id) {
+  if (!id || !id[0])
+    return id;
+  for (size_t i = 0; i < sizeof(LEGACY_ENGINES) / sizeof(LEGACY_ENGINES[0]);
+       i++)
+    if (strcasecmp(id, LEGACY_ENGINES[i].was) == 0)
+      return LEGACY_ENGINES[i].now;
+  return id;
+}
+
 int is_engine_id_enabled(const char *engine_id) {
   if (!engine_id)
     return 0;
@@ -545,12 +588,10 @@ int get_user_engines(char ***out_ids, int *out_count) {
     while (*token == ' ' || *token == '\t')
       token++;
 
-    /* saved preferences from before the engine swap keep working. In the
-       disabled set the old name means the engine it became. */
-    if (strcmp(token, "startpage") == 0)
-      token = "bing";
-    else if (strcmp(token, "mojeek") == 0)
-      token = "brave";
+    /* saved preferences from before an engine was renamed or removed keep
+       working. In the disabled set the old name means the provider it became.
+       L2: one table, so a cookie written by any release is understood. */
+    token = legacy_engine_id(token);
 
     if (token[0] != '\0' && is_engine_id_enabled(token)) {
       char **new_ids = realloc(ids, sizeof(char *) * (size_t)(count + 1));

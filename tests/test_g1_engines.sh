@@ -1,7 +1,10 @@
 #!/bin/sh
-# G1: engines="*" means the registry defaults, and naming a disabled engine
-# opts it in. Before this, "*" force-enabled every entry, so an engine shipped
-# disabled (ddg-lite, google, searxng) still ran on every query.
+# G1 + L2: engines="*" means the registry defaults, and naming a disabled
+# engine opts it in. Before this, "*" force-enabled every entry, so an engine
+# shipped disabled (google, searxng) still ran on every query.
+#
+# L2 removed DuckDuckGo Lite: the id is now UNKNOWN, not merely disabled, so the
+# test asserts that naming it changes nothing and does not stop the parse.
 set -u
 cd "$(dirname "$0")/.." || exit 1
 BIN=./bin/omnisearch
@@ -16,7 +19,7 @@ run_with() {
 fail=0
 # 1. default "*": disabled entries stay disabled
 out=$(run_with 'engines="*"')
-for id in ddg-lite google searxng; do
+for id in google searxng; do
   case ",$out," in
     *",$id,"*) echo "FAIL: engines=\"*\" enabled $id"; fail=1 ;;
   esac
@@ -32,8 +35,18 @@ case ",$out," in
   *",yacy,"*) : ;;
   *) echo "FAIL: engines=\"*,yacy\" did not enable yacy"; fail=1 ;;
 esac
+# L2: ddg-lite was removed from the build. Naming it must be a no-op, not a
+# parse failure and not a resurrected engine.
 case ",$out," in
-  *",ddg-lite,"*) echo "FAIL: engines=\"*,yacy\" enabled ddg-lite"; fail=1 ;;
+  *",ddg-lite,"*) echo "FAIL: engines=\"*,yacy\" resurrected ddg-lite"; fail=1 ;;
+esac
+out=$(run_with 'engines="*,-ddg-lite"')
+case ",$out," in
+  *",ddg,"*) : ;;
+  *) echo "FAIL: engines=\"*,-ddg-lite\" broke the parse (ddg missing)"; fail=1 ;;
+esac
+case ",$out," in
+  *",ddg-lite,"*) echo "FAIL: engines=\"*,-ddg-lite\" still lists ddg-lite"; fail=1 ;;
 esac
 
 # 3. an explicit list alone disables everything else

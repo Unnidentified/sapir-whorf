@@ -63,11 +63,9 @@ static int response_looks_like_results_page(const ScrapeJob *job,
 
   const char *id = job->engine->id;
 
-  if (strcmp(id, "ddg") == 0 || strcmp(id, "ddg-lite") == 0) {
+  if (strcmp(id, "ddg") == 0) {
     return response_contains(response, "result__a") ||
-           response_contains(response, "result-link") ||
-           response_contains(response, "result__snippet") ||
-           response_contains(response, "result-snippet");
+           response_contains(response, "result__snippet");
   }
 
   if (strcmp(id, "bing") == 0) {
@@ -111,7 +109,7 @@ static int response_declares_no_results(const ScrapeJob *job,
            response_contains(response, "There are no results");
   if (strcmp(id, "google") == 0 || strcmp(id, "google_cse") == 0)
     return response_contains(response, "did not match any documents");
-  if (strcmp(id, "ddg") == 0 || strcmp(id, "ddg-lite") == 0)
+  if (strcmp(id, "ddg") == 0)
     return response_contains(response, "No results found") ||
            response_contains(response, "No results.");
   return 0;
