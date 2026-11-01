@@ -17,7 +17,7 @@ One request each; see `docs/probe-log.tsv`.
 **Step 1 — the token page.**
 
 ```
-GET https://www.google.com/cse/cse.js?cx=partner-pub-8993703457585266:4862972284
+GET https://www.google.com/cse/cse.js?cx=<a public demo cx from a third party — never a default>
   UA:     Safari/17.2 macOS
   Accept: */*
   Referer: https://cse.google.com/

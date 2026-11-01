@@ -4,6 +4,14 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+        <!-- L3: this page has a password field and cards that say where a
+             credential is stored, so it must not be cached or leak a referrer.
+             Beaker's response API sets no custom headers (measured), so these
+             are the browser-side declarations; the save handler answers with a
+             redirect to a clean URL so a value never sits in history either. -->
+        <meta http-equiv="Cache-Control" content="no-store">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta name="referrer" content="no-referrer">
         <title>
             sw — {{l("settings_title")}}
         </title>
@@ -11,17 +19,9 @@
         <link rel="stylesheet" href="static/themes/{{theme}}.css">
         {{if theme == "custom"}}
         <style>
-            :root {
-                --bg-main: {{custom_bg_main}};
-                --bg-card: {{custom_bg_card}};
-                --border: {{custom_border}};
-                --text-primary: {{custom_text_primary}};
-                --text-secondary: {{custom_text_secondary}};
-                --text-muted: {{custom_text_muted}};
-                --accent: {{custom_accent}};
-                --accent-glow: {{custom_accent_glow}};
-                --text-dim: {{custom_text_dim}};
-            }
+            /* L3: the nine custom colours arrive as one declaration list, so
+               the settings page keeps its context slots for the accounts cards */
+            :root { {{custom_vars}} }
         </style>
         {{endif}}
         <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -274,6 +274,51 @@
                          when the engines form was rewritten. beaker then
                          reported an unclosed if and skipped to the end of the
                          file. The balance is now a test, not a memory. -->
+                    <!-- L3: Accounts and servers. One ROW PER FIELD, because
+                         beaker cannot nest a loop: a row whose first-in-card
+                         flag is set opens the card and the last row of a card
+                         closes it. Secrets are write-only - the page renders
+                         the last four characters only, and a blank field on
+                         save keeps what is stored. -->
+                    <section class="settings-section" id="accounts">
+                        <h3 class="settings-section-title">{{l("accounts_label")}}</h3>
+                        <p class="settings-section-desc">{{l("accounts_desc")}}</p>
+                        {{for a in accounts}}
+                        {{if a[10]}}
+                        <div class="account-card">
+                            <h4 class="account-title">{{a[1]}}</h4>
+                            <p class="account-why">{{a[2]}}</p>
+                            <p class="account-links">{{a[3]}}</p>
+                            {{if a[4]}}<p class="account-test-result">{{a[4]}}</p>{{endif}}
+                            <form action="/settings/account-save" method="GET" class="account-form" autocomplete="off">
+                                <input type="hidden" name="card" value="{{a[0]}}">
+                        {{endif}}
+                                <div class="account-field">
+                                    <label class="settings-label" for="f_{{a[0]}}_{{a[5]}}">{{a[6]}}</label>
+                                    <input class="settings-input" type="{{a[11]}}" id="f_{{a[0]}}_{{a[5]}}"
+                                           name="{{a[5]}}" autocomplete="off" value=""
+                                           placeholder="{{a[7]}}">
+                                    <span class="account-source">{{a[8]}}</span>
+                                </div>
+                        {{if a[12]}}
+                                <div class="account-row">
+                                    <label class="settings-label" for="admin_{{a[0]}}">{{l("admin_token_label")}}</label>
+                                    <input class="settings-input" type="password" id="admin_{{a[0]}}"
+                                           name="admin" autocomplete="off"
+                                           placeholder="{{l("admin_token_placeholder")}}">
+                                </div>
+                                <div class="account-buttons">
+                                    <button type="submit" class="btn-primary">{{l("save_button")}}</button>
+                                </div>
+                            </form>
+                            <p class="account-test">
+                                <a class="btn-secondary" href="/settings/account-test?card={{a[0]}}&amp;admin=" id="test_{{a[0]}}">{{l("test_button")}}</a>
+                                <a class="account-clear" href="/settings/account-clear?card={{a[0]}}&amp;field=first&amp;admin=">{{l("clear_button")}}</a>
+                            </p>
+                        </div>
+                        {{endif}}
+                        {{endfor}}
+                    </section>
                     <div class="settings-actions">
                         <button type="submit" class="btn-primary">{{l("save_settings_button")}}</button>
                     </div>

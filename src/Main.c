@@ -10,6 +10,8 @@
 
 #include "Cache/Cache.h"
 #include "Config.h"
+#include "Utility/Secrets.h"
+#include "Utility/Effective.h"
 #include "Scraping/ApiEngines.h"
 #include "Infobox/Wikipedia.h"
 #include "Providers/Providers.h"
@@ -21,6 +23,7 @@
 #include "Routes/Images.h"
 #include "Routes/Videos.h"
 #include "Routes/Describe.h"
+#include "Routes/Accounts.h"
 #include "Routes/Widget.h"
 #include "Routes/Info.h"
 #include "Routes/Metrics.h"
@@ -149,6 +152,19 @@ int main(int argc, char **argv) {
     config_path = "config.ini";
 
   int config_rc = load_config(config_path, &cfg);
+  /* L3: the page-owned file loads after config.ini and before anything reads a
+     setting, so secrets.ini overrides config.ini and the environment overrides
+     both. A refusal (an unreadable mode) is loud and leaves the file's values
+     out, which is the safe direction. */
+  secrets_load();
+  /* fold the page-owned values into the config object once, so every existing
+     reader of global_config.searxng_url (and the rest) sees the live value
+     without a second code path. The page calls the same function after a save. */
+  apply_effective_settings(&cfg);
+  /* L3: create the admin token on first start and print it once. Writing to
+     /settings needs it, and a token that appears only when someone first tries
+     to save would be found too late. */
+  (void)secrets_admin_token();
   if (config_rc != 0 && config_rc != 2) {
     fprintf(stderr, "[WARN] Could not load %s, using defaults\n", config_path);
   }
@@ -364,6 +380,9 @@ int main(int argc, char **argv) {
   set_handler("/images", images_handler);
   set_handler("/videos", videos_handler);
   set_handler("/d", describe_handler);
+  set_handler("/settings/account-save", accounts_save_handler);
+  set_handler("/settings/account-clear", accounts_clear_handler);
+  set_handler("/settings/account-test", accounts_test_handler);
   /* J4.0: a card is a thing with a URL */
   register_widget_routes();
   set_handler("/proxy", image_proxy_handler);

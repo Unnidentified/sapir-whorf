@@ -350,6 +350,36 @@ void context_set_custom_palette(TemplateContext *ctx, const CustomTheme *theme) 
   context_set(ctx, "custom_palette", palette);
 }
 
+/* the shared part: the nine colours as "#rrggbb" strings, plus the glow */
+static void custom_colour_strings(const CustomTheme *theme, char values[][16],
+                                  int count) {
+  for (int i = 0; i < CUSTOM_COLOUR_COUNT && i < count; i++)
+    snprintf(values[i], 16, "#%s", custom_slot((CustomTheme *)theme, i));
+  if (count > CUSTOM_COLOUR_COUNT)
+    snprintf(values[CUSTOM_COLOUR_COUNT], 16, "#%s1a", theme->accent);
+}
+
+static void custom_vars_block(const CustomTheme *theme, char *out, size_t cap) {
+  char values[CUSTOM_COLOUR_COUNT + 1][16];
+  custom_colour_strings(theme, values, CUSTOM_COLOUR_COUNT + 1);
+  snprintf(out, cap,
+           "--bg-main: %s; --bg-card: %s; --border: %s; --text-primary: %s; "
+           "--text-secondary: %s; --text-muted: %s; --accent: %s; "
+           "--text-dim: %s; --accent-glow: %s;",
+           values[0], values[1], values[2], values[3], values[4], values[5],
+           values[6], values[7], values[8]);
+}
+
+void context_set_custom_theme_compact(TemplateContext *ctx,
+                                      const CustomTheme *theme) {
+  if (!ctx || !theme)
+    return;
+  /* beaker keeps the pointer, so the buffer has to outlive the call */
+  static __thread char block[1024];
+  custom_vars_block(theme, block, sizeof(block));
+  context_set(ctx, "custom_vars", block);
+}
+
 void context_set_custom_theme(TemplateContext *ctx, const CustomTheme *theme) {
   if (!ctx || !theme)
     return;
@@ -361,18 +391,13 @@ void context_set_custom_theme(TemplateContext *ctx, const CustomTheme *theme) {
 
   /* beaker keeps the pointer, so these must outlive the call */
   static __thread char values[CUSTOM_COLOUR_COUNT + 1][16];
-
-  for (int i = 0; i < CUSTOM_COLOUR_COUNT; i++)
-    snprintf(values[i], sizeof(values[i]), "#%s",
-             custom_slot((CustomTheme *)theme, i));
-
-  snprintf(values[CUSTOM_COLOUR_COUNT], sizeof(values[0]), "#%s1a",
-           theme->accent);
-
+  custom_colour_strings(theme, values, CUSTOM_COLOUR_COUNT + 1);
   for (int i = 0; i < CUSTOM_COLOUR_COUNT + 1; i++)
     context_set(ctx, KEYS[i], values[i]);
 
-
+  static __thread char block[1024];
+  custom_vars_block(theme, block, sizeof(block));
+  context_set(ctx, "custom_vars", block);
 }
 
 const char *get_title_font(void) {

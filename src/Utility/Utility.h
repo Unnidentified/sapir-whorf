@@ -54,6 +54,10 @@ typedef struct {
 
 void get_custom_theme(CustomTheme *out);
 void context_set_custom_theme(TemplateContext *ctx, const CustomTheme *theme);
+/* L3: the same colours as ONE key ("custom_vars"), for a page that cannot
+   afford nine of the 32 context slots. The settings page uses this. */
+void context_set_custom_theme_compact(TemplateContext *ctx,
+                                      const CustomTheme *theme);
 /* the palette as one CSS string: use this unless the page has colour pickers */
 void context_set_custom_palette(TemplateContext *ctx, const CustomTheme *theme);
 int parse_custom_theme_cookie(const char *value, CustomTheme *out);

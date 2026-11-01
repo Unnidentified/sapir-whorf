@@ -1,0 +1,9 @@
+# L3/L6.4: a credential or a log must never travel in an image either.
+secrets.ini
+*.log
+*.err
+*.err.old
+.git
+obj/
+bin/
+.DS_Store

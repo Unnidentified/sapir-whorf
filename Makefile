@@ -530,6 +530,18 @@ k6-check:
 k3-check:
 	@./tests/test_k3_resume.sh
 
+# L3: the credentials form end to end - gate, 0600, masked, no leaks
+l3accounts-check:
+	@./tests/test_l3_accounts.sh
+
+# L3: the secrets file - 0600, masked, env wins, cleared means gone
+tests/test_l3_secrets: tests/test_l3_secrets.c src/Utility/Secrets.c
+	@$(CC) -Isrc -o $@ $^ -lpthread
+
+l3check: tests/test_l3_secrets
+	@rm -rf /tmp/l3sec && mkdir -p /tmp/l3sec && chmod 700 /tmp/l3sec
+	@L3_TMPDIR=/tmp/l3sec ./tests/test_l3_secrets
+
 # L2: every id this project has shipped still works, and ddg-lite is gone
 l2check:
 	@./tests/test_l2_legacy.sh
@@ -612,7 +624,8 @@ dist:
 	@echo "dist: /tmp/omnisearch-$(VERSION).tar.gz"
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
+	@./tools/dist_check.sh /tmp/omnisearch-$(VERSION).tar.gz
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check toggle-check k6-check k3-check k12-check terms-check hrefs-check defs-check categories-check context-check translate-check places-check weights-check k7-check k7check l1check l2check k11check k4check k4videos-check k5check ua-check answers-check junk-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check toggle-check k6-check k3-check k12-check terms-check hrefs-check defs-check categories-check context-check translate-check places-check weights-check k7-check k7check l1check l2check l3check l3accounts-check k11check k4check k4videos-check k5check ua-check answers-check junk-check smoke
 
 .PHONY: k12-check k3-check toggle-check terms-check hrefs-check answersfanout-check widget-check searxng-check optin-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

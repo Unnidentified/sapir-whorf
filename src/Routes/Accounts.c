@@ -1,0 +1,443 @@
+#include "Accounts.h"
+#include "../Config.h"
+#include "../Providers/Providers.h"
+#include "../Utility/Effective.h"
+#include "../Utility/Secrets.h"
+#include "../Utility/HttpClient.h"
+#include "../Utility/Utility.h"
+#include <curl/curl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+/* one card: a provider that takes configuration */
+typedef struct {
+  const char *id;        /* card id in the URL */
+  const char *title;     /* what the page calls it */
+  const char *why;       /* one line: what it is for */
+  const char *fields[6]; /* SecretKey names, in display order */
+  int secret[6];         /* 1 = write-only */
+  const char *links;     /* helper links, as HTML (static, from this file) */
+} AccountCard;
+
+static const AccountCard CARDS[] = {
+    {"reddit", "Reddit",
+     "Search Reddit with your own registered app. App-only access needs no login.",
+     {"reddit_client_id", "reddit_client_secret", "reddit_username",
+      "reddit_redirect_uri", NULL},
+     {0, 1, 0, 0, 0, 0},
+     "Read the client id at https://www.reddit.com/prefs/apps — it is the "
+     "string under the app's name. Use a client id you registered yourself; "
+     "never paste another app's."},
+    {"searxng", "SearXNG",
+     "A SearXNG instance is the documented low-risk route to Google's index.",
+     {"searxng_url", "searxng_engines", NULL, NULL, NULL, NULL},
+     {0, 0, 0, 0, 0, 0},
+     "Run one with: docker compose up searxng. Its URL is then "
+     "http://127.0.0.1:8888, and the JSON format must be enabled there."},
+    {"yacy", "YaCy",
+     "A YaCy peer you run yourself. Off by default; most people do not have one.",
+     {"yacy_instance", NULL, NULL, NULL, NULL, NULL},
+     {0, 0, 0, 0, 0, 0},
+     "A peer you run yourself: https://yacy.net/"},
+    {"google", "Google",
+     "The JSON API closed to new customers in January 2026. Only a key issued "
+     "before then works.",
+     {"google_cse_cx", "google_cse_key", NULL, NULL, NULL, NULL},
+     {0, 1, 0, 0, 0, 0},
+     "A cx comes from https://programmablesearchengine.google.com/ and is the "
+     "only thing the Element endpoint needs."},
+};
+enum { CARD_COUNT = sizeof(CARDS) / sizeof(CARDS[0]) };
+
+int accounts_require_admin(UrlParams *params) {
+  const char *token = "";
+  if (params) {
+    for (int i = 0; i < params->count; i++)
+      if (strcmp(params->params[i].key, "admin") == 0)
+        token = params->params[i].value;
+  }
+  return secrets_admin_token_matches(token);
+}
+
+static const AccountCard *card_by_id(const char *id) {
+  if (!id)
+    return NULL;
+  for (size_t i = 0; i < CARD_COUNT; i++)
+    if (strcmp(CARDS[i].id, id) == 0)
+      return &CARDS[i];
+  return NULL;
+}
+
+/* the last test result, kept in memory (never on disk: it can name a status
+   code, not a secret) */
+typedef struct {
+  char result[256];
+  time_t at;
+} TestResult;
+static TestResult g_tests[CARD_COUNT];
+
+static void remember_test(const AccountCard *card, const char *text) {
+  size_t i = (size_t)(card - CARDS);
+  if (i >= CARD_COUNT)
+    return;
+  snprintf(g_tests[i].result, sizeof(g_tests[i].result), "%s", text);
+  g_tests[i].at = time(NULL);
+}
+
+static void test_result_text(const AccountCard *card, char *out, size_t cap) {
+  size_t i = (size_t)(card - CARDS);
+  out[0] = '\0';
+  if (i >= CARD_COUNT || !g_tests[i].result[0])
+    return;
+  char when[32];
+  struct tm tm_local;
+  localtime_r(&g_tests[i].at, &tm_local);
+  strftime(when, sizeof(when), "%d %b %H:%M", &tm_local);
+  snprintf(out, cap, "%s · %s", g_tests[i].result, when);
+}
+
+/* One FLAT matrix, one row per field, because beaker's {{for}} cannot nest: a
+   card's fields are rows too, with the card's own data repeated and a flag that
+   says "start of a card", so the template is a single loop.
+   Columns: card id | card title | why | links | test text | field name |
+            field label | masked value | source | credential | first-in-card */
+enum { ACCOUNT_COLS = 13 };
+
+AccountCards accounts_build(const char *locale_id) {
+  (void)locale_id;
+  AccountCards cards;
+  cards.count = 0;
+  int total = 0;
+  for (size_t c = 0; c < CARD_COUNT; c++)
+    for (int f = 0; f < 4 && CARDS[c].fields[f]; f++)
+      total++;
+  cards.rows = calloc((size_t)total + 1, sizeof(char **));
+  cards.inner = calloc((size_t)total + 1, sizeof(int));
+  if (!cards.rows || !cards.inner) {
+    free(cards.rows);
+    free(cards.inner);
+    cards.count = 0;
+    return cards;
+  }
+
+  int row = 0;
+  for (size_t c = 0; c < CARD_COUNT; c++) {
+    const AccountCard *card = &CARDS[c];
+    char test_text[320];
+    test_result_text(card, test_text, sizeof(test_text));
+    int first = 1;
+    for (int f = 0; f < 4 && card->fields[f]; f++) {
+      SecretKey key = secrets_key_from_name(card->fields[f]);
+      if (key == SK_COUNT)
+        continue;
+      const char *value = "";
+      SecretSource src = secrets_get(key, &value);
+      char masked[64] = "";
+      if (value[0])
+        secrets_mask(key, masked, sizeof(masked));
+      char label[64];
+      snprintf(label, sizeof(label), "%s", card->fields[f]);
+      for (char *p = label; *p; p++)
+        if (*p == '_')
+          *p = ' ';
+      EffectiveSource eff = src == SECRET_SOURCE_ENV
+                                ? EFFECTIVE_FROM_ENV
+                            : src == SECRET_SOURCE_FILE ? EFFECTIVE_FROM_FILE
+                                                        : EFFECTIVE_FROM_DEFAULT;
+
+      cards.rows[row] = calloc(ACCOUNT_COLS + 1, sizeof(char *));
+      if (!cards.rows[row])
+        break;
+      cards.rows[row][0] = strdup(card->id);
+      cards.rows[row][1] = strdup(card->title);
+      cards.rows[row][2] = strdup(card->why);
+      cards.rows[row][3] = strdup(card->links);
+      cards.rows[row][4] = strdup(test_text);
+      cards.rows[row][5] = strdup(card->fields[f]);
+      cards.rows[row][6] = strdup(label);
+      cards.rows[row][7] = strdup(masked);
+      cards.rows[row][8] = strdup(effective_source_label(eff));
+      cards.rows[row][9] = strdup(card->secret[f] ? "1" : "");
+      cards.rows[row][10] = strdup(first ? "1" : "");
+      /* 11: the input type, decided here so the template needs no nested if */
+      cards.rows[row][11] = strdup(card->secret[f] ? "password" : "text");
+      /* 12: the last field of a card closes the card's markup */
+      cards.rows[row][12] =
+          strdup(card->fields[f + 1] ? "" : "1");
+      cards.inner[row] = ACCOUNT_COLS;
+      first = 0;
+      row++;
+    }
+  }
+  cards.count = row;
+  return cards;
+}
+
+void accounts_free(AccountCards *cards) {
+  if (!cards || !cards->rows)
+    return;
+  for (int c = 0; c < cards->count; c++) {
+    if (!cards->rows[c])
+      continue;
+    for (int f = 0; f < ACCOUNT_COLS + 1 && cards->rows[c][f]; f++)
+      free(cards->rows[c][f]);
+    free(cards->rows[c]);
+  }
+  free(cards->rows);
+  free(cards->inner);
+  cards->rows = NULL;
+  cards->inner = NULL;
+  cards->count = 0;
+}
+
+int accounts_save_handler(UrlParams *params) {
+  if (!accounts_require_admin(params)) {
+    send_status("403 Forbidden");
+    send_response(
+        "<h1>Forbidden</h1><p>Writing server settings needs the admin token. "
+        "It is in <code>~/.omnisearch/secrets.ini</code> and was printed once "
+        "at startup.</p><p><a href=\"/settings\">Back to settings</a></p>");
+    return 0;
+  }
+
+  const char *card_id = "";
+  for (int i = 0; params && i < params->count; i++) {
+    const char *key = params->params[i].key;
+    const char *value = params->params[i].value;
+    if (strcmp(key, "card") == 0) {
+      card_id = value;
+      continue;
+    }
+    if (strcmp(key, "admin") == 0 || strcmp(key, "cb") == 0)
+      continue;
+    /* a field is only accepted when the card owns it, so this endpoint cannot
+       write an arbitrary key */
+    const AccountCard *card = card_by_id(card_id);
+    if (!card)
+      continue;
+    int owned = 0;
+    for (int f = 0; f < 4 && card->fields[f]; f++)
+      if (strcmp(card->fields[f], key) == 0)
+        owned = 1;
+    if (!owned)
+      continue;
+    SecretKey sk = secrets_key_from_name(key);
+    if (sk == SK_COUNT)
+      continue;
+    /* blank means "keep the old value", which is what a masked field shows */
+    if (!value[0])
+      continue;
+    if (secrets_set(sk, value) != 0)
+      fprintf(stderr, "[WARN] account save failed for %s\n", key);
+  }
+  secrets_reload_after_save();
+  {
+    extern Config global_config;
+    apply_effective_settings(&global_config);
+  }
+  send_redirect("/settings#accounts");
+  return 0;
+}
+
+/* the "Clear" button: one field, no value at all */
+int accounts_clear_handler(UrlParams *params) {
+  if (!accounts_require_admin(params)) {
+    send_status("403 Forbidden");
+    send_response("<h1>Forbidden</h1>");
+    return 0;
+  }
+  const char *card_id = "", *field = "";
+  for (int i = 0; params && i < params->count; i++) {
+    if (strcmp(params->params[i].key, "card") == 0)
+      card_id = params->params[i].value;
+    else if (strcmp(params->params[i].key, "field") == 0)
+      field = params->params[i].value;
+  }
+  const AccountCard *card = card_by_id(card_id);
+  if (card) {
+    for (int f = 0; f < 4 && card->fields[f]; f++)
+      if (strcmp(card->fields[f], field) == 0)
+        secrets_set(secrets_key_from_name(field), "");
+  }
+  secrets_reload_after_save();
+  send_redirect("/settings#accounts");
+  return 0;
+}
+
+/* The smallest real call each card can make. Nothing here prints a token, a
+   header or a body: only a sentence and an HTTP status. One per 30 seconds per
+   card, so a stuck button cannot hammer Reddit or a bridge. */
+static void reddit_test(const char *client_id, const char *secret, char *out,
+                        size_t cap);
+
+int accounts_test_handler(UrlParams *params) {
+  if (!accounts_require_admin(params)) {
+    send_status("403 Forbidden");
+    send_response("<h1>Forbidden</h1>");
+    return 0;
+  }
+  const char *card_id = "";
+  for (int i = 0; params && i < params->count; i++)
+    if (strcmp(params->params[i].key, "card") == 0)
+      card_id = params->params[i].value;
+  const AccountCard *card = card_by_id(card_id);
+  if (!card) {
+    send_status("404 Not Found");
+    send_response("<h1>Unknown card</h1>");
+    return 0;
+  }
+
+  char text[256];
+  size_t idx = (size_t)(card - CARDS);
+  time_t now = time(NULL);
+  if (g_tests[idx].at && now - g_tests[idx].at < 30) {
+    snprintf(text, sizeof(text), "Just tested. Wait %d s before testing again.",
+             (int)(30 - (now - g_tests[idx].at)));
+    remember_test(card, text);
+  } else if (strcmp(card->id, "reddit") == 0) {
+    const char *id = "";
+    const char *secret = "";
+    secrets_get(SK_REDDIT_CLIENT_ID, &id);
+    secrets_get(SK_REDDIT_CLIENT_SECRET, &secret);
+    reddit_test(id, secret, text, sizeof(text));
+    remember_test(card, text);
+  } else if (strcmp(card->id, "searxng") == 0) {
+    const char *url = "";
+    secrets_get(SK_SEARXNG_URL, &url);
+    if (!url[0])
+      snprintf(text, sizeof(text), "No URL saved yet.");
+    else {
+      char reply[256];
+      if (searxng_test(url, reply, sizeof(reply)) == 0)
+        snprintf(text, sizeof(text), "%s", reply);
+      else
+        snprintf(text, sizeof(text), "Can't reach %s", url);
+    }
+    remember_test(card, text);
+  } else if (strcmp(card->id, "yacy") == 0) {
+    const char *url = "";
+    secrets_get(SK_YACY_INSTANCE, &url);
+    char probe[512];
+    snprintf(probe, sizeof(probe), "%s/Status.html", url[0] ? url : DEFAULT_YACY_INSTANCE);
+    int reachable = url_reachable(probe, 2500);
+    snprintf(text, sizeof(text), reachable ? "A YaCy peer answers at %s"
+                                           : "No peer answers at %s",
+             url[0] ? url : DEFAULT_YACY_INSTANCE);
+    remember_test(card, text);
+  } else if (strcmp(card->id, "google") == 0) {
+    const char *cx = "";
+    secrets_get(SK_GOOGLE_CSE_CX, &cx);
+    snprintf(text, sizeof(text),
+             cx[0] ? "A cx is saved. The Element endpoint is experimental."
+                   : "No cx saved. Google's JSON API no longer issues keys.");
+    remember_test(card, text);
+  } else {
+    snprintf(text, sizeof(text), "Nothing to test.");
+    remember_test(card, text);
+  }
+
+  send_redirect("/settings#accounts");
+  return 0;
+}
+
+/* is anything listening at this URL? HEAD first, GET as a fallback, 2.5 s */
+int url_reachable(const char *url, long timeout_ms) {
+  if (!url || !url[0])
+    return 0;
+  CURL *curl = curl_easy_init();
+  if (!curl)
+    return 0;
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
+  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                   "Mozilla/5.0 (compatible; omnisearch/1.0)");
+  CURLcode rc = curl_easy_perform(curl);
+  long status = 0;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+  curl_easy_cleanup(curl);
+  return rc == CURLE_OK && status > 0 && status < 500;
+}
+
+/* SearXNG: one JSON search. A 403 here almost always means the instance does
+   not have `json` in search.formats, which is worth saying in words. */
+int searxng_test(const char *base_url, char *out, size_t cap) {
+  char url[600];
+  snprintf(url, sizeof(url), "%s/search?q=test&format=json", base_url);
+  CURL *curl = curl_easy_init();
+  if (!curl)
+    return -1;
+  char *body = NULL;
+  size_t len = 0;
+  FILE *mem = tmpfile();
+  if (!mem) {
+    curl_easy_cleanup(curl);
+    return -1;
+  }
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 4000L);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, mem);
+  curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                   "Mozilla/5.0 (compatible; omnisearch/1.0)");
+  CURLcode rc = curl_easy_perform(curl);
+  long status = 0;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+  curl_easy_cleanup(curl);
+  if (rc != CURLE_OK) {
+    fclose(mem);
+    return -1;
+  }
+  if (status == 403) {
+    snprintf(out, cap,
+             "SearXNG refused JSON (403): enable \"json\" under "
+             "search.formats");
+    fclose(mem);
+    return 0;
+  }
+  if (status != 200) {
+    snprintf(out, cap, "SearXNG answered %ld", status);
+    fclose(mem);
+    return 0;
+  }
+  fseek(mem, 0, SEEK_END);
+  long size = ftell(mem);
+  fseek(mem, 0, SEEK_SET);
+  if (size > 0 && size < 1024 * 1024) {
+    body = malloc((size_t)size + 1);
+    if (body) {
+      len = fread(body, 1, (size_t)size, mem);
+      body[len] = '\0';
+    }
+  }
+  fclose(mem);
+  if (!body) {
+    snprintf(out, cap, "SearXNG answered 200 with an unreadable body");
+    return 0;
+  }
+  /* count the results without a JSON parser dependency here: the field is a
+     top-level array of objects, and the count is what the owner needs */
+  int results = 0;
+  for (const char *p = body; (p = strstr(p, "\"url\"")) != NULL; p++)
+    results++;
+  snprintf(out, cap, "SearXNG answered: %d result%s in JSON", results,
+           results == 1 ? "" : "s");
+  free(body);
+  return 0;
+}
+
+/* Reddit: fetch an app-only token and ask one question. This is the evidence
+   the owner runs once with their own key; it prints a sentence and a status,
+   never the token, the header or the body. */
+static void reddit_test(const char *client_id, const char *secret, char *out,
+                        size_t cap) {
+  if (!client_id || !client_id[0]) {
+    snprintf(out, cap, "No client id saved yet.");
+    return;
+  }
+  extern int reddit_test_credentials(const char *client_id,
+                                     const char *client_secret,
+                                     char *out, size_t cap);
+  reddit_test_credentials(client_id, secret, out, cap);
+}

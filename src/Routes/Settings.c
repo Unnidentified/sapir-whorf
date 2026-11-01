@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "Accounts.h"
 #include "../Config.h"
 #include "../Scraping/Scraping.h"
 #include "../Scraping/EngineHealth.h"
@@ -233,7 +234,7 @@ int settings_handler(UrlParams *params) {
   context_set(&ctx, "page_scale_css", get_page_scale_css());
   CustomTheme custom_theme;
   get_custom_theme(&custom_theme);
-  context_set_custom_theme(&ctx, &custom_theme);
+  context_set_custom_theme_compact(&ctx, &custom_theme);
   context_set(&ctx, "locale", locale);
   {
     extern Config global_config;
@@ -301,6 +302,17 @@ int settings_handler(UrlParams *params) {
     char seen[16];
     snprintf(seen, sizeof(seen), "%d", toggleable);
     context_set(&ctx, "provider_count", seen);
+  }
+
+  /* L3: the Accounts and servers cards. One matrix, one context key, and the
+     rows are built in C because beaker's {{if}} does not nest. */
+  {
+    AccountCards cards = accounts_build(locale);
+    context_set_array_of_arrays(&ctx, "accounts", cards.rows, cards.count,
+                                cards.inner);
+    /* the fields inside a card are a "name|label|masked|source|credential"
+       string; the template splits nothing, so the fields arrive pre-split */
+    accounts_free(&cards);
   }
 
   if (enabled_count > 0) {
@@ -478,6 +490,14 @@ int settings_handler(UrlParams *params) {
   }
 
   /* the template engine keeps these pointers, so they are freed after render */
+
+  if (getenv("OMNI_PERF")) {
+    fprintf(stderr, "[CTX] settings page uses %d of %d context slots:",
+            ctx.count, MAX_CONTEXT_VARS);
+    for (int kv = 0; kv < ctx.count; kv++)
+      fprintf(stderr, " %s", ctx.vars[kv].key);
+    fprintf(stderr, "\n");
+  }
 
   char *rendered_html = render_template("settings.html", &ctx);
   send_response(rendered_html);
