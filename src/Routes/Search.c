@@ -1056,23 +1056,24 @@ int results_handler(UrlParams *params) {
               search_href ? search_href : "/search");
   free(search_href);
 
+  /* K1.4: one predicate for "may this request contact this engine". It was
+     three separate conditions in three places, and the F2 recovery round only
+     had one of them - measured: with an opt-in provider named and NOT opted
+     in, the recovery round still fetched it, because it scanned the whole
+     registry instead of the eligible set. */
+  #define ENGINE_MAY_BE_CONTACTED(e)                                          \
+    ((e)->enabled &&                                                          \
+     engine_allowed_for_user((e), user_engines, user_engine_count,             \
+                             has_user_pref) &&                                \
+     !((e)->opt_in && !opt_in_enabled_for((e)->id)) &&                        \
+     (!selected_engine || (e) == selected_engine))
+
   /* eligible engines for this request: filtered once so the counting and the
      job setup below can never disagree */
   const SearchEngine *eligible[MAX_ENGINES];
   int eligible_count = 0;
   for (int i = 0; i < ENGINE_COUNT; i++) {
-    if (!ENGINE_REGISTRY[i].enabled)
-      continue;
-    if (selected_engine && &ENGINE_REGISTRY[i] != selected_engine)
-      continue;
-    if (!engine_allowed_for_user(&ENGINE_REGISTRY[i], user_engines,
-                                 user_engine_count, has_user_pref))
-      continue;
-    /* K1.5/J5 tiers: a provider that needs the owner's opt-in is never fanned
-       out. It is reachable only when it is the engine this request names, and
-       only when this browser has switched that provider on. */
-    if (ENGINE_REGISTRY[i].opt_in &&
-        (!selected_engine || !opt_in_enabled_for(ENGINE_REGISTRY[i].id)))
+    if (!ENGINE_MAY_BE_CONTACTED(&ENGINE_REGISTRY[i]))
       continue;
     eligible[eligible_count++] = &ENGINE_REGISTRY[i];
   }
@@ -1618,9 +1619,9 @@ int results_handler(UrlParams *params) {
     for (size_t p = 0; p < sizeof(LANE_ORDER) / sizeof(LANE_ORDER[0]) && !lane;
          p++) {
       for (int i = 0; i < ENGINE_COUNT; i++) {
-        if (!ENGINE_REGISTRY[i].enabled ||
-            !(ENGINE_REGISTRY[i].verticals & V_WEB) ||
-            !ENGINE_REGISTRY[i].supports_site)
+        if (!(ENGINE_REGISTRY[i].verticals & V_WEB) ||
+            !ENGINE_REGISTRY[i].supports_site ||
+            !ENGINE_MAY_BE_CONTACTED(&ENGINE_REGISTRY[i]))
           continue;
         if (strcmp(ENGINE_REGISTRY[i].id, LANE_ORDER[p]) == 0) {
           lane = &ENGINE_REGISTRY[i];
@@ -1710,9 +1711,11 @@ int results_handler(UrlParams *params) {
       for (int pass = 0; pass < 2 && added < 3; pass++) {
       for (int i = 0; i < ENGINE_COUNT && engine_idx < (int)job_capacity; i++) {
         const SearchEngine *cand = &ENGINE_REGISTRY[i];
-        if (!cand->enabled || !(cand->verticals & V_WEB))
+        if (!(cand->verticals & V_WEB))
           continue;
-        if (!engine_health_allow(cand->id))
+        /* the same gate as the first pass: recovery must never reach a
+           provider the first pass was not allowed to reach */
+        if (!ENGINE_MAY_BE_CONTACTED(cand) || !engine_health_allow(cand->id))
           continue;
         int already = 0;
         for (int j = 0; j < engine_idx; j++)

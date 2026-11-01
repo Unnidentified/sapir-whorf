@@ -131,45 +131,52 @@ int settings_handler(UrlParams *params) {
   for (int i = 0; i < provider_row_count; i++) {
     ProviderRow *r = &provider_rows[i];
     if (i == 0 || r->group != provider_rows[i - 1].group) {
-      provider_data[prow] = malloc(sizeof(char *) * 11);
+      provider_data[prow] = malloc(sizeof(char *) * 12);
       provider_data[prow][0] = strdup("group");
       provider_data[prow][1] = strdup("group");
       provider_data[prow][2] = strdup(provider_group_label(r->group));
-      for (int c = 3; c < 11; c++)
+      for (int c = 3; c < 12; c++)
         provider_data[prow][c] = strdup("");
       /* a heading row draws no control: it is disabled so it never submits,
          and the stylesheet hides the box */
       provider_data[prow][4] = strdup("group");
       provider_data[prow][6] = strdup("");
       provider_data[prow][7] = strdup("disabled");
-      provider_inner[prow] = 11;
+      provider_inner[prow] = 12;
       prow++;
     }
 
     ProviderState state = provider_state(r);
-    provider_data[prow] = malloc(sizeof(char *) * 11);
+    provider_data[prow] = malloc(sizeof(char *) * 12);
     provider_data[prow][0] = strdup("row");
     provider_data[prow][1] = strdup(r->id);
     provider_data[prow][2] = strdup(r->label);
     provider_data[prow][3] = strdup(r->host ? r->host : "");
     /* the state kind, not the sentence: the words live in the locales, and
        colour alone is not a state (the review asked for words) */
+    int opted_in = r->opt_in && opt_in_enabled_for(r->id);
     provider_data[prow][4] =
         strdup(!r->toggleable ? "local"
+               : state == PS_UNAVAILABLE ? (provider_needs_config(r) ? "needs_config" : "unavailable")
+               : r->opt_in ? (opted_in ? "on" : "off")
                : state == PS_ON ? "on"
-               : state == PS_OFF ? "off"
-               : provider_needs_config(r) ? "needs_config"
-                                          : "unavailable");
+                                : "off");
     provider_data[prow][5] = strdup("");
     /* the box is ticked when the provider is OFF, because the form submits the
        disabled set - one param per provider that is off, none for one that is
        on, and the script collapses even that into a single field */
-    provider_data[prow][6] = strdup(state == PS_OFF ? "checked" : "");
+    provider_data[prow][6] =
+        strdup(r->opt_in ? (opted_in ? "checked" : "")
+                         : state == PS_OFF ? "checked" : "");
     provider_data[prow][7] = strdup((state == PS_UNAVAILABLE || !r->toggleable) ? "disabled" : "");
     provider_data[prow][8] = strdup(r->toggleable ? "" : "1");
     provider_data[prow][9] = strdup(r->opt_in ? "1" : "");
     provider_data[prow][10] = strdup(r->opt_in ? provider_opt_in_disclosure(r->id) : "");
-    provider_inner[prow] = 11;
+    /* K1.5: an opt-in provider has ONE control, and it is the opt-in switch -
+       a second "off" checkbox for the same row would be two gates with the same
+       meaning. The field name says which gate it writes. */
+    provider_data[prow][11] = strdup(r->opt_in ? "optin_" : "off_");
+    provider_inner[prow] = 12;
     prow++;
   }
 

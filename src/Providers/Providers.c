@@ -206,7 +206,10 @@ ProviderState provider_state(const ProviderRow *row) {
     return PS_OFF;
   if (!row->toggleable)
     return PS_ON;
-  if (row->opt_in && !opt_in_enabled_for(row->id))
+  /* an opt-in provider is available when the *server* permits it; whether
+     this browser has switched it on is a different question, and the page
+     shows that as the switch's own state rather than as unavailability */
+  if (row->opt_in && !opt_in_providers_available())
     return PS_UNAVAILABLE;
   for (int i = 0; i < ENGINE_COUNT; i++) {
     if (strcmp(ENGINE_REGISTRY[i].id, row->id) != 0)

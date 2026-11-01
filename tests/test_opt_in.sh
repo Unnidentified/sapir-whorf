@@ -39,54 +39,45 @@ start off 8101 off
 start on 8102 on
 sleep 4
 
-# 1. server refuses: no control, and it says why
+# 1. server refuses: no switch anywhere, and it says why
 curl -sS -o /tmp/optin-off.html -m 10 "http://127.0.0.1:8101/settings"
-grep -q 'name="opt_in"' /tmp/optin-off.html && {
-  echo "FAIL: the switch was offered while the server forbids the providers"; fail=1; }
+grep -q 'name="optin_' /tmp/optin-off.html && {
+  echo "FAIL: a per-provider switch was offered while the server forbids it"; fail=1; }
 grep -qi "has not enabled these providers" /tmp/optin-off.html || {
   echo "FAIL: the page did not say the server forbids them"; fail=1; }
 grep -qi "Legal notice" /tmp/optin-off.html || {
   echo "FAIL: the disclaimer was missing"; fail=1; }
 
 # 2. a cookie cannot override the server
-curl -sS -o /tmp/optin-forced.html -m 10 -b "opt_in=1" "http://127.0.0.1:8101/settings"
-grep -q 'name="opt_in"' /tmp/optin-forced.html && {
-  echo "FAIL: opt_in=1 cookie produced a control on a refusing server"; fail=1; }
+curl -sS -o /tmp/optin-forced.html -m 10 -b "optin=1"   "http://127.0.0.1:8101/settings"
+grep -q 'name="optin_' /tmp/optin-forced.html && {
+  echo "FAIL: an optin cookie produced a switch on a refusing server"; fail=1; }
 
-# 3. server permits: the control exists, unchecked, and says nothing is registered
+# 3. server permits: the section explains itself. There is no global switch
+#    any more (K1.5): the switch is the provider's own row, and the shipped
+#    build registers none, so the page must say so rather than offer a control
+#    that would switch nothing.
 curl -sS -o /tmp/optin-on.html -m 10 "http://127.0.0.1:8102/settings"
-grep -q 'name="opt_in"' /tmp/optin-on.html || {
-  echo "FAIL: the switch was not offered on a permitting server"; fail=1; }
-grep -q 'id="opt_in"[^>]*checked' /tmp/optin-on.html && {
-  echo "FAIL: the switch was on by default"; fail=1; }
+grep -q 'name="opt_in"' /tmp/optin-on.html && {
+  echo "FAIL: the removed global switch is still rendered"; fail=1; }
 grep -qi "No provider of this kind is registered" /tmp/optin-on.html || {
   echo "FAIL: the page did not say that no such provider exists yet"; fail=1; }
+grep -qi "own switch under Opt-in" /tmp/optin-on.html || {
+  echo "FAIL: the page did not point at the per-provider switch"; fail=1; }
 
-# 4. opting in sets the cookie; the page then shows it checked
-curl -sS -o /tmp/optin-h1.txt -m 10 -D /tmp/optin-h1.h \
-  "http://127.0.0.1:8102/save_settings?opt_in_present=1&opt_in=1"
-grep -qi "set-cookie: opt_in=1" /tmp/optin-h1.h || {
-  echo "FAIL: opting in did not set the cookie"; fail=1; }
-curl -sS -o /tmp/optin-in.html -m 10 -b "opt_in=1" "http://127.0.0.1:8102/settings"
-grep -q 'id="opt_in"[^>]*checked' /tmp/optin-in.html || {
-  echo "FAIL: the switch did not show as on after opting in"; fail=1; }
-
-# 5. it can be withdrawn: present-but-unchecked means off
-curl -sS -o /dev/null -m 10 -D /tmp/optin-h2.h \
-  "http://127.0.0.1:8102/save_settings?opt_in_present=1"
-grep -qi "set-cookie: opt_in=0" /tmp/optin-h2.h || {
-  echo "FAIL: an unchecked switch did not clear the opt-in"; fail=1; }
-
-# 6. a form without the control does not touch an existing choice
+# 4. an unrelated save does not touch the opt-in list
 curl -sS -o /dev/null -m 10 -D /tmp/optin-h3.h \
   "http://127.0.0.1:8102/save_settings?theme=amber"
-grep -qi "set-cookie: opt_in" /tmp/optin-h3.h && {
+grep -qi "set-cookie: optin" /tmp/optin-h3.h && {
   echo "FAIL: an unrelated save changed the opt-in"; fail=1; }
+
+# 5. the per-provider path is measured end to end in test_k1_optin.sh, which
+#    registers a provider and checks what leaves the machine.
 
 for p in $PIDS; do kill "$p" 2>/dev/null; done
 rm -f /tmp/optin-*.ini
 if [ "$fail" -eq 0 ]; then
-  echo "J5.5 opt-in switch: PASS (server gate, browser gate, withdraw, unrelated save)"
+  echo "J5.5 opt-in switch: PASS (server gate, no global switch, per-provider path elsewhere)"
 else
   exit 1
 fi

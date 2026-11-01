@@ -20,6 +20,10 @@ int settings_save_handler(UrlParams *params) {
   int engines_present = 0;
   int engines_seen = 0;
   const char *off_list = NULL; /* K1.3: the single field settings.js writes */
+  /* K1.5: the opt-in list, one entry per provider this browser switched on */
+  char optin_ids[64][32];
+  int optin_count = 0;
+  int optin_seen = 0;
   int answers_present = 0;
   int opt_in_present = 0;
   const char *opt_in = NULL;
@@ -93,6 +97,20 @@ int settings_save_handler(UrlParams *params) {
            truncated submission would silently re-enable providers. */
         engines_present = 1;
         engines_seen = atoi(params->params[i].value);
+      } else if (strncmp(params->params[i].key, "optin_", 6) == 0) {
+        /* K1.5: written only when the form was on the page and the server
+           permits opt-in providers at all */
+        optin_seen = 1;
+        if (strcmp(params->params[i].value, "1") == 0 &&
+            optin_count < 64) {
+          const char *pid = params->params[i].key + 6;
+          if (provider_id_known(pid)) {
+            strncpy(optin_ids[optin_count], pid,
+                    sizeof(optin_ids[optin_count]) - 1);
+            optin_ids[optin_count][sizeof(optin_ids[optin_count]) - 1] = '\0';
+            optin_count++;
+          }
+        }
       } else if (strcmp(params->params[i].key, "off") == 0) {
         off_list = params->params[i].value;
       } else if (strncmp(params->params[i].key, "off_", 4) == 0 &&
@@ -281,6 +299,27 @@ int settings_save_handler(UrlParams *params) {
       set_cookie("engines", cookie_value, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
                  false, false);
     }
+  }
+
+  if (optin_seen && opt_in_providers_available()) {
+    char value[1024];
+    int written = 0;
+    for (int i = 0; i < optin_count; i++) {
+      int need = (int)strlen(optin_ids[i]) + (i > 0 ? 1 : 0);
+      if (written + need + 1 > (int)sizeof(value))
+        break;
+      if (i > 0)
+        value[written++] = '|';
+      written += snprintf(value + written, sizeof(value) - (size_t)written,
+                          "%s", optin_ids[i]);
+    }
+    value[written] = '\0';
+    set_cookie("optin", value, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false,
+               false);
+    /* the old single cookie said "all of them"; leaving it would re-enable
+       everything the moment this list is emptied */
+    set_cookie("opt_in", "0", "Thu, 01 Jan 1970 00:00:00 GMT", "/", false,
+               false);
   }
 
   if (default_engine_present) {

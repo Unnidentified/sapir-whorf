@@ -468,6 +468,7 @@ widget-check:
 # J5.5 tier 3: the opt-in switch and its two gates
 optin-check:
 	@./tests/test_opt_in.sh
+	@./tests/test_k1_optin.sh
 
 # J3c: results under the answer, and the three fan-out modes
 answersfanout-check:
