@@ -67,6 +67,56 @@ static int is_link_word(const char *word) {
          strcasecmp(word, "de") == 0 || strcasecmp(word, "del") == 0;
 }
 
+/* Numbers the reader's way: thousands separators, and the decimal mark the
+   locale uses. A price is a number to read, not a float to dump. */
+static void stock_format_number(double value, int decimals, const char *lang,
+                                char *out, size_t cap) {
+  char raw[64];
+  snprintf(raw, sizeof(raw), "%.*f", decimals, value);
+  int decimal_comma = 0;
+  if (lang) {
+    static const char *COMMA[] = {"de", "es", "it", "pt", "fr", "nl", "ru",
+                                  "lv", "fi", "vi", "af"};
+    for (size_t i = 0; i < sizeof(COMMA) / sizeof(COMMA[0]); i++)
+      if (strncasecmp(lang, COMMA[i], 2) == 0)
+        decimal_comma = 1;
+  }
+  char *dot = strchr(raw, '.');
+  char whole[48], frac[16];
+  if (dot) {
+    size_t n = (size_t)(dot - raw);
+    if (n >= sizeof(whole))
+      n = sizeof(whole) - 1;
+    memcpy(whole, raw, n);
+    whole[n] = '\0';
+    snprintf(frac, sizeof(frac), "%s", dot + 1);
+  } else {
+    snprintf(whole, sizeof(whole), "%s", raw);
+    frac[0] = '\0';
+  }
+  /* group the integer part in threes, from the right */
+  char grouped[64];
+  size_t glen = 0, wlen = strlen(whole);
+  for (size_t i = 0; i < wlen && glen + 2 < sizeof(grouped); i++) {
+    if (i > 0 && (wlen - i) % 3 == 0)
+      grouped[glen++] = decimal_comma ? '.' : ',';
+    grouped[glen++] = whole[i];
+  }
+  grouped[glen] = '\0';
+  if (frac[0])
+    snprintf(out, cap, "%s%s%s", grouped, decimal_comma ? "," : ".", frac);
+  else
+    snprintf(out, cap, "%s", grouped);
+}
+
+/* "30 Oct, 16:00 UTC" - UTC because the provider's stamp is UTC and inventing
+   a zone from the reader's locale would be a guess. */
+static void stock_format_time(time_t t, char *out, size_t cap) {
+  struct tm tm_utc;
+  gmtime_r(&t, &tm_utc);
+  strftime(out, cap, "%e %b, %H:%M UTC", &tm_utc);
+}
+
 /* K11: names to symbols, from the bundled SEC table.
  *
  * The table is a *name* map, not a quote source: it answers "nvidia" and
@@ -392,7 +442,8 @@ int stocks_symbol_was_explicit(const char *query, const char *ticker) {
   return 0;
 }
 
-int stocks_widget(const char *ticker, int explicit_symbol, WidgetData *out) {
+int stocks_widget(const char *ticker, int explicit_symbol,
+                  const char *lang, WidgetData *out) {
   if (!out || !ticker || !ticker[0])
     return 0;
   memset(out, 0, sizeof(*out));
@@ -456,22 +507,72 @@ int stocks_widget(const char *ticker, int explicit_symbol, WidgetData *out) {
     json_decref(root);
     return 1;
   }
-  snprintf(out->result, sizeof(out->result), "%.4f %s", json_number_value(price),
-           currency ? currency : "");
+  /* K11: the quote is presented, not dumped. Two decimals for a share price,
+     four for a sub-dollar one, thousands separators and the reader's decimal
+     mark; the name and the exchange under the number; the change with an arrow
+     so colour is never the only signal. An index is quoted in points, not in a
+     currency it does not have. */
+  {
+    const char *quote_type =
+        meta ? json_string_value(json_object_get(meta, "quoteType")) : NULL;
+    const char *long_name =
+        meta ? json_string_value(json_object_get(meta, "longName")) : NULL;
+    if (!long_name && meta)
+      long_name = json_string_value(json_object_get(meta, "shortName"));
+    const char *exchange = meta
+                               ? json_string_value(json_object_get(
+                                     meta, "fullExchangeName"))
+                               : NULL;
+    if (!exchange && meta)
+      exchange = json_string_value(json_object_get(meta, "exchangeName"));
 
-  char when[32] = "";
-  if (json_is_integer(stamp)) {
-    time_t t = (time_t)json_integer_value(stamp);
-    struct tm tm_utc;
-    gmtime_r(&t, &tm_utc);
-    strftime(when, sizeof(when), "%Y-%m-%d %H:%M UTC", &tm_utc);
-  }
-  if (json_is_number(prev)) {
-    snprintf(out->note, sizeof(out->note), "%.10s · prev %.4f · %.28s",
-             symbol ? symbol : ticker, json_number_value(prev), when);
-  } else {
-    snprintf(out->note, sizeof(out->note), "%.10s · %.28s",
-             symbol ? symbol : ticker, when);
+    char number[64];
+    int decimals = json_number_value(price) < 1.0 ? 4 : 2;
+    stock_format_number(json_number_value(price), decimals, lang, number,
+                        sizeof(number));
+    const char *unit = ((quote_type && strcasecmp(quote_type, "INDEX") == 0) ||
+                        (symbol && symbol[0] == '^'))
+                           ? "points"
+                           : (currency && currency[0] ? currency : "");
+    snprintf(out->result, sizeof(out->result), "%s %s", number, unit);
+
+    char when[64] = "";
+    if (json_is_integer(stamp)) {
+      time_t t = (time_t)json_integer_value(stamp);
+      stock_format_time(t, when, sizeof(when));
+    }
+
+    /* the change: absolute and percent, with the arrow before the number */
+    char change_text[96] = "";
+    if (json_is_number(prev) && json_number_value(prev) > 0) {
+      double before = json_number_value(prev);
+      double delta = json_number_value(price) - before;
+      char abs_text[32], pct_text[32], abs_num[32];
+      stock_format_number(delta < 0 ? -delta : delta, decimals, lang, abs_num,
+                          sizeof(abs_num));
+      snprintf(abs_text, sizeof(abs_text), "%s%s", delta < 0 ? "-" : "",
+               abs_num);
+      stock_format_number(delta / before * 100.0, 2, lang, pct_text,
+                          sizeof(pct_text));
+      snprintf(change_text, sizeof(change_text), "%s %s (%s%%)",
+               delta > 0 ? "\xE2\x96\xB2" : delta < 0 ? "\xE2\x96\xBC" : "\xC2\xB7",
+               abs_text, pct_text);
+    }
+
+    char head[96] = "";
+    if (long_name && long_name[0])
+      snprintf(head, sizeof(head), "%s", long_name);
+    char listing[96] = "";
+    if (exchange && exchange[0])
+      snprintf(listing, sizeof(listing), "%s: %s", exchange,
+               symbol ? symbol : ticker);
+    else
+      snprintf(listing, sizeof(listing), "%s", symbol ? symbol : ticker);
+
+    snprintf(out->note, sizeof(out->note), "%s%s%s%s%s%s%s",
+             head[0] ? head : listing, head[0] ? " · " : "",
+             head[0] ? listing : "", change_text[0] ? " · " : "", change_text,
+             when[0] ? " · " : "", when);
   }
   out->ok = 1;
   json_decref(root);

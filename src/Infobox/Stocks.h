@@ -18,6 +18,7 @@ int stocks_lookup_name(const char *name, char *out, size_t cap);
 int stocks_symbol_known(const char *symbol);
 
 /* 1 when a card applies; out->ok says whether a quote came back. */
-int stocks_widget(const char *ticker, int explicit_symbol, WidgetData *out);
+int stocks_widget(const char *ticker, int explicit_symbol,
+                  const char *lang, WidgetData *out);
 
 #endif
