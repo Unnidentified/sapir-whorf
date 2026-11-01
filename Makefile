@@ -371,6 +371,17 @@ tests/test_g4_answerbox: tests/test_g4_answerbox.c $(LINT_SRCS) \
                          src/Infobox/Infobox.c
 	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto -lm
 
+# K7: the description extractor and the robots reader, with no network
+tests/test_k7_descriptions: tests/test_k7_descriptions.c \
+                            src/Infobox/Descriptions.c src/Routes/ImageProxy.c \
+                            $(LINT_SRCS) src/Cache/Cache.c src/Config.c \
+                            src/Proxy/Proxy.c src/Utility/JsonHelper.c \
+                            src/Utility/HttpClient.c src/Utility/Unescape.c
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto -lm
+
+k7check: tests/test_k7_descriptions
+	@./tests/test_k7_descriptions
+
 # K11: name -> symbol resolution, with no network (the bundled SEC table)
 tests/test_k11_stocks: tests/test_k11_stocks.c src/Infobox/Stocks.c \
                        $(LINT_SRCS) src/Cache/Cache.c src/Config.c \

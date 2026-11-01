@@ -118,3 +118,62 @@ void html_escape(const char *in, char *out, size_t size) {
   }
   out[used] = '\0';
 }
+
+void unescape_html_entities(const char *in, char *out, size_t size) {
+  out[0] = '\0';
+  if (!in || size == 0)
+    return;
+
+  size_t o = 0;
+  for (const char *p = in; *p && o + 1 < size; p++) {
+    if (*p != '&') {
+      out[o++] = *p;
+      continue;
+    }
+
+    const char *semi = strchr(p, ';');
+    if (!semi || semi - p > 10) {
+      out[o++] = *p;
+      continue;
+    }
+
+    char entity[12];
+    size_t len = (size_t)(semi - p + 1);
+    memcpy(entity, p, len);
+    entity[len] = '\0';
+
+    char decoded = 0;
+    if (strcmp(entity, "&amp;") == 0) decoded = '&';
+    else if (strcmp(entity, "&lt;") == 0) decoded = '<';
+    else if (strcmp(entity, "&gt;") == 0) decoded = '>';
+    else if (strcmp(entity, "&quot;") == 0) decoded = '"';
+    else if (strcmp(entity, "&apos;") == 0) decoded = '\'';
+    else if (strcmp(entity, "&nbsp;") == 0) decoded = ' ';
+    else if (entity[1] == '#') {
+      int value = 0, ok = 1;
+      if (entity[2] == 'x' || entity[2] == 'X') {
+        for (const char *q = entity + 3; *q != ';'; q++) {
+          if (*q >= '0' && *q <= '9') value = value * 16 + (*q - '0');
+          else if ((*q | 32) >= 'a' && (*q | 32) <= 'f') value = value * 16 + (*q | 32) - 'a' + 10;
+          else { ok = 0; break; }
+        }
+      } else {
+        for (const char *q = entity + 2; *q != ';'; q++) {
+          if (*q >= '0' && *q <= '9') value = value * 10 + (*q - '0');
+          else { ok = 0; break; }
+        }
+      }
+      if (ok && value > 0 && value < 128)
+        decoded = (char)value;
+    }
+
+    if (decoded) {
+      out[o++] = decoded;
+      p = semi;
+    } else {
+      out[o++] = *p;
+    }
+  }
+  out[o] = '\0';
+}
+

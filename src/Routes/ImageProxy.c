@@ -680,3 +680,70 @@ int image_proxy_handler(UrlParams *params) {
   free(cache_key);
   return 0;
 }
+
+/* K7: the description fetcher's one request. It reuses this file's socket
+   guard rather than growing a second, weaker copy: the guard is the reason a
+   result URL cannot reach the loopback address, and a page fetched for its
+   description is no different from an image. */
+int proxy_guarded_get(const char *url, long timeout_ms, size_t max_bytes,
+                      char **body_out, size_t *len_out, long *status_out) {
+  if (body_out)
+    *body_out = NULL;
+  if (len_out)
+    *len_out = 0;
+  if (status_out)
+    *status_out = 0;
+  if (!url || !body_out)
+    return -1;
+
+  CURL *curl = curl_easy_init();
+  if (!curl)
+    return -1;
+
+  MemoryBuffer buf = {.data = malloc(8192), .size = 0, .capacity = 8192};
+  if (!buf.data) {
+    curl_easy_cleanup(curl);
+    return -1;
+  }
+
+  struct curl_slist *headers = NULL;
+  headers = curl_slist_append(headers, "Accept: text/html,application/xhtml+xml");
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
+  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
+  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
+  curl_easy_setopt(curl, CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)max_bytes);
+  curl_easy_setopt(curl, CURLOPT_OPENSOCKETFUNCTION, guard_opensocket);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
+  curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                   "omnisearch/1.0 (+https://codeberg.org/gabrielf/omnisearch)");
+  apply_proxy_settings(curl);
+
+  CURLcode rc = curl_easy_perform(curl);
+  long status = 0;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+  char *content_type = NULL;
+  curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &content_type);
+  if (status_out)
+    *status_out = status;
+
+  int ok = -1;
+  if (rc == CURLE_OK && status >= 200 && status < 300 && buf.size > 0 &&
+      (!content_type || strncasecmp(content_type, "text/html", 9) == 0 ||
+       strncasecmp(content_type, "application/xhtml", 17) == 0)) {
+    buf.data[buf.size] = '\0';
+    *body_out = buf.data;
+    if (len_out)
+      *len_out = buf.size;
+    buf.data = NULL;
+    ok = 0;
+  }
+  free(buf.data);
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
+  return ok;
+}
