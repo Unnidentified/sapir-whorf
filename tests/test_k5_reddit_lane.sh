@@ -89,16 +89,27 @@ check() {
 }
 
 check "linux+kernel+probe1" "" 0 "a plain query must not start the lane"
-check "best+rust+ide+reddit+probe2" "" 1 "the word reddit"
-check "r%2Frust+ide+probe3" "" 1 "an r/<sub> token"
-check "site%3Areddit.com+rust+probe4" "" 1 "a typed site:reddit.com operator"
+# K5.2 problem 2: one engine wide is not a lane. Two site:-capable engines are
+# asked per query, so the lane survives one of them being rate-limited.
+check "best+rust+ide+reddit+probe2" "" 2 "the word reddit (two engines)"
+check "r%2Frust+ide+probe3" "" 2 "an r/<sub> token"
+check "site%3Areddit.com+rust+probe4" "" 2 "a typed site:reddit.com operator"
 # K12.4: a saved provider choice must not disable the lane
-check "best+rust+ide+reddit+probe5" "engines=off=brave" 1 "a saved provider choice"
+check "best+rust+ide+reddit+probe5" "engines=off=brave" 2 "a saved provider choice"
 # ...but switching the lane engines off must
 check "best+rust+ide+probe6" "engines=off=ddg|yahoo|bing|brave" 0 \
       "every lane engine switched off"
 check "best+rust+ide+reddit+probe7" "engines=off=reddit" 0 \
       "the Reddit provider switched off on its own"
+# one of the two lane engines switched off: the lane still runs, on the others,
+# and never through the one that is off
+check "best+rust+ide+reddit+probe8" "engines=off=ddg" 2 \
+      "DDG switched off, the lane runs on the others"
+if tail -2 "$DIR/srv.log" | grep -q "reddit lane via ddg"; then
+    say_fail "DDG is off, but the lane asked DDG"
+else
+    say_pass
+fi
 
 echo "K5.4 reddit lane: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

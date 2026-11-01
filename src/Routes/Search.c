@@ -1626,6 +1626,8 @@ int results_handler(UrlParams *params) {
      It joins the same parallel batch, so it costs no extra latency, and it is
      a separate job so its results merge and rank like any other source. */
   int reddit_lane_job = -1;
+  int lane_job_ids[2] = {-1, -1};
+  int lane_job_count = 0;
   /* K5.4: the lane used to require user_engine_count == 0, so anyone who had
      ever saved a provider choice never saw a Reddit thread - the likeliest
      reason the owner's searches showed none. The provider toggle is the real
@@ -1639,28 +1641,33 @@ int results_handler(UrlParams *params) {
   }
   if (reddit_wanted && page == 1 && engine_idx < ENGINE_COUNT &&
       !provider_is_off("reddit")) {
-    /* Measured, not assumed (tools/queries-reddit.tsv): of the scraped
-       engines only DuckDuckGo Lite actually honours site:reddit.com - it
-       returns ~10 Reddit threads, while Yahoo returns a zero-byte body for the
-       same operator and Bing and Brave return none. The lane therefore asks
-       DDG, and falls back to any other site:-capable web engine only if DDG is
-       unavailable. */
+    /* K5.2 problem 2: one engine wide. DuckDuckGo is the most rate-limited
+       engine in the set, and the two measurements on record disagree about
+       who honours the operator (tools/queries-reddit.tsv: Yahoo 12 plain / 89
+       site: hits against 0 for Bing and Brave; a later probe: DDG returns
+       threads, Yahoo a zero-byte body). Rather than pick a winner from two
+       contradictory measurements, the lane asks the two engines that have ever
+       answered - two requests, one batch, no extra latency - and the log names
+       which one delivered. */
     static const char *LANE_ORDER[] = {"ddg", "yahoo", "bing", "brave"};
-    const SearchEngine *lane = NULL;
-    for (size_t p = 0; p < sizeof(LANE_ORDER) / sizeof(LANE_ORDER[0]) && !lane;
-         p++) {
+    const SearchEngine *lane[2] = {NULL, NULL};
+    int lane_count = 0;
+    for (size_t p = 0;
+         p < sizeof(LANE_ORDER) / sizeof(LANE_ORDER[0]) && lane_count < 2; p++) {
       for (int i = 0; i < ENGINE_COUNT; i++) {
         if (!(ENGINE_REGISTRY[i].verticals & V_WEB) ||
             !ENGINE_REGISTRY[i].supports_site ||
             !ENGINE_MAY_BE_CONTACTED(&ENGINE_REGISTRY[i]))
           continue;
         if (strcmp(ENGINE_REGISTRY[i].id, LANE_ORDER[p]) == 0) {
-          lane = &ENGINE_REGISTRY[i];
+          if (engine_health_allow(ENGINE_REGISTRY[i].id)) {
+            lane[lane_count++] = &ENGINE_REGISTRY[i];
+          }
           break;
         }
       }
     }
-    if (lane && engine_health_allow(lane->id)) {
+    if (lane_count > 0) {
       char lane_query[512];
       if (analysis.discussion_site[0])
         snprintf(lane_query, sizeof(lane_query), "site:%s %s",
@@ -1669,33 +1676,37 @@ int results_handler(UrlParams *params) {
         snprintf(lane_query, sizeof(lane_query), "site:reddit.com %s",
                  analysis.engine_core);
 
-      all_results[engine_idx] = NULL;
-      jobs[engine_idx].engine = lane;
-      jobs[engine_idx].query = jobs[engine_idx].query_text;
-      snprintf(jobs[engine_idx].query_text,
-               sizeof(jobs[engine_idx].query_text), "%s", lane_query);
-      snprintf(jobs[engine_idx].lang, sizeof(jobs[engine_idx].lang), "%s",
-               lang);
-      snprintf(jobs[engine_idx].region, sizeof(jobs[engine_idx].region), "%s",
-               region);
-      snprintf(jobs[engine_idx].accept_language,
-               sizeof(jobs[engine_idx].accept_language), "%s",
-               accept_language);
-      jobs[engine_idx].out_results = &all_results[engine_idx];
-      jobs[engine_idx].max_results = MAX_RESULTS_PER_ENGINE;
-      jobs[engine_idx].results_count = 0;
-      jobs[engine_idx].page = page;
-      jobs[engine_idx].handle = NULL;
-      jobs[engine_idx].response.memory = NULL;
-      jobs[engine_idx].response.size = 0;
-      jobs[engine_idx].response.capacity = 0;
-      jobs[engine_idx].http_status = 0;
-      jobs[engine_idx].status = SCRAPE_STATUS_PENDING;
-      reddit_lane_job = engine_idx;
-      engine_idx++;
-      if (getenv("OMNI_PERF"))
-        fprintf(stderr, "[F3] reddit lane via %s (query length %zu)\n", lane->id,
-                strlen(lane_query));
+      for (int l = 0; l < lane_count && engine_idx < ENGINE_COUNT; l++) {
+        all_results[engine_idx] = NULL;
+        jobs[engine_idx].engine = lane[l];
+        jobs[engine_idx].query = jobs[engine_idx].query_text;
+        snprintf(jobs[engine_idx].query_text,
+                 sizeof(jobs[engine_idx].query_text), "%s", lane_query);
+        snprintf(jobs[engine_idx].lang, sizeof(jobs[engine_idx].lang), "%s",
+                 lang);
+        snprintf(jobs[engine_idx].region, sizeof(jobs[engine_idx].region), "%s",
+                 region);
+        snprintf(jobs[engine_idx].accept_language,
+                 sizeof(jobs[engine_idx].accept_language), "%s",
+                 accept_language);
+        jobs[engine_idx].out_results = &all_results[engine_idx];
+        jobs[engine_idx].max_results = MAX_RESULTS_PER_ENGINE;
+        jobs[engine_idx].results_count = 0;
+        jobs[engine_idx].page = page;
+        jobs[engine_idx].handle = NULL;
+        jobs[engine_idx].response.memory = NULL;
+        jobs[engine_idx].response.size = 0;
+        jobs[engine_idx].response.capacity = 0;
+        jobs[engine_idx].http_status = 0;
+        jobs[engine_idx].status = SCRAPE_STATUS_PENDING;
+        if (reddit_lane_job < 0)
+          reddit_lane_job = engine_idx;
+        lane_job_ids[lane_job_count++] = engine_idx;
+        engine_idx++;
+        if (getenv("OMNI_PERF"))
+          fprintf(stderr, "[F3] reddit lane via %s (query length %zu)\n",
+                  lane[l]->id, strlen(lane_query));
+      }
     }
   }
 
