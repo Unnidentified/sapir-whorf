@@ -248,6 +248,48 @@ int provider_needs_config(const ProviderRow *row) {
          global_config.searxng_url[0] == '\0';
 }
 
+/* L4: which field a row is waiting for. SearXNG needs a URL, YaCy an instance,
+   Google a cx; everything else that is unavailable is unavailable for a reason
+   the owner cannot fix from the page. */
+const char *provider_reason_field(const ProviderRow *row) {
+  if (!row)
+    return "";
+  if (strcmp(row->id, "searxng") == 0)
+    return "searxng_url";
+  if (strcmp(row->id, "yacy") == 0)
+    return "yacy_instance";
+  if (strcmp(row->id, "google_cse") == 0 || strcmp(row->id, "google") == 0)
+    return "google_cse_cx";
+  return "";
+}
+
+ProviderReason provider_reason(const ProviderRow *row) {
+  if (!row)
+    return PR_NOT_IN_BUILD;
+  ProviderState state = provider_state(row);
+  if (state == PS_ON || state == PS_OFF) {
+    if (!row->toggleable)
+      return PR_LOCAL;
+    return PR_AVAILABLE;
+  }
+  if (!row->toggleable)
+    return PR_LOCAL;
+  /* the provider is in the build and the page has a row for it */
+  if (provider_needs_config(row))
+    return PR_NEEDS_FIELD;
+  /* Google's JSON API closed to new customers; the Element endpoint still
+     answers. Say which one this is. */
+  if (strcmp(row->id, "google") == 0)
+    return PR_CLOSED_UPSTREAM;
+  if (strcmp(row->id, "yacy") == 0)
+    return PR_UNREACHABLE;
+  /* enabled in the registry but switched off by config.ini's list */
+  for (int i = 0; i < ENGINE_COUNT; i++)
+    if (strcmp(ENGINE_REGISTRY[i].id, row->id) == 0)
+      return ENGINE_REGISTRY[i].enabled ? PR_UNREACHABLE : PR_NOT_IN_BUILD;
+  return PR_NOT_IN_BUILD;
+}
+
 const char *provider_state_note(const ProviderRow *row) {
   switch (provider_state(row)) {
   case PS_OFF:
@@ -257,9 +299,34 @@ const char *provider_state_note(const ProviderRow *row) {
   default:
     break;
   }
-  if (provider_needs_config(row))
-    return "Needs searxng_url";
-  return "Disabled by the server administrator";
+  switch (provider_reason(row)) {
+  case PR_LOCAL:
+    return "Runs locally, no network";
+  case PR_NEEDS_FIELD: {
+    /* the field name is the fix, so it is in the sentence */
+    const char *field = provider_reason_field(row);
+    static __thread char note[192];
+    snprintf(note, sizeof(note), "Needs %s. Fill it in below.",
+             field[0] ? field : "a setting");
+    return note;
+  }
+  case PR_CLOSED_UPSTREAM:
+    return strcmp(row->id, "google") == 0
+               ? "Google no longer issues keys for this API. Only a key "
+                 "issued before January 2026 works."
+               : "The provider no longer accepts new users.";
+  case PR_UNREACHABLE: {
+    static __thread char note[192];
+    snprintf(note, sizeof(note), "Can't reach %s. Enter a working one below.",
+             row->host ? row->host : "the instance");
+    return note;
+  }
+  case PR_OFF_IN_CONFIG:
+    return "Turned off in config.ini (engines = ...). Remove the -id, or tick "
+           "it below.";
+  default:
+    return "Not part of this build.";
+  }
 }
 
 const char *provider_opt_in_disclosure(const char *id) {

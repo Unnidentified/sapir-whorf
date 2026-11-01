@@ -105,6 +105,15 @@ typedef struct {
   /* the "%s is the encoded query" template a definition supplies; the generic
      url builder uses it instead of base_url + query_param */
   const char *search_url_fmt;
+  /* L4: a JSON engine names a path inside the reply instead of four XPaths.
+     Open Library answers its search page with JSON, which is stabler than the
+     markup the first definition scraped - and its HTML never matched. The three
+     fields are dotted paths from a node; a path ending in [] means "an array". */
+  const char *json_results;  /* e.g. "docs"                        */
+  const char *json_title;    /* "title"                            */
+  const char *json_link;     /* "key"  (prefixed with json_link_prefix) */
+  const char *json_snippet;  /* "author_name" or "first_publish_year" */
+  const char *json_link_prefix; /* "https://openlibrary.org"      */
 } SearchEngine;
 
 typedef struct {

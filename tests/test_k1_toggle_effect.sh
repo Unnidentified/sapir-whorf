@@ -73,6 +73,25 @@ query_for() {
 
 count_host() { grep -c "^$1\$" "$LOG" 2>/dev/null || true; }
 
+# L4: an engine whose host refuses this network cannot be "reached" by any
+# query, and that is not the switch failing. A transport refusal leaves no
+# CONNECT in the log at all, so the off case would pass for the wrong reason -
+# skip the pair and say so, rather than failing the registry.
+refuses_us() {
+    python3 - "$1" <<'PY'
+import socket, sys, ssl
+host = sys.argv[1]
+try:
+    ctx = ssl.create_default_context()
+    with socket.create_connection((host, 443), timeout=4) as s:
+        with ctx.wrap_socket(s, server_hostname=host):
+            pass
+except Exception:
+    sys.exit(1)
+sys.exit(0)
+PY
+}
+
 # one request; $2 is the cookie ("" for none), $3 is an engine id ("" for none)
 ask() {
     cookie="${2:-}"
@@ -194,6 +213,10 @@ while IFS='|' read -r id host group state kind; do
     # on: the query reaches the host. An engine is named explicitly, because
     # otherwise the router only asks the verticals the query looks like - an
     # academic API is not asked for a web query, and that is correct behaviour.
+    if [ -n "$host" ] && ! refuses_us "$host"; then
+        echo "  skip: $id -- $host refuses this network, so neither case can be measured here"
+        continue
+    fi
     engine=""
     [ "$kind" = "engine" ] && engine="$id"
     before=$(count_host "$host")

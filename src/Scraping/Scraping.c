@@ -159,6 +159,10 @@ static void classify_job_response(ScrapeJob *job, const char *response,
   }
 
   if (job->engine->body_parser) {
+    /* L4: a definition's JSON parser needs to know which engine it is running
+       for; the job is the only place that is written down */
+    extern __thread const char *g_def_json_engine;
+    g_def_json_engine = job->engine->name;
     job->results_count = job->engine->body_parser(
         response, response_size, job->lang, job->out_results, job->max_results);
     if (job->results_count > 0) {

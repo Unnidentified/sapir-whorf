@@ -11,6 +11,7 @@
 #include "../Utility/XmlHelper.h"
 #include <dirent.h>
 #include <jansson.h>
+#include <jansson.h>
 #include <libxml/HTMLparser.h>
 #include <libxml/parser.h>
 #include <limits.h>
@@ -102,6 +103,145 @@ static char *resolve_url(const SearchEngine *engine, char *href) {
   }
   free(href);
   return out;
+}
+
+static int definition_json_body_parser(const char *body, size_t len,
+                                       const char *lang,
+                                       SearchResult **out_results,
+                                       int max_results);
+
+/* L4: a JSON engine. Open Library publishes a search endpoint whose reply is
+   one object per book; reading `docs[]` is stabler than four XPaths over a page
+   that changes shape, and it is the reason the first definition found nothing
+   while answering 200 in a second.
+
+   The paths are dotted and a segment ending in "[]" means "an array here".
+   That is all the generality this needs: one level, named fields, no schema. */
+static const char *json_walk(json_t *node, const char *path, json_t **owner) {
+  if (owner)
+    *owner = node;
+  if (!node || !path || !path[0])
+    return NULL;
+  char segment[64];
+  const char *dot = strchr(path, '.');
+  size_t len = dot ? (size_t)(dot - path) : strlen(path);
+  if (len >= sizeof(segment))
+    return NULL;
+  memcpy(segment, path, len);
+  segment[len] = '\0';
+  const char *next = dot ? dot + 1 : NULL;
+  json_t *child = json_object_get(node, segment);
+  if (!child)
+    return NULL;
+  if (!next) {
+    if (owner)
+      *owner = node;
+    return json_string_value(child);
+  }
+  return json_walk(child, next, owner);
+}
+
+/* the first scalar at a path, as text: a string as-is, an array's first
+   string, or an integer rendered */
+static void json_scalar(json_t *node, const char *path, char *out, size_t cap) {
+  out[0] = '\0';
+  if (!node || !path)
+    return;
+  char segment[64];
+  const char *dot = strchr(path, '.');
+  size_t len = dot ? (size_t)(dot - path) : strlen(path);
+  if (len >= sizeof(segment))
+    return;
+  memcpy(segment, path, len);
+  segment[len] = '\0';
+  json_t *child = json_object_get(node, segment);
+  if (!child)
+    return;
+  if (dot) {
+    json_scalar(child, dot + 1, out, cap);
+    return;
+  }
+  if (json_is_string(child)) {
+    snprintf(out, cap, "%s", json_string_value(child));
+    return;
+  }
+  if (json_is_integer(child)) {
+    snprintf(out, cap, "%lld", (long long)json_integer_value(child));
+    return;
+  }
+  if (json_is_array(child) && json_array_size(child) > 0) {
+    json_t *first = json_array_get(child, 0);
+    if (json_is_string(first))
+      snprintf(out, cap, "%s", json_string_value(first));
+    else if (json_is_integer(first))
+      snprintf(out, cap, "%lld", (long long)json_integer_value(first));
+  }
+}
+
+static int parse_definition_json(const char *engine_name, const char *body,
+                                 size_t len, SearchResult **out_results,
+                                 int max_results) {
+  const SearchEngine *engine = engine_by_display_name(engine_name);
+  if (!engine || !engine->json_results || !body)
+    return 0;
+  json_error_t error;
+  json_t *root = json_loadb(body, len, 0, &error);
+  if (!root)
+    return 0;
+  json_t *list = json_object_get(root, engine->json_results);
+  if (!json_is_array(list)) {
+    json_decref(root);
+    return 0;
+  }
+  size_t n = json_array_size(list);
+  SearchResult *results = alloc_results_array((int)n, max_results);
+  if (!results) {
+    json_decref(root);
+    return 0;
+  }
+  int made = 0;
+  for (size_t i = 0; i < n && made < max_results; i++) {
+    json_t *item = json_array_get(list, i);
+    if (!json_is_object(item))
+      continue;
+    char title[256] = "", link[512] = "", snippet[512] = "";
+    if (engine->json_title)
+      json_scalar(item, engine->json_title, title, sizeof(title));
+    if (engine->json_link) {
+      char raw[512] = "";
+      json_scalar(item, engine->json_link, raw, sizeof(raw));
+      snprintf(link, sizeof(link), "%s%s",
+               engine->json_link_prefix ? engine->json_link_prefix : "", raw);
+    }
+    if (engine->json_snippet)
+      json_scalar(item, engine->json_snippet, snippet, sizeof(snippet));
+    if (!title[0] || !link[0])
+      continue;
+    if (assign_result(&results[made], strdup(link), strdup(title),
+                      snippet[0] ? strdup(snippet) : NULL, 1))
+      made++;
+  }
+  json_decref(root);
+  if (made == 0) {
+    xml_result_free(results, 0);
+    return 0;
+  }
+  *out_results = results;
+  return made;
+}
+
+/* L4: the fetch path calls body_parser with the body and no engine name. The
+   dispatch sets this thread-local immediately before, from the job it is
+   running, so the JSON parser can find its selectors without guessing. */
+__thread const char *g_def_json_engine = NULL;
+
+static int definition_json_body_parser(const char *body, size_t len,
+                                       const char *lang,
+                                       SearchResult **out_results,
+                                       int max_results) {
+  (void)lang;
+  return parse_definition_json(g_def_json_engine, body, len, out_results,
+                               max_results);
 }
 
 /* one shared parser: the selectors come from the engine the job is running */
@@ -242,7 +382,20 @@ static int load_one(const char *path, char *reason, size_t reason_size) {
     json_decref(root);
     return 0;
   }
-  if (!xpath_result || !xpath_link) {
+  /* L4: a JSON definition names its paths instead of four XPaths; exactly one
+     of the two styles must be complete, or the file is rejected with a reason */
+  const char *json_results = json_str(root, "json_results");
+  const char *json_title = json_str(root, "json_title");
+  const char *json_link = json_str(root, "json_link");
+  int json_style = json_results && json_results[0];
+  if (json_style) {
+    if (!json_title || !json_title[0] || !json_link || !json_link[0]) {
+      snprintf(reason, reason_size,
+               "a json_results definition also needs json_title and json_link");
+      json_decref(root);
+      return 0;
+    }
+  } else if (!xpath_result || !xpath_link) {
     snprintf(reason, reason_size, "xpath_result and xpath_link are required");
     json_decref(root);
     return 0;
@@ -273,7 +426,19 @@ static int load_one(const char *path, char *reason, size_t reason_size) {
   engine.xpath_title = arena_strdup(xpath_title);
   engine.xpath_link = arena_strdup(xpath_link);
   engine.xpath_snippet = arena_strdup(xpath_snippet);
-  engine.parser = parse_definition;
+  /* L4: a definition may name JSON paths instead of XPaths; the two are
+     exclusive, and which one is set decides the parser */
+  engine.json_results = arena_strdup(json_str(root, "json_results"));
+  engine.json_title = arena_strdup(json_str(root, "json_title"));
+  engine.json_link = arena_strdup(json_str(root, "json_link"));
+  engine.json_snippet = arena_strdup(json_str(root, "json_snippet"));
+  engine.json_link_prefix = arena_strdup(json_str(root, "json_link_prefix"));
+  /* a JSON definition answers through body_parser, because the fetch path only
+     builds a document for a parser that wants one */
+  if (engine.json_results && engine.json_results[0])
+    engine.body_parser = definition_json_body_parser;
+  else
+    engine.parser = parse_definition;
   /* Off unless the file says on. A definition is a claim about a page someone
      may not have measured against this build's 2 s page deadline: Open Library
      answers in ~1.7 s against three engines and is cancelled against eleven,
@@ -294,10 +459,17 @@ static int load_one(const char *path, char *reason, size_t reason_size) {
   json_t *opt_in = json_object_get(root, "opt_in");
   engine.opt_in = json_is_true(opt_in) ? 1 : 0;
 
-  if (!engine.id || !engine.name || !engine.search_url_fmt ||
-      !engine.xpath_result ||
-      !engine.xpath_link) {
-    snprintf(reason, reason_size, "out of memory");
+  /* L4: a JSON definition has no XPaths, so the completeness check follows the
+     style it declared */
+  int complete = engine.id && engine.name && engine.search_url_fmt;
+  if (complete && engine.json_results && engine.json_results[0])
+    complete = engine.json_title && engine.json_link;
+  else if (complete)
+    complete = engine.xpath_result && engine.xpath_link;
+  if (!complete) {
+    snprintf(reason, reason_size,
+             "a definition needs an id, a name, a search_url, and either the "
+             "XPath set or the json_ set");
     json_decref(root);
     return 0;
   }

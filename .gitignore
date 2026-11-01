@@ -36,3 +36,4 @@ tests/test_k7_descriptions
 secrets.ini
 omnisearch.err.old
 tests/test_l3_secrets
+secrets/

@@ -133,11 +133,11 @@ int settings_handler(UrlParams *params) {
   for (int i = 0; i < provider_row_count; i++) {
     ProviderRow *r = &provider_rows[i];
     if (i == 0 || r->group != provider_rows[i - 1].group) {
-      provider_data[prow] = malloc(sizeof(char *) * 14);
+      provider_data[prow] = malloc(sizeof(char *) * 15);
       provider_data[prow][0] = strdup("group");
       provider_data[prow][1] = strdup("group");
       provider_data[prow][2] = strdup(provider_group_label(r->group));
-      for (int c = 3; c < 14; c++)
+      for (int c = 3; c < 15; c++)
         provider_data[prow][c] = strdup("");
       /* a heading row draws no control: it is disabled so it never submits,
          and the stylesheet hides the box */
@@ -149,12 +149,13 @@ int settings_handler(UrlParams *params) {
       provider_data[prow][12] = strdup("");
       /* 13: the no-script toggle link, empty on a heading */
       provider_data[prow][13] = strdup("");
-      provider_inner[prow] = 14;
+      provider_data[prow][14] = strdup("");
+      provider_inner[prow] = 15;
       prow++;
     }
 
     ProviderState state = provider_state(r);
-    provider_data[prow] = malloc(sizeof(char *) * 14);
+    provider_data[prow] = malloc(sizeof(char *) * 15);
     provider_data[prow][0] = strdup("row");
     provider_data[prow][1] = strdup(r->id);
     provider_data[prow][2] = strdup(r->label);
@@ -220,7 +221,28 @@ int settings_handler(UrlParams *params) {
     } else {
       provider_data[prow][13] = strdup("");
     }
-    provider_inner[prow] = 14;
+    /* L4: the sentence beside the box, built here from the reason enum so the
+       template does not need five mutually exclusive conditionals */
+    {
+      ProviderReason reason = provider_reason(r);
+      const char *word = provider_state_note(r);
+      char sentence[320];
+      if (state == PS_ON)
+        snprintf(sentence, sizeof(sentence), "%s",
+                 beaker_get_locale_value(locale, "provider_state_on"));
+      else if (state == PS_OFF)
+        snprintf(sentence, sizeof(sentence), "%s",
+                 beaker_get_locale_value(locale, "provider_state_off"));
+      else if (reason == PR_LOCAL)
+        snprintf(sentence, sizeof(sentence), "%s",
+                 beaker_get_locale_value(locale, "provider_state_local"));
+      else
+        snprintf(sentence, sizeof(sentence), "%s: %s",
+                 beaker_get_locale_value(locale, "provider_state_unavailable"),
+                 word ? word : "");
+      provider_data[prow][14] = strdup(sentence);
+    }
+    provider_inner[prow] = 15;
     prow++;
   }
 

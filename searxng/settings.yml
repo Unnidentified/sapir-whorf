@@ -1,0 +1,38 @@
+# L4: the SearXNG instance the compose file runs, for one machine.
+#
+# The two settings that matter:
+#   - search.formats includes json: without it, a JSON request gets a 403, which
+#     is indistinguishable from "the bridge is broken";
+#   - server.limiter is false: this is a private instance behind loopback, and
+#     the limiter's captcha cannot be solved by a program.
+#
+# use_default_settings keeps SearXNG's own engine list and overrides only what
+# is written here.
+use_default_settings: true
+
+general:
+  instance_name: "omnisearch bridge"
+
+server:
+  secret_key: "REPLACE_ME_AT_FIRST_RUN"
+  limiter: false
+  public_instance: false
+  image_proxy: false
+  bind_address: "0.0.0.0"
+  port: 8080
+
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json
+
+# the engines the app asks for by default, all of them working without an API
+# key and without an account
+engines:
+  - name: google
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: qwant
+    disabled: false

@@ -88,8 +88,26 @@ ProviderState provider_state(const ProviderRow *row);
    as opposed to switched off by the administrator. The page says which. */
 int provider_needs_config(const ProviderRow *row);
 
-/* The words next to the state: "On", "Off (by you)", or the reason the server
-   gives. Never colour alone - the review asked for words. */
+/* L4: why a row is unavailable, as a reason a reader can act on. One enum,
+ * one sentence per case, and each case names its own fix. "Disabled by the
+ * server administrator" was true of nothing the owner could reach: the owner IS
+ * the administrator, and there was no statement of what to do. */
+typedef enum {
+  PR_AVAILABLE = 0,  /* on and reachable */
+  PR_NEEDS_FIELD,    /* a card in /settings is missing a value */
+  PR_UNREACHABLE,    /* the peer or instance does not answer */
+  PR_CLOSED_UPSTREAM,/* the provider stopped accepting new users */
+  PR_OFF_IN_CONFIG,  /* engines = ... in config.ini leaves it out */
+  PR_NOT_IN_BUILD,   /* this build has no such provider */
+  PR_LOCAL           /* runs here, nothing to reach */
+} ProviderReason;
+
+/* The reason, and the field that would fix it (for PR_NEEDS_FIELD). */
+ProviderReason provider_reason(const ProviderRow *row);
+const char *provider_reason_field(const ProviderRow *row);
+
+/* The words next to the state: "On", "Off (by you)", or the reason in a
+   sentence with its fix. Never colour alone. */
 const char *provider_state_note(const ProviderRow *row);
 
 /* K1.5: one short disclosure per opt-in provider - what leaves the machine,

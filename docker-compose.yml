@@ -1,10 +1,45 @@
+# L4/L6.3: two services, and both on loopback.
+#
+# The port binding used to be "8087:8087", which publishes on every host
+# interface - and this app has no login, while /settings now holds a credential.
+# 127.0.0.1:8087:8087 is the same page, reachable from this machine only.
+#
+# SearXNG is the documented low-risk route to Google's index, and it needs a
+# second process. It is here so "give the owner a working one" is one command:
+#   docker compose up -d
+# The JSON format is enabled in the mounted settings.yml - without it SearXNG
+# answers JSON requests with 403, which looks exactly like a broken bridge.
 services:
   omnisearch:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8087:8087"
+      - "127.0.0.1:8087:8087"
+    environment:
+      # the URL the app should use for the bridge: the service name, inside the
+      # compose network, so the owner does not have to type it anywhere
+      OMNI_SEARXNG_URL: "http://searxng:8080"
+      OMNI_SEARXNG_ENGINES: "google,brave,qwant"
+      # L3: the page-owned file of server settings. Mounted from the host so a
+      # credential survives a rebuild, and never baked into the image.
+      OMNI_SECRETS_FILE: "/secrets/secrets.ini"
     volumes:
       - ./locales:/app/locales
       - ./example-config.ini:/etc/omnisearch/config.ini
+      - ./secrets:/secrets
+    depends_on:
+      - searxng
+
+  searxng:
+    image: searxng/searxng:latest
+    # bound to loopback only: this is a private instance for one machine
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      # the settings ship with the repo; the secret key is generated at first
+      # run into ./secrets and is never committed
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./secrets/searxng:/var/cache/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://127.0.0.1:8888/

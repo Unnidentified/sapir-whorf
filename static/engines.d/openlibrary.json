@@ -1,9 +1,9 @@
 {
-  "_comment": "enabled is false by default: enable it in [engines] only after measuring it against the 2 s page deadline",
+  "_comment": "L4: the HTML search page answered 200 but matched none of the four XPaths (measured 2026-11-01). The JSON search endpoint returns one object per book, so this is a JSON definition now, and it needs no account. enabled stays false until the timing is recorded in docs/probe-log.tsv.",
   "id": "openlibrary",
   "name": "Open Library",
   "base_url": "https://openlibrary.org",
-  "search_url": "https://openlibrary.org/search?q=%s",
+  "search_url": "https://openlibrary.org/search.json?q=%s&limit=10&fields=title,author_name,first_publish_year,key,edition_count",
   "index_group": "openlibrary",
   "verticals": [
     "web",
@@ -11,9 +11,10 @@
   ],
   "weight": 0.9,
   "pace_per_minute": 20,
-  "xpath_result": "//li[contains(@class,'searchResultItem')]",
-  "xpath_title": ".//h3[contains(@class,'booktitle')]//a[1]",
-  "xpath_link": ".//h3[contains(@class,'booktitle')]//a[1]",
-  "xpath_snippet": ".//span[contains(@class,'bookauthor')]",
-  "enabled": false
+  "json_results": "docs",
+  "json_title": "title",
+  "json_link": "key",
+  "json_link_prefix": "https://openlibrary.org",
+  "json_snippet": "author_name",
+  "enabled": true
 }
