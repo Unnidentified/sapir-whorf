@@ -1083,16 +1083,16 @@ int results_handler(UrlParams *params) {
   for (int i = 0; i < eligible_count; i++)
     eligible_all[i] = eligible[i];
 
-  /* skip engines whose breaker is open, but never leave the page without one */
+  /* skip engines whose breaker is open. K3: this used to keep the last
+     engine even when it was suspended ("never leave the page without one"),
+     which made the page say "Resumes in 4m" and then contact it on the next
+     request - a suspension that is not honoured is not a suspension. When
+     nothing is healthy the page shows the paused state, which is the truth. */
   if (eligible_count > 0) {
     int healthy[MAX_ENGINES];
-    int healthy_count = 0;
-    for (int i = 0; i < eligible_count; i++) {
+    for (int i = 0; i < eligible_count; i++)
       healthy[i] = engine_health_allow(eligible[i]->id);
-      if (healthy[i])
-        healthy_count++;
-    }
-    if (healthy_count > 0 && healthy_count < eligible_count) {
+    {
       int kept = 0;
       for (int i = 0; i < eligible_count; i++)
         if (healthy[i])
@@ -1129,13 +1129,17 @@ int results_handler(UrlParams *params) {
       web_count++;
     }
 
-    /* If every general engine is broken, still probe the strongest one so a
-       general query is never answered by vertical APIs alone. */
+    /* If every general engine is broken, probe the strongest *healthy* one so
+       a general query is never answered by vertical APIs alone. K3: this used
+       to ignore the breaker on purpose, and the consequence was that the page
+       said "Resumes in 4m" while it contacted the engine immediately - a
+       suspension that is not honoured is not a suspension. When nothing is
+       healthy the page shows the paused state instead. */
     if (web_count == 0) {
       const SearchEngine *best = NULL;
       for (int i = 0; i < eligible_all_count; i++) {
         const SearchEngine *e = eligible_all[i];
-        if (!(e->verticals & V_WEB))
+        if (!(e->verticals & V_WEB) || !healthy[i])
           continue;
         if (!best || engine_effective_weight(e) > engine_effective_weight(best))
           best = e;

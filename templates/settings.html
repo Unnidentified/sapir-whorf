@@ -217,8 +217,8 @@
 
                         {{if opt_in_state != "locked"}}
                         <p class="settings-section-desc">{{l("opt_in_off_by_default")}}</p>
-                        {{if opt_in_note}}
-                        <p class="settings-section-desc settings-locked">{{opt_in_note}}</p>
+                        {{if opt_in_state == "empty"}}
+                        <p class="settings-section-desc settings-locked">{{l("opt_in_none_registered")}}</p>
                         {{endif}}
                         <!-- K1.5: the switch is the provider's own row in the
                              table above, under Opt-in. Two controls with the
@@ -239,7 +239,7 @@
                         </details>
                     </section>
 
-                    {{if has_engine_lists}}
+                    {{if index_groups}}
                     <section class="settings-section">
                         <h3 class="settings-section-title">Engine status</h3>
                         <p class="settings-section-desc">Independent indexes answering now: <strong>{{index_groups}}</strong>.</p>
@@ -247,18 +247,22 @@
                         <p class="cached-note">{{index_groups_warning}}</p>
                         {{endif}}
                         <p class="settings-section-desc">Live state of each source. An engine that is paused says why and for how long — a pause you cannot see looks like a broken engine.</p>
+                        <noscript><p class="settings-section-desc">This table does not update itself without JavaScript; reload the page to see the current state.</p></noscript>
                         <div class="settings-table-wrap">
-                            <table class="settings-table">
+                            <!-- K3: data-now is the server's clock. The script
+                                 takes the skew once so a client whose clock is
+                                 wrong still counts down to the right instant. -->
+                            <table class="settings-table" id="engine-status" data-now="{{now_epoch}}">
                                 <thead>
                                     <tr><th>Engine</th><th>State</th><th>Why</th><th>Resumes</th><th>Answered</th><th>Useful</th></tr>
                                 </thead>
                                 <tbody>
                                     {{for row in engine_status}}
-                                    <tr>
+                                    <tr data-engine="{{row[0]}}" {{if row[7] == "1"}}data-suspended="1"{{endif}}>
                                         <td>{{row[0]}}</td>
-                                        <td>{{row[1]}}</td>
-                                        <td>{{row[2]}}</td>
-                                        <td>{{row[3]}}</td>
+                                        <td class="state">{{row[1]}}</td>
+                                        <td class="why">{{row[2]}}</td>
+                                        <td class="resume" {{if row[6] != ""}}data-resume-at="{{row[6]}}"{{endif}}>{{row[3]}}</td>
                                         <td>{{row[4]}}</td>
                                         <td>{{row[5]}}</td>
                                     </tr>
@@ -270,7 +274,7 @@
                     {{endif}}
 
                     <!-- K1.3: this block used to sit inside a second
-                         "has_engine_lists" condition whose closing tag was lost
+                         condition whose closing tag was lost
                          when the engines form was rewritten. beaker then
                          reported an unclosed if and skipped to the end of the
                          file. The balance is now a test, not a memory. -->

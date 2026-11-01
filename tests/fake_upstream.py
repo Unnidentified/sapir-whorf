@@ -23,8 +23,20 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        # every request is counted so a test can assert that none arrived
+        try:
+            with open(os.environ.get("FAKE_HITS", "/tmp/fake_upstream.hits"), "a") as f:
+                f.write(self.path + "\n")
+        except OSError:
+            pass
         m = mode()
-        if m == "block":
+        if m == "retry6":
+            # K3: suspended for a short, measurable time
+            self.send_response(429)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Retry-After", "6")
+            body = b"<html><title>429</title>slow down</html>"
+        elif m == "block":
             body = b"<html><title>Captcha</title>Just a moment...</html>"
             self.send_response(503)
             self.send_header("Content-Type", "text/html")

@@ -209,14 +209,22 @@ int settings_handler(UrlParams *params) {
        "locked" means the server forbids it, so the control is not rendered at
        all; the note is empty unless nothing is registered behind the switch. */
     int permitted = opt_in_providers_available();
+    /* one key, four states: the page was at the hard context limit and the
+       fourth (a separate note key) pushed engine_status out of it - measured:
+       the status table rendered with an empty tbody. "empty" means the server
+       permits opt-in providers and this build registers none. */
     context_set(&ctx, "opt_in_state",
                 !permitted ? "locked"
-                           : (opt_in_providers_allowed() ? "on" : "off"));
-    if (permitted && engine_count_opt_in() == 0)
-      context_set(&ctx, "opt_in_note",
-                  beaker_get_locale_value(locale, "opt_in_none_registered"));
+                : opt_in_providers_allowed() ? "on"
+                : engine_count_opt_in() == 0 ? "empty"
+                                             : "off");
   }
   context_set(&ctx, "default_engine", default_engine);
+  {
+    char now[24];
+    snprintf(now, sizeof(now), "%lld", (long long)time(NULL));
+    context_set(&ctx, "now_epoch", now);
+  }
   context_set_array_of_arrays(&ctx, "locales", locale_data, locale_count,
                               inner_counts);
 
@@ -255,10 +263,12 @@ int settings_handler(UrlParams *params) {
   if (enabled_count > 0) {
     context_set_array_of_arrays(&ctx, "enabled_engines", engine_data,
                                 enabled_count, engine_inner);
-    /* beaker's {{if exists ...}} does not work for a 2-D array (measured: the
-       engines section silently disappeared), so one flag guards both engine
-       sections. Two flags for two lists was two slots; this is one. */
-    context_set(&ctx, "has_engine_lists", "1");
+    /* K3: the "has lists" flag is gone. The page renders with 32 of the 32
+       context slots once beaker's four __locale keys are counted, and adding
+       the absolute resume instant pushed engine_status out of it - the table
+       rendered with an empty tbody and no error. The status section is now
+       guarded by index_groups, which is empty exactly when no engine answered,
+       so it carries no extra key. */
 
     /* J5.5: the editor. One row per engine with its effective weight - the
        configured one, or this browser's override when it has one - so the form
@@ -347,11 +357,13 @@ int settings_handler(UrlParams *params) {
   /* G2: what the breaker is actually doing, per engine. A pause the user cannot
      see is indistinguishable from a broken search engine - that was the
      complaint behind the rate-limit work. Row: name, state, why, resumes,
-     counters, quality. */
+     counters, quality, and (K3) the absolute instant it may be retried.
+     Declared at function scope because the template reads these pointers after
+     the block ends, and so the strings can be freed after the render. */
+  char ***status_rows = malloc(sizeof(char **) * enabled_count);
+  int *status_inner = malloc(sizeof(int) * enabled_count);
+  int status_count = 0;
   {
-    char ***status_rows = malloc(sizeof(char **) * enabled_count);
-    int *status_inner = malloc(sizeof(int) * enabled_count);
-    int status_count = 0;
     for (int i = 0; i < ENGINE_COUNT && status_count < enabled_count; i++) {
       if (!ENGINE_REGISTRY[i].enabled)
         continue;
@@ -369,11 +381,17 @@ int settings_handler(UrlParams *params) {
         break;
       }
       snprintf(why, 48, "%s", engine_health_suspend_name(reason));
+      /* K3: the absolute instant, formatted once here as the no-script
+         fallback. The script reads data-resume-at and counts down; the number
+         it counts from is the field the dispatcher tests, not a copy of it. */
+      time_t open_until = engine_health_open_until(ENGINE_REGISTRY[i].id);
+      char resume_at[24] = "";
       if (reason == SUSPEND_NONE)
         snprintf(resumes, 48, "-");
-      else if (left > 0)
+      else if (left > 0) {
         snprintf(resumes, 48, "in %dm %02ds", left / 60, left % 60);
-      else
+        snprintf(resume_at, sizeof(resume_at), "%lld", (long long)open_until);
+      } else
         snprintf(resumes, 48, "ready to retry");
       snprintf(stats, 96, "%lu ok / %lu blocked / %lu errors",
                h ? h->total_ok : 0UL, h ? h->total_blocked : 0UL,
@@ -383,15 +401,17 @@ int settings_handler(UrlParams *params) {
       else
         snprintf(quality, 24, "-");
 
-      char **row = malloc(sizeof(char *) * 6);
-      row[0] = (char *)ENGINE_REGISTRY[i].name;
-      row[1] = (char *)engine_health_state_name(h ? h->state : HEALTH_CLOSED);
+      char **row = malloc(sizeof(char *) * 8);
+      row[0] = strdup(ENGINE_REGISTRY[i].name);
+      row[1] = strdup(engine_health_state_name(h ? h->state : HEALTH_CLOSED));
       row[2] = why;
       row[3] = resumes;
       row[4] = stats;
       row[5] = quality;
+      row[6] = strdup(resume_at);
+      row[7] = strdup(reason == SUSPEND_NONE ? "" : "1");
       status_rows[status_count] = row;
-      status_inner[status_count] = 6;
+      status_inner[status_count] = 8;
       status_count++;
     }
     if (status_count > 0) {
@@ -414,6 +434,17 @@ int settings_handler(UrlParams *params) {
       free(engine_data[i]);
     free(engine_data);
   }
+  if (status_rows) {
+    for (int i = 0; i < status_count; i++) {
+      if (!status_rows[i])
+        continue;
+      for (int c = 0; c < status_inner[i]; c++)
+        free(status_rows[i][c]);
+      free(status_rows[i]);
+    }
+    free(status_rows);
+  }
+  free(status_inner);
   free(engine_inner);
   if (has_user_pref) {
     for (int i = 0; i < user_engine_count; i++)

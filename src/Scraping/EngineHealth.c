@@ -62,9 +62,13 @@ static SuspendReason classify_failure(int status, long http_status,
 static int first_strike_seconds(SuspendReason reason, int retry_after) {
   switch (reason) {
   case SUSPEND_RATE_LIMIT: {
+    /* Honour the header. The floor used to be 30 s, which turned a server's
+       "Retry-After: 6" into half a minute and made the page's countdown a
+       number the upstream had not asked for. A small floor still stops a
+       misconfigured "Retry-After: 0" from becoming a tight loop. */
     int wait = retry_after > 0 ? retry_after : 60;
-    if (wait < 30)
-      wait = 30;
+    if (wait < 5)
+      wait = 5;
     if (wait > 3600)
       wait = 3600;
     return wait;
@@ -316,6 +320,16 @@ SuspendReason engine_health_suspension(const char *id, int *seconds_left) {
   if (seconds_left)
     *seconds_left = left;
   return reason;
+}
+
+time_t engine_health_open_until(const char *id) {
+  time_t open_until = 0;
+  pthread_mutex_lock(&health_mutex);
+  EngineHealthEntry *entry = find_or_create(id);
+  if (entry)
+    open_until = entry->open_until;
+  pthread_mutex_unlock(&health_mutex);
+  return open_until;
 }
 
 const char *engine_health_suspend_name(SuspendReason reason) {

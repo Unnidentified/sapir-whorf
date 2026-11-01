@@ -23,6 +23,7 @@
 #include "Routes/Metrics.h"
 #include "Routes/Search.h"
 #include "Limiter/RateLimit.h"
+#include "Routes/EngineStatus.h"
 #include "Routes/Settings.h"
 #include "Routes/SettingsSave.h"
 #include "Ranking/Ranker.h"
@@ -362,6 +363,7 @@ int main(int argc, char **argv) {
   set_handler("/settings", settings_handler);
   set_handler("/history", history_handler);
   set_handler("/save_settings", settings_save_handler);
+  set_handler("/settings/engine-status.json", engine_status_handler);
 
   fprintf(stderr, "[INFO] Starting Omnisearch on %s:%d\n", cfg.host, cfg.port);
 

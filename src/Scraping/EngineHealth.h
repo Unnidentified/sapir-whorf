@@ -65,6 +65,13 @@ void engine_health_record(const char *id, int status, long http_status,
 /* G2: the reason this engine is paused and how long is left, both for the
    page copy and for the /settings panel. Returns SUSPEND_NONE when open. */
 SuspendReason engine_health_suspension(const char *id, int *seconds_left);
+
+/* K3: the absolute instant the engine may be contacted again, 0 when it may be
+   contacted now. This is the same field the dispatcher tests before it sends
+   anything, so a page that counts down from it cannot disagree with the gate.
+   The breaker and an upstream Retry-After share it: the later of the two
+   wins, because either one can hold the engine. */
+time_t engine_health_open_until(const char *id);
 const char *engine_health_suspend_name(SuspendReason reason);
 
 /* G2: per-engine outbound token bucket. 0 when the engine has no allowance
