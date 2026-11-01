@@ -358,8 +358,9 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
   {
     char ticker[16];
     if (stocks_parse(work, ticker, sizeof(ticker))) {
-      stocks_widget(ticker, out);
-      return 1;
+      /* K11: 0 means "no card", and then the query is a normal search */
+      return stocks_widget(ticker,
+                           stocks_symbol_was_explicit(work, ticker), out);
     }
   }
 
@@ -394,7 +395,8 @@ int answer_box_widget_forced(const char *kind, const char *query,
   if (strcmp(kind, "stock") == 0) {
     char ticker[16];
     if (stocks_parse(query, ticker, sizeof(ticker)))
-      return stocks_widget(ticker, out);
+      return stocks_widget(ticker,
+                           stocks_symbol_was_explicit(query, ticker), out);
     return 0;
   }
   if (strcmp(kind, "calculator") != 0)

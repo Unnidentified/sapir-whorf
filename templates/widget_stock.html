@@ -1,12 +1,16 @@
 <div class="widget widget-stock">
   <div class="widget-head">
     <span class="widget-title">{{l("stock_title")}} · {{widget_expression}}</span>
-    <span class="widget-source">{{widget_note}}</span>
+    <!-- K11: the note is the quote's provenance ("NVDA · prev ..."), so it is
+         only shown with a quote. On failure widget_result already carries the
+         provider's message, and printing it here as well is the duplicate the
+         owner saw. -->
+    <span class="widget-source">{{if widget_ok == "1"}}{{widget_note}}{{endif}}</span>
   </div>
   {{if widget_ok == "1"}}
   <p class="widget-to">{{widget_result}}</p>
+  <p class="widget-note">{{l("stock_disclaimer")}}</p>
   {{else}}
   <p class="widget-error">{{widget_result}}</p>
   {{endif}}
-  <p class="widget-note">{{l("stock_disclaimer")}}</p>
 </div>
