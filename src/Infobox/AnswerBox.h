@@ -36,7 +36,7 @@ typedef struct {
   char note[96];             /* "Error", "Infinity", or a short caveat */
   char href[256];            /* optional "more" link, built in C so no template
                                 has to url-encode anything */
-  char chart_path[1024];     /* K11: an SVG path for the sparkline, in a 240x60
+  char chart_path[2048];     /* K11: an SVG path for the sparkline, in a 240x60
                                 box. Path data, not markup: the template owns
                                 the <svg> element and every colour comes from a
                                 token. Empty when the provider sent no series. */
@@ -90,7 +90,8 @@ typedef int (*AnswerProviderGate)(const char *kind);
 void answer_box_set_provider_gate(AnswerProviderGate gate);
 
 int answer_box_widget_forced(const char *kind, const char *query,
-                             const char *lang, WidgetData *out);
+                             const char *lang, const char *range,
+                             WidgetData *out);
 
 /* the widget template for an answerer id, or NULL: so the page asks the table
    instead of keeping a second list of kind names */

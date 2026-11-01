@@ -442,8 +442,8 @@ int stocks_symbol_was_explicit(const char *query, const char *ticker) {
   return 0;
 }
 
-int stocks_widget(const char *ticker, int explicit_symbol,
-                  const char *lang, WidgetData *out) {
+int stocks_widget(const char *ticker, int explicit_symbol, const char *lang,
+                  const char *range, WidgetData *out) {
   if (!out || !ticker || !ticker[0])
     return 0;
   memset(out, 0, sizeof(*out));
@@ -451,8 +451,28 @@ int stocks_widget(const char *ticker, int explicit_symbol,
   snprintf(out->title, sizeof(out->title), "Share price");
   snprintf(out->expression, sizeof(out->expression), "%s", ticker);
 
+  /* K11: the window. The card's range links send range=<yahoo window>; an
+     unknown or absent one falls back to the five days the plan asks for. */
+  static const struct {
+    const char *id;
+    const char *interval;
+    const char *range;
+  } WINDOWS[] = {{"1d", "5m", "1d"},   {"5d", "30m", "5d"},
+                 {"1mo", "1d", "1mo"}, {"6mo", "1d", "6mo"},
+                 {"ytd", "1d", "ytd"}, {"1y", "1d", "1y"},
+                 {"5y", "1wk", "5y"}};
+  const char *interval = "30m", *window = "5d";
+  for (size_t w = 0; w < sizeof(WINDOWS) / sizeof(WINDOWS[0]); w++)
+    if (range && strcmp(range, WINDOWS[w].id) == 0) {
+      interval = WINDOWS[w].interval;
+      window = WINDOWS[w].range;
+      break;
+    }
   char url[1200];
-  snprintf(url, sizeof(url), STOCK_ENDPOINT, ticker);
+  snprintf(url, sizeof(url),
+           "https://query1.finance.yahoo.com/v8/finance/chart/%.12s?"
+           "interval=%s&range=%s",
+           ticker, interval, window);
   HttpResponse resp = http_get_budget(
       url, "Mozilla/5.0 (compatible; omnisearch/1.0; "
            "+https://codeberg.org/gabrielf/omnisearch)",
@@ -601,23 +621,41 @@ int stocks_widget(const char *ticker, int explicit_symbol,
         have = 1;
       }
       if (have && n > 1 && hi > lo) {
+        /* beaker's context keeps 255 characters per value, and a truncated
+           path draws a wrong chart. So: at most 28 points, integers, relative
+           moves ("l3 -4"), which is about seven characters a point. A
+           sparkline does not need one point per pixel. */
+        size_t stride = (n + 27) / 28;
+        if (stride < 1)
+          stride = 1;
         size_t used = 0;
-        int point = 0;
-        for (size_t i = 0; i < n; i++) {
+        int point = 0, prev_x = 0, prev_y = 0;
+        for (size_t i = 0; i < n; i += stride) {
           json_t *v = json_array_get(series, i);
           if (!json_is_number(v))
             continue;
           double d = json_number_value(v);
           int x = (int)((double)i * 240.0 / (double)(n - 1));
           int y = 58 - (int)((d - lo) / (hi - lo) * 56.0);
-          int wrote = snprintf(out->chart_path + used,
-                               sizeof(out->chart_path) - used, "%s%d,%d",
-                               point ? " L" : "M", x, y);
+          int wrote;
+          if (point == 0)
+            wrote = snprintf(out->chart_path + used,
+                             sizeof(out->chart_path) - used, "M%d %d", x, y);
+          else
+            wrote = snprintf(out->chart_path + used,
+                             sizeof(out->chart_path) - used, "l%d %d",
+                             x - prev_x, y - prev_y);
           if (wrote < 0 || (size_t)wrote >= sizeof(out->chart_path) - used)
             break;
           used += (size_t)wrote;
+          prev_x = x;
+          prev_y = y;
           point++;
         }
+        /* a path that does not fit is not drawn at all: a truncated "d" would
+           draw a chart that is not the price */
+        if (strlen(out->chart_path) > 240)
+          out->chart_path[0] = '\0';
         (void)stamps;
       }
     }

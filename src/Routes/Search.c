@@ -1332,7 +1332,7 @@ int results_handler(UrlParams *params) {
                                          &widget, lang);
       else
         wres = widget_mode[0]
-                     ? answer_box_widget_forced(widget_mode, raw_query, lang,
+                     ? answer_box_widget_forced(widget_mode, raw_query, lang, NULL,
                                                 &widget)
                      : answer_box_widget(raw_query, lang, NULL, &widget);
       if (wres) {

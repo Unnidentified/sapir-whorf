@@ -56,6 +56,7 @@ static int widget_fragment(const char *kind, UrlParams *params) {
   const char *key = "";
   const char *from = "";
   const char *to = "";
+  const char *range = "";
   for (int i = 0; i < params->count; i++) {
     if (strcmp(params->params[i].key, "q") == 0)
       query = params->params[i].value;
@@ -65,6 +66,8 @@ static int widget_fragment(const char *kind, UrlParams *params) {
       from = params->params[i].value;
     else if (strcmp(params->params[i].key, "to") == 0)
       to = params->params[i].value;
+    else if (strcmp(params->params[i].key, "range") == 0)
+      range = params->params[i].value;
   }
 
   /* get_locale() returns a heap string that may be NULL, and the fallback is
@@ -102,7 +105,7 @@ static int widget_fragment(const char *kind, UrlParams *params) {
   if (strcmp(kind, "translate") == 0 && to[0])
     resolved = translate_widget_explicit(query, from, to, &widget, lang);
   else
-    resolved = answer_box_widget_forced(kind, work, lang, &widget);
+    resolved = answer_box_widget_forced(kind, work, lang, range, &widget);
 
   if (!resolved) {
     send_status("204 No Content");

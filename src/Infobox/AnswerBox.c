@@ -12,6 +12,7 @@
 #include "Dictionary.h"
 #include "UnitConversion.h"
 #include "Wikipedia.h"
+#include "../Utility/Utility.h"
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -334,6 +335,8 @@ static int provider_denied(const char *kind) {
 
 int answer_box_widget(const char *query, const char *lang, const char *append,
                       WidgetData *out) {
+  /* no range here: the plain path has no card UI to ask for one */
+  const char *range = NULL;
   char work[320];
   char expression[256];
   double value;
@@ -377,19 +380,28 @@ int answer_box_widget(const char *query, const char *lang, const char *append,
     char ticker[16];
     if (!provider_denied("stock") && stocks_parse(work, ticker, sizeof(ticker))) {
       /* K11: 0 means "no card", and then the query is a normal search */
-      return stocks_widget(ticker,
-                           stocks_symbol_was_explicit(work, ticker), lang,
-                           out);
+      if (!stocks_widget(ticker, stocks_symbol_was_explicit(work, ticker), lang,
+                         range, out))
+        return 0;
+      /* the range links carry the query the reader typed: a bare ticker has no
+         price keyword, so "q=NVDA" would answer nothing when clicked */
+      if (!range || !range[0]) {
+        char encoded[512];
+        url_encode(work, encoded, sizeof(encoded));
+        snprintf(out->href, sizeof(out->href), "/w/stock?q=%s&range=", encoded);
+      }
+      return 1;
     }
   }
 
   if (!is_calculator_query(work))
     return 0;
-  return answer_box_widget_forced("calculator", work, lang, out);
+  return answer_box_widget_forced("calculator", work, lang, NULL, out);
 }
 
 int answer_box_widget_forced(const char *kind, const char *query,
-                             const char *lang, WidgetData *out) {
+                             const char *lang, const char *range,
+                             WidgetData *out) {
   char expression[256];
   double value;
   if (!out || !kind)
@@ -420,9 +432,15 @@ int answer_box_widget_forced(const char *kind, const char *query,
   if (strcmp(kind, "stock") == 0) {
     char ticker[16];
     if (stocks_parse(query, ticker, sizeof(ticker)))
-      return stocks_widget(ticker,
-                           stocks_symbol_was_explicit(query, ticker), lang,
-                           out);
+      if (!stocks_widget(ticker, stocks_symbol_was_explicit(query, ticker),
+                         lang, range, out))
+        return 0;
+      if (!range || !range[0]) {
+        char encoded[512];
+        url_encode(query, encoded, sizeof(encoded));
+        snprintf(out->href, sizeof(out->href), "/w/stock?q=%s&range=", encoded);
+      }
+      return 1;
     return 0;
   }
   if (strcmp(kind, "calculator") != 0)

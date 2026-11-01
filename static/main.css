@@ -2557,3 +2557,19 @@ input[type="color"]:focus-visible {
   margin: 0.35rem 0 0.1rem;
   color: var(--accent);
 }
+/* K11: the chart window links. Quiet, because the card is about the number. */
+.stock-ranges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0.3rem 0 0.15rem;
+  font-size: 0.76rem;
+}
+.stock-ranges a {
+  color: var(--link);
+  text-decoration: none;
+}
+.stock-ranges a:hover,
+.stock-ranges a:focus-visible {
+  text-decoration: underline;
+}
