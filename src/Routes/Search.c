@@ -1333,78 +1333,11 @@ int results_handler(UrlParams *params) {
     }
   }
 
-  /* J5.3 + J5.4: one strip, one context key.
-
-     Two strips used to be two keys, and the context is a hard 32 slots
-     (beaker's MAX_CONTEXT_VARS) - adding the engine strip took a slot that
-     paused_note needed, and the page silently lost its pause notice. Both
-     strips are the same thing: a chip that narrows the fan-out. So they share
-     one matrix of {href, label, class, group}; the group is a class name, not
-     data the template has to branch on.
-
-     A category appears only when an enabled engine declares it: a chip that can
-     only ever return nothing is a lie about what the build can do. The engine
-     rows are appended after the fan-out, in the same matrix. */
-  StringMatrix filters;
-  string_matrix_init(&filters);
-  {
-    static const struct {
-      const char *id;
-      int mask;
-      const char *label;
-    } categories[] = {{"news", V_NEWS, "news_tab"},
-                      {"code", V_CODE, "code_tab"},
-                      {"academic", V_ACADEMIC, "academic_tab"}};
-
-    /* "All" is a row like any other, so it is active only when nothing else is
-       selected - the hardcoded link it replaced was active on every page. */
-    {
-      char *href = build_search_href(raw_query, NULL, 1, web_explicit, NULL);
-      if (href) {
-        char *fields[4];
-        fields[0] = href;
-        fields[1] = (char *)beaker_get_locale_value(locale, "all_tab");
-        fields[2] = (char *)(!cat[0] && engine_id_matches(selected_engine_id, "all")
-                                 ? "chip chip-all active"
-                                 : "chip chip-all");
-        fields[3] = (char *)"all";
-        string_matrix_append(&filters, (const char *const *)fields, 4);
-        free(href);
-      }
-    }
-
-    for (size_t c = 0; c < sizeof(categories) / sizeof(categories[0]); c++) {
-      int available = 0;
-      for (int i = 0; i < ENGINE_COUNT; i++) {
-        if (ENGINE_REGISTRY[i].enabled &&
-            (ENGINE_REGISTRY[i].verticals & categories[c].mask)) {
-          available = 1;
-          break;
-        }
-      }
-      if (!available)
-        continue;
-      char *href = build_search_href(raw_query, NULL, 1, web_explicit,
-                                     categories[c].id);
-      if (!href)
-        continue;
-      char *fields[4];
-      fields[0] = href;
-      fields[1] = (char *)beaker_get_locale_value(locale, categories[c].label);
-      fields[2] = (char *)(strcmp(cat, categories[c].id) == 0
-                               ? "chip chip-cat active"
-                               : "chip chip-cat");
-      fields[3] = (char *)categories[c].id;
-      string_matrix_append(&filters, (const char *const *)fields, 4);
-      free(href);
-    }
-    /* set here as well as after the fan-out: an empty result page still has a
-       strip, and the later set (with the engine rows) overwrites this one */
-    context_set_array_of_arrays(&ctx, "filter_links", filters.rows,
-                                filters.count,
-                                filters.count > 0 ? filters.field_counts : NULL);
-  }
-
+  /* K4: the chip strip is gone. It was a second navigation next to the tab
+     bar, it duplicated the engine list on every results page, and it held a
+     context slot that the page needs more. The evidence it carried - which
+     engines answered, and with how many - is one line in the footer, built
+     after the fan-out; the slot it used is now free. */
   /* J3b: the card offers a way to ask for the web - unless this request *is*
      that way. Keep ?web=1 on the links the page generates from here. */
   context_set(&ctx, "show_web_link", web_explicit ? "" : "1");
@@ -1480,12 +1413,22 @@ int results_handler(UrlParams *params) {
         context_set(&ctx, "widget_result",
                     widget.ok && widget.result[0] ? widget.result
                                                   : widget.note);
-        context_set(&ctx, "widget_expression", widget.expression);
+        /* K4: a key is only worth a slot on the page that can read it. The
+           expression belongs to the stock and translate cards, the href to a
+           card that links out, and the code pair to translate alone; setting
+           them empty on every other card cost slots the context does not have
+           (it renders with 31 of beaker's 32). */
+        if (widget.expression[0] &&
+            (strcmp(widget.kind, "stock") == 0 ||
+             strcmp(widget.kind, "translate") == 0))
+          context_set(&ctx, "widget_expression", widget.expression);
         context_set(&ctx, "widget_note", widget.note);
-        context_set(&ctx, "widget_href", widget.href);
+        if (widget.href[0])
+          context_set(&ctx, "widget_href", widget.href);
         /* K10: "from|to" for the translate card's two menus. One key, because
-           the page renders with 32 of beaker's 32 slots. */
-        context_set(&ctx, "translate_codes", widget.translate_codes);
+           the page renders with 31 of beaker's 32 slots. */
+        if (widget.translate_codes[0])
+          context_set(&ctx, "translate_codes", widget.translate_codes);
         context_set(&ctx, "widget_ok", widget.ok ? "1" : "");
         if (getenv("OMNI_PERF"))
           fprintf(stderr, "[WIDGET] kind=%s ok=%d expr='%s' note='%s'\n",
@@ -2582,38 +2525,46 @@ int results_handler(UrlParams *params) {
       fprintf(stderr, "\n");
     }
 
-    /* J5.4: one row per engine that was actually asked, with what it returned.
-       The counts come from the jobs, not from the rendered rows: an engine that
-       answered and was then deduplicated away is not the same as one that
-       answered nothing. */
-    for (int i = 0; i < engine_idx && filters.count < 10; i++) {
-      if (!jobs[i].engine || !jobs[i].engine->id)
-        continue;
-      char *href = build_search_href(raw_query, jobs[i].engine->id, 1,
-                                     web_explicit, cat);
-      if (!href)
-        continue;
-      char name[128];
-      snprintf(name, sizeof(name), "%s (%d)", jobs[i].engine->name,
-               jobs[i].results_count);
-      char *fields[4];
-      fields[0] = href;
-      fields[1] = name;
-      fields[2] = (char *)(engine_id_matches(selected_engine_id,
-                                             jobs[i].engine->id)
-                               ? "chip chip-eng active"
-                               : "chip chip-eng");
-      fields[3] = (char *)jobs[i].engine->id;
-      string_matrix_append(&filters, (const char *const *)fields, 4);
-      free(href);
+    /* K4: "Results from Bing (12), Brave (9)" - the same counts the chips
+       carried, in a line that does not compete with the tab bar. */
+    {
+      char line[512];
+      size_t used = 0;
+      line[0] = '\0';
+      for (int i = 0; i < engine_idx; i++) {
+        if (!jobs[i].engine || !jobs[i].engine->id || jobs[i].results_count <= 0)
+          continue;
+        int n = snprintf(line + used, sizeof(line) - used, "%s%s (%d)",
+                         used ? ", " : "", jobs[i].engine->name,
+                         jobs[i].results_count);
+        if (n < 0 || (size_t)n >= sizeof(line) - used)
+          break;
+        used += (size_t)n;
+      }
+      if (used > 0) {
+        char full[640];
+        /* a locale that has not been translated yet must not print (null) */
+        const char *label = beaker_get_locale_value(locale, "results_from");
+        if (!label || !label[0])
+          label = "Results from";
+        snprintf(full, sizeof(full), "%s %s", label, line);
+        context_set(&ctx, "answered_note", full);
+      } else {
+        context_set(&ctx, "answered_note", "");
+      }
+      if (getenv("OMNI_PERF"))
+        fprintf(stderr, "[F4] answered note: %s\n", used ? line : "(none)");
     }
 
     /* set even when empty: the render check fails on a key the template reads
        and the context never defines */
-    context_set_array_of_arrays(&ctx, "filter_links", filters.rows,
-                                filters.count,
-                                filters.count > 0 ? filters.field_counts : NULL);
-    string_matrix_free(&filters);
+    if (getenv("OMNI_PERF")) {
+      fprintf(stderr, "[F4] context keys used: %d of %d:", ctx.count,
+              MAX_CONTEXT_VARS);
+      for (int kv = 0; kv < ctx.count; kv++)
+        fprintf(stderr, " %s", ctx.vars[kv].key);
+      fprintf(stderr, "\n");
+    }
 
     char *html = render_template("results.html", &ctx);
     if (html) {

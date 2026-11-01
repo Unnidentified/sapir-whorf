@@ -2236,39 +2236,6 @@ input[type="color"]:focus-visible {
     }
 }
 
-/* J5.3 + J5.4: one strip for both the category chips and the per-engine chips.
-   Dim by design - it states what was asked and what each engine returned, not a
-   control anyone needs on every visit. */
-.filter-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0 0 1rem;
-  padding: 0 0 0.6rem;
-  border-bottom: 1px solid var(--border);
-}
-.filter-tabs a {
-  font-size: 0.82rem;
-  padding: 0.28rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.filter-tabs a:hover,
-.filter-tabs a:focus-visible {
-  color: var(--text-primary);
-  border-color: var(--accent);
-}
-.filter-tabs a.active {
-  /* --on-accent is derived per theme in :root from the accent and the text, so
-     this stays readable on all 16 themes instead of assuming a white label */
-  color: var(--on-accent);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
 /* J4c/J4d/J4b: the cards say where their data came from and what it is not.
    A community translation and an unofficial quote both need that line. */
 .widget-note {
@@ -2298,13 +2265,12 @@ input[type="color"]:focus-visible {
 }
 
 
-/* the per-engine chips are secondary: they report, they do not lead */
-.filter-tabs a.chip-eng {
-  font-size: 0.72rem;
-  opacity: 0.85;
-}
-.filter-tabs a.chip-eng.active {
-  opacity: 1;
+/* K4: the engine counts the chips carried, as one line under the results.
+   Quiet, because the tab bar is the navigation. */
+.results-source-note {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-dim);
 }
 
 /* K1.3: the provider table. One row per provider, grouped by what it answers,

@@ -503,6 +503,10 @@ k6-check:
 k3-check:
 	@./tests/test_k3_resume.sh
 
+# K4: the results page fits beaker's 32 context slots, with no key dropped
+k4check:
+	@./tests/test_k4_context.sh
+
 # K5.4: which queries start the Reddit lane, and what stops it (offline)
 k5check:
 	@./tests/test_k5_reddit_lane.sh

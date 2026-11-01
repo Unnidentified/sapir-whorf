@@ -1,7 +1,9 @@
 #!/bin/bash
-# J5.3: a category tab narrows which engines are asked, keeps itself on the
+# J5.3 + K4: a category narrows which engines are asked, keeps itself on the
 # pager, and says so when nothing serves it rather than silently answering with
-# web results.
+# web results. Since K4 the category is a URL parameter with no UI of its own:
+# the tab bar is the only navigation, and the per-engine counts live in one
+# footer line instead of a chip strip.
 set -u
 cd "$(dirname "$0")/.." || exit 1
 PORT=8123
@@ -27,72 +29,52 @@ FAIL=0
 fail() { echo "FAIL: $1"; FAIL=1; }
 
 body() { curl -sS -m 40 "http://127.0.0.1:$PORT/search?$1&nc=$RANDOM" -o /tmp/j5cat.html; }
-# the strip only: the chrome's own All tab is also class="active", and counting
-# it made this test pass for the wrong reason until it was scoped
-strip() { python3 -c "
-import re, sys
-h = open('/tmp/j5cat.html').read()
-m = re.search(r'<nav class=\"filter-tabs\".*?</nav>', h, re.S)
-print(m.group(0) if m else '')
-"; }
+# K4: none of this may come back. The strip was a second navigation.
+no_chips() {
+  grep -q 'filter-tabs' /tmp/j5cat.html && fail "the filter strip is back"
+  grep -q 'class="chip' /tmp/j5cat.html && fail "chip markup is back"
+  return 0
+}
+# the footer line, if the page has one
+note() { grep -o '<p class="results-source-note">[^<]*</p>' /tmp/j5cat.html | head -1; }
 
-# 1. the strip exists, and it names only what an enabled engine declares: this
-#    build is the three engines above, so academic is there and code is not
+# 1. no strip, no chips, and the tab bar is there exactly once
 body "q=linux+kernel"
-grep -q 'class="filter-tabs"' /tmp/j5cat.html || fail "no filter strip"
-grep -q "cat=academic" /tmp/j5cat.html || fail "strip has no academic"
-grep -q "cat=code" /tmp/j5cat.html \
-  && fail "strip offers code, but no enabled engine declares it"
+no_chips
+[ "$(grep -c 'class="nav-tabs"' /tmp/j5cat.html)" = "1" ] \
+  || fail "the tab bar is not the single navigation"
 
-# 2. exactly one row in the strip is active
-strip > /tmp/j5cat.strip
-active=$(grep -o 'chip[^"]*active' /tmp/j5cat.strip | wc -l | tr -d ' ')
-[ "$active" = "1" ] || fail "expected one active row, saw $active"
-grep -q 'q=linux%20kernel" class="chip chip-all active"' /tmp/j5cat.strip \
-  || fail "All is not active on an unfiltered search"
-
-# 3. a category is active on its own page and nothing else is
+# 2. the category page still renders and still has no chips
 body "q=linux+kernel&cat=academic"
-strip > /tmp/j5cat.strip
-grep -q 'cat=academic" class="chip chip-cat active"' /tmp/j5cat.strip \
-  || fail "academic is not active on its own page"
-grep -q 'q=linux%20kernel" class="chip chip-all active"' /tmp/j5cat.strip \
-  && fail "All is active while a category is selected"
+no_chips
 
 # 4. the pager keeps the category
 body "q=linux+kernel&cat=academic&p=2"
 grep -q 'cat=academic' /tmp/j5cat.html || fail "pager dropped the category"
 
-# J5.4: every engine that was asked appears with its count, and selecting one
-# makes exactly that chip active - one active row across both groups
+# K4: the counts the chips carried are one footer line. Offline this test may
+# have no answer at all, so the rule is: a page with results names its engines,
+# a page without results has no line rather than an empty one.
 body "q=linux+kernel"
-strip > /tmp/j5cat.strip
-eng=$(grep -c 'chip-eng' /tmp/j5cat.strip)
-if [ "$eng" -lt 1 ]; then
-  echo "  skip: no engine was asked (every candidate is paused or unavailable)"
+no_chips
+if grep -q 'class="result"' /tmp/j5cat.html; then
+  note > /tmp/j5cat.note
+  [ -s /tmp/j5cat.note ] || fail "results without the answered-by line"
+  grep -q '(' /tmp/j5cat.note || fail "the answered-by line carries no count"
 else
-grep -q 'chip-eng[^>]*>.*(' /tmp/j5cat.strip || fail "an engine chip has no count"
-act=$(grep -o 'chip[^"]*active' /tmp/j5cat.strip | wc -l | tr -d ' ')
-[ "$act" = "1" ] || fail "expected one active chip across both groups, saw $act"
+  [ -z "$(note)" ] || fail "an empty page printed an empty source line"
 fi
-
-# an engine that is enabled and routed: selecting it makes its chip active. An
-# id that is not available falls back to All, which is why this uses ddg.
+# ?engine= is still a URL parameter, and still must not bring a chip back
 body "q=linux+kernel&engine=ddg"
-strip > /tmp/j5cat.strip
-if grep -q 'chip-eng' /tmp/j5cat.strip; then
-  grep -q 'chip-eng active' /tmp/j5cat.strip \
-    || fail "the selected engine is not active"
-fi
-grep -q 'chip-all active' /tmp/j5cat.strip \
-  && fail "All is active while an engine is selected"
+no_chips
 
 # 5. an unknown category is ignored, not fatal
 code=$(curl -sS -m 30 -o /tmp/j5cat.html -w '%{http_code}' \
   "http://127.0.0.1:$PORT/search?q=linux+kernel&cat=bogus&nc=$RANDOM")
 [ "$code" = "200" ] || fail "unknown category returned $code"
-grep -q 'class="filter-tabs"' /tmp/j5cat.html \
-  || fail "unknown category removed the strip"
+no_chips
+grep -q 'class="result"' /tmp/j5cat.html \
+  || fail "an unknown category cost the page its results"
 
 # 6. a category with no enabled engine answers honestly instead of with web
 #    results: this build has no media index

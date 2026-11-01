@@ -31,13 +31,6 @@
         <p class="no-results-hint"><a href="{{chrome_all_href}}">{{l("all_tab")}}</a></p>
     </div>
     {{endif}}
-    {{if exists filter_links}}
-    <nav class="filter-tabs" aria-label="{{l("filter_label")}}">
-        {{for f in filter_links}}
-        <a href="{{f[0]}}" class="{{f[2]}}">{{f[1]}}</a>
-        {{endfor}}
-    </nav>
-    {{endif}}
                 {{if widget_kind == "calculator"}}{{include "widget_calculator.html"}}{{endif}}
                 {{if widget_kind == "translate"}}{{include "widget_translate.html"}}{{endif}}
                 {{if widget_kind == "place"}}{{include "widget_place.html"}}{{endif}}
@@ -125,6 +118,9 @@
                     </a>
                     {{endfor}}
                 </nav>
+                {{endif}}
+                {{if exists answered_note}}
+                <p class="results-source-note">{{answered_note}}</p>
                 {{endif}}
             </main>
             <aside class="infobox-sidebar" aria-label="{{l("panel_label")}}">
