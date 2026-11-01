@@ -2547,3 +2547,13 @@ input[type="color"]:focus-visible {
   font-size: 0.76rem;
   color: var(--text-dim);
 }
+
+/* K11: the sparkline. Colour comes from the text token, so it follows the theme
+   without a new palette entry, and the path is drawn by the server. */
+.widget-chart {
+  display: block;
+  width: 100%;
+  height: 3.2rem;
+  margin: 0.35rem 0 0.1rem;
+  color: var(--accent);
+}

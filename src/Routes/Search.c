@@ -1372,6 +1372,8 @@ int results_handler(UrlParams *params) {
         context_set(&ctx, "widget_note", widget.note);
         if (widget.href[0])
           context_set(&ctx, "widget_href", widget.href);
+        if (widget.chart_path[0])
+          context_set(&ctx, "widget_chart", widget.chart_path);
         /* K10: "from|to" for the translate card's two menus. One key, because
            the page renders with 31 of beaker's 32 slots. */
         if (widget.translate_codes[0])

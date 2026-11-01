@@ -126,6 +126,8 @@ static int widget_fragment(const char *kind, UrlParams *params) {
     context_set(&ctx, "widget_expression", widget.expression);
     context_set(&ctx, "widget_note", widget.note);
     context_set(&ctx, "widget_href", widget.href);
+    if (widget.chart_path[0])
+      context_set(&ctx, "widget_chart", widget.chart_path);
     context_set(&ctx, "widget_ok", widget.ok ? "1" : "");
     /* the keypad appends to this, and the form carries it back */
     /* the card must show what will be submitted next, which is the expression

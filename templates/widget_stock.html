@@ -9,6 +9,16 @@
   </div>
   {{if widget_ok == "1"}}
   <p class="widget-to">{{widget_result}}</p>
+  {{if exists widget_chart}}
+  <!-- K11: drawn here, from path data the server computed: no script, no image
+       request, and the colour comes from a token -->
+  <svg class="widget-chart" viewBox="0 0 240 60" role="img"
+       aria-label="{{l("stock_chart_label")}}" preserveAspectRatio="none">
+    <title>{{l("stock_chart_label")}}</title>
+    <path d="{{widget_chart}}" fill="none" stroke="currentColor"
+          stroke-width="2" vector-effect="non-scaling-stroke"/>
+  </svg>
+  {{endif}}
   <p class="widget-note">{{l("stock_disclaimer")}}</p>
   {{else}}
   <p class="widget-error">{{widget_result}}</p>

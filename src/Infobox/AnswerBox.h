@@ -36,6 +36,10 @@ typedef struct {
   char note[96];             /* "Error", "Infinity", or a short caveat */
   char href[256];            /* optional "more" link, built in C so no template
                                 has to url-encode anything */
+  char chart_path[1024];     /* K11: an SVG path for the sparkline, in a 240x60
+                                box. Path data, not markup: the template owns
+                                the <svg> element and every colour comes from a
+                                token. Empty when the provider sent no series. */
   int ok;                    /* 1 when result is a number */
 } WidgetData;
 

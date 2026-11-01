@@ -21,7 +21,7 @@
 
 #define STOCK_BUDGET_MS 900
 #define STOCK_ENDPOINT                                                     \
-  "https://query1.finance.yahoo.com/v8/finance/chart/%.12s?interval=1d&range=5d"
+  "https://query1.finance.yahoo.com/v8/finance/chart/%.12s?interval=30m&range=5d"
 
 /* A ticker is only recognised when the query says it is one. An upper-case word
    on its own is a name or an acronym far more often than a listed company. */
@@ -574,6 +574,55 @@ int stocks_widget(const char *ticker, int explicit_symbol,
              head[0] ? listing : "", change_text[0] ? " · " : "", change_text,
              when[0] ? " · " : "", when);
   }
+  /* K11: the sparkline. The chart endpoint already returns the series in
+     indicators.quote[0].close; the card draws it as path data in a 240x60 box,
+     so the page needs no third-party script and no image request. */
+  {
+    json_t *indicators =
+        json_object_get(json_array_get(results, 0), "indicators");
+    json_t *quote = indicators ? json_object_get(indicators, "quote") : NULL;
+    json_t *series =
+        json_is_array(quote) ? json_object_get(json_array_get(quote, 0), "close")
+                             : NULL;
+    json_t *stamps = json_object_get(json_array_get(results, 0), "timestamp");
+    if (json_is_array(series)) {
+      size_t n = json_array_size(series);
+      double lo = 0, hi = 0;
+      int have = 0;
+      for (size_t i = 0; i < n; i++) {
+        json_t *v = json_array_get(series, i);
+        if (!json_is_number(v))
+          continue;
+        double d = json_number_value(v);
+        if (!have || d < lo)
+          lo = d;
+        if (!have || d > hi)
+          hi = d;
+        have = 1;
+      }
+      if (have && n > 1 && hi > lo) {
+        size_t used = 0;
+        int point = 0;
+        for (size_t i = 0; i < n; i++) {
+          json_t *v = json_array_get(series, i);
+          if (!json_is_number(v))
+            continue;
+          double d = json_number_value(v);
+          int x = (int)((double)i * 240.0 / (double)(n - 1));
+          int y = 58 - (int)((d - lo) / (hi - lo) * 56.0);
+          int wrote = snprintf(out->chart_path + used,
+                               sizeof(out->chart_path) - used, "%s%d,%d",
+                               point ? " L" : "M", x, y);
+          if (wrote < 0 || (size_t)wrote >= sizeof(out->chart_path) - used)
+            break;
+          used += (size_t)wrote;
+          point++;
+        }
+        (void)stamps;
+      }
+    }
+  }
+
   out->ok = 1;
   json_decref(root);
   return 1;
