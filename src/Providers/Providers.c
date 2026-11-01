@@ -157,6 +157,11 @@ int provider_id_known(const char *id) {
   return 0;
 }
 
+int provider_widget_denied(const char *kind) {
+  const char *provider = provider_id_for_widget_kind(kind);
+  return provider && provider_is_off(provider);
+}
+
 int provider_is_lane(const char *id) {
   return id && strcasecmp(id, "reddit") == 0;
 }

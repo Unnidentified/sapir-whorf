@@ -48,6 +48,11 @@ int provider_id_known(const char *id);
    switch at all: there is nothing to switch off in a local computation. */
 int provider_uses_network(const char *id);
 
+/* K1.4: the widget resolver's gate - "is the provider behind this card
+   switched off?". One copy, installed by the search page and by the fragment
+   endpoint, because /w/<kind> used to reach the providers without any gate. */
+int provider_widget_denied(const char *kind);
+
 /* K5.3: a lane provider has a destination but no host of its own - it is
    reached through another provider's connection (the Reddit lane asks the web
    engines for site:reddit.com). A test that checks "on means a request to its

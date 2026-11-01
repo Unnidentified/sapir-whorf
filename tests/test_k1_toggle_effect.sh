@@ -215,5 +215,22 @@ while IFS='|' read -r id host group state kind; do
     say_pass
 done < "$DIR/todo"
 
+# K1.4: the second door. /w/<kind> reaches the same provider, and a switched-off
+# one must answer like a kind that does not exist - 204 - rather than closing the
+# connection with no reply at all, which is what curl reports as "empty reply".
+for pair in "translate:hello&to=de" "stock:nvidia+stock"; do
+    kind=${pair%%:*}
+    qs=${pair#*:}
+    # the "on" case is not asserted here: this server's proxy refuses every
+    # request, so a card that needs the network has nothing to show. The
+    # regression that matters is the answer itself - a closed provider used to
+    # close the connection instead of saying no.
+    provider=$(printf '%s' "$kind" | sed 's/stock$/stocks/')
+    code=$(curl -sS -o /dev/null -m 20 -w '%{http_code}' -b "engines=off=$provider" \
+           "http://127.0.0.1:$PORT/w/$kind?q=$qs&nc=$RANDOM" 2>/dev/null)
+    [ "$code" = "204" ] && say_pass \
+        || say_fail "/w/$kind with $provider off returned $code, expected 204"
+done
+
 echo "checked $total providers: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

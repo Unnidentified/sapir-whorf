@@ -35,8 +35,14 @@ static int widget_fragment(const char *kind, UrlParams *params) {
      same answer as one for a kind that does not exist. */
   {
     const char *provider = provider_id_for_widget_kind(kind);
-    if (provider && provider_is_off(provider))
+    if (provider && provider_is_off(provider)) {
+      /* an empty reply is not an answer: curl reports "empty reply from
+         server" and a browser sees a broken connection. A switched-off
+         provider gets the same response as a kind that does not exist. */
+      send_status("204 No Content");
+      send_response("");
       return 0;
+    }
   }
 
   /* the limiter, same budget as the search path: a card fetch is a page fetch

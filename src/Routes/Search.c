@@ -375,10 +375,10 @@ static InfoBox fetch_colour_wrapper(char *query) {
   return fetch_colour_data(query);
 }
 
-/* K1.4: the widget resolver asks this before contacting a provider */
+/* K1.4: the widget resolver asks this before contacting a provider. It lives in
+   the provider module now, because the fragment endpoint needs the same gate. */
 static int widget_provider_gate(const char *kind) {
-  const char *provider = provider_id_for_widget_kind(kind);
-  return provider && provider_is_off(provider);
+  return provider_widget_denied(kind);
 }
 
 static InfoBoxHandler handlers[] = {

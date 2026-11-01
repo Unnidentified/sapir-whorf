@@ -1,4 +1,5 @@
 #include "ImageScraping.h"
+#include "../Providers/Providers.h"
 #include "../Utility/HttpClient.h"
 #include "../Routes/ImageProxy.h"
 #include "Config.h"
@@ -100,6 +101,12 @@ int scrape_images(const char *query, int page, ImageResult **out_results,
   *out_count = 0;
 
   if (!query || strlen(query) == 0)
+    return -1;
+
+  /* K1.4: the images path is one of the paths a switch has to reach. This
+     scraper has exactly one source, and switching it off means no request at
+     all - not a request whose results are then hidden. */
+  if (provider_is_off("bing"))
     return -1;
 
   CURL *tmp = curl_easy_init();
