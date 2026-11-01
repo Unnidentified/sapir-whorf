@@ -507,6 +507,11 @@ k3-check:
 k4check:
 	@./tests/test_k4_context.sh
 
+# K4: the Videos tab and /videos (offline-safe: the "all off" page needs no
+# network, and the card assertions only run when a provider answered)
+k4videos-check:
+	@./tests/test_k4_videos.sh
+
 # K5.4: which queries start the Reddit lane, and what stops it (offline)
 k5check:
 	@./tests/test_k5_reddit_lane.sh

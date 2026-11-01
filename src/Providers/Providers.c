@@ -26,6 +26,9 @@ static const ProviderRow EXTRA[] = {
        off without switching off the engine that fetches it. Its destination is
        reddit.com, reached through a site: operator, so no new third party. */
     {"reddit", "Reddit", "reddit.com", PG_WEB, 0, 1},
+    /* K4: video providers are their own group, because a reader may want
+       videos on and every other vertical off. */
+    {"dailymotion", "Dailymotion", "api.dailymotion.com", PG_VIDEOS, 0, 1},
 };
 enum { EXTRA_COUNT = sizeof(EXTRA) / sizeof(EXTRA[0]) };
 
@@ -39,6 +42,8 @@ const char *provider_group_label(ProviderGroup g) {
     return "Academic and code";
   case PG_ANSWERS:
     return "Answers";
+  case PG_VIDEOS:
+    return "Videos";
   case PG_BRIDGES:
     return "Bridges and APIs";
   case PG_OPTIN:

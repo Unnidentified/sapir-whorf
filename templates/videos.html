@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="{{__locale_id}}" dir="{{__locale_direction}}" class="title-{{title_font}}" style="--page-scale: {{page_scale_css}}">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+        <title>sw — {{l("videos_tab")}} — {{query}}</title>
+        <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+        <link rel="stylesheet" href="static/main.css">
+        <link rel="stylesheet" href="static/themes/{{theme}}.css">
+        {{if theme == "custom"}}
+        <style>
+            :root { {{custom_palette}} }
+        </style>
+        {{endif}}
+        <link rel="search" type="application/opensearchdescription+xml" title="sapir-whorf" href="/opensearch.xml">
+    </head>
+    <body class="videos-view">
+        {{include "_chrome.html"}}
+        <main class="video-results-container">
+            {{if videos_state == "no_providers"}}
+            <div class="no-results">
+                <p>{{l("no_video_providers")}}</p>
+                <p class="no-results-hint"><a href="/settings">{{l("settings_tab")}}</a></p>
+            </div>
+            {{endif}}
+            {{if videos_state == "empty"}}
+            <div class="no-results">
+                <p>{{l("no_videos_found")}} <span class="no-results-query">{{query}}</span>.</p>
+            </div>
+            {{endif}}
+
+            <div class="video-grid">
+                {{for v in videos}}
+                <a class="video-card" href="{{v[2]}}" target="_blank" rel="noopener noreferrer">
+                    <span class="video-thumb">
+                        {{if v[0] != ""}}<img src="{{v[0]}}" alt="" loading="lazy">{{endif}}
+                        {{if v[3] != ""}}<span class="video-duration">{{v[3]}}</span>{{endif}}
+                    </span>
+                    <span class="video-title">{{v[1]}}</span>
+                    <span class="video-meta">
+                        {{if v[4] != ""}}<span class="video-channel">{{v[4]}}</span> · {{endif}}<span class="video-platform">{{v[5]}}</span>
+                    </span>
+                </a>
+                {{endfor}}
+            </div>
+        </main>
+        {{include "_footer.html"}}
+    </body>
+</html>

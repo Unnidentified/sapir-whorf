@@ -19,6 +19,7 @@
 #include "Routes/Home.h"
 #include "Routes/ImageProxy.h"
 #include "Routes/Images.h"
+#include "Routes/Videos.h"
 #include "Routes/Widget.h"
 #include "Routes/Info.h"
 #include "Routes/Metrics.h"
@@ -174,6 +175,7 @@ int main(int argc, char **argv) {
                                 : "unavailable",
              is_engine ? "engine"
              : provider_is_lane(rows[i].id) ? "lane"
+             : rows[i].group == PG_VIDEOS   ? "video"
                                             : "widget");
     }
     return 0;
@@ -358,6 +360,7 @@ int main(int argc, char **argv) {
   set_handler("/opensearch.xml", handle_opensearch);
   set_handler("/search", results_handler);
   set_handler("/images", images_handler);
+  set_handler("/videos", videos_handler);
   /* J4.0: a card is a thing with a URL */
   register_widget_routes();
   set_handler("/proxy", image_proxy_handler);

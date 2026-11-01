@@ -87,6 +87,18 @@ ask() {
     fi
 }
 
+# a video provider is only reached by /videos, not by a web search
+ask_video() {
+    cookie="${1:-}"
+    if [ -n "$cookie" ]; then
+        curl -sS -o /dev/null -m 30 -b "$cookie" \
+             "http://127.0.0.1:$PORT/videos?q=linux+kernel&nc=$RANDOM" 2>/dev/null
+    else
+        curl -sS -o /dev/null -m 30 \
+             "http://127.0.0.1:$PORT/videos?q=linux+kernel&nc=$RANDOM" 2>/dev/null
+    fi
+}
+
 $BIN --config "$DIR/t.ini" --providers 2>/dev/null > "$DIR/todo"
 [ -s "$DIR/todo" ] || { echo "FAIL --providers listed nothing"; exit 1; }
 
@@ -127,6 +139,25 @@ while IFS='|' read -r id host group state kind; do
         continue
         ;;
     esac
+
+    # K4: a video provider is reached by /videos only, so the probe asks there.
+    if [ "$kind" = "video" ]; then
+        before=$(count_host "$host")
+        ask_video ""
+        on=$(count_host "$host")
+        if [ "$on" -le "$before" ]; then
+            say_fail "$id: on, but /videos did not ask for $host (log $before -> $on)"
+            continue
+        fi
+        ask_video "engines=off=$id"
+        after=$(count_host "$host")
+        if [ "$after" -ne "$on" ]; then
+            say_fail "$id: off, but /videos still asked for $host ($on -> $after)"
+            continue
+        fi
+        say_pass
+        continue
+    fi
 
     # K5.3: a lane provider is reached through another provider's connection,
     # so "a request to its host" is the wrong question. Its switch shows up in

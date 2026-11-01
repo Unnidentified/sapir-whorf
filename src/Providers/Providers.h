@@ -15,6 +15,7 @@ typedef enum {
   PG_WEB = 0,
   PG_ACADEMIC,
   PG_ANSWERS,
+  PG_VIDEOS,
   PG_BRIDGES,
   PG_OPTIN,
   PG_GROUP_COUNT
