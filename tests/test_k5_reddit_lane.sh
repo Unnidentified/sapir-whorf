@@ -94,6 +94,13 @@ check "linux+kernel+probe1" "" 0 "a plain query must not start the lane"
 check "best+rust+ide+reddit+probe2" "" 2 "the word reddit (two engines)"
 check "r%2Frust+ide+probe3" "" 2 "an r/<sub> token"
 check "site%3Areddit.com+rust+probe4" "" 2 "a typed site:reddit.com operator"
+# L6.1: "r/" matched inside words, so each of these bought two lane requests
+# nobody asked for. None of them is a subreddit.
+check "and%2For+probe9" "" 0 "and/or is not a subreddit"
+check "color%2Fcolour+probe10" "" 0 "color/colour is not a subreddit"
+check "hammer%2Fanvil+probe11" "" 0 "hammer/anvil is not a subreddit"
+check "either%2For+probe12" "" 0 "either/or is not a subreddit"
+check "index.php%3Fpage%3D2+probe13" "" 0 "a URL with r/ buried in it is not a subreddit"
 # K12.4: a saved provider choice must not disable the lane
 check "best+rust+ide+reddit+probe5" "engines=off=brave" 2 "a saved provider choice"
 # ...but switching the lane engines off must

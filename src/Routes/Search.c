@@ -1531,7 +1531,18 @@ int results_handler(UrlParams *params) {
      site:reddit.com operator (which is passed through unchanged). */
   int reddit_wanted = analysis.wants_discussion;
   if (!reddit_wanted && raw_query) {
-    if (strcasestr(raw_query, "reddit") || strcasestr(raw_query, "r/"))
+    /* L6.1: strcasestr(raw_query, "r/") fired inside words - and/or,
+       color/colour, hammer/anvil, either/or - and each one bought a
+       site:reddit.com lane request nobody asked for. An r/ token is at the
+       start or after a space, which is the test QueryAnalysis already uses. */
+    const char *r = NULL;
+    for (const char *scan = raw_query; (scan = strcasestr(scan, "r/")); scan++) {
+      if (scan == raw_query || scan[-1] == ' ' || scan[-1] == '\t') {
+        r = scan;
+        break;
+      }
+    }
+    if (strcasestr(raw_query, "reddit") || r)
       reddit_wanted = 1;
   }
   /* L5: Reddit's own API first, when the owner's app is configured.

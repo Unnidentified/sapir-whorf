@@ -26,7 +26,11 @@ static const ProviderRow EXTRA[] = {
     /* K5.3: the Reddit lane is its own provider - a row the reader can switch
        off without switching off the engine that fetches it. Its destination is
        reddit.com, reached through a site: operator, so no new third party. */
-    {"reddit", "Reddit", "reddit.com", PG_WEB, 0, 1},
+    /* L6.2: the host is where the request goes, not where the results live.
+       Without credentials the lane asks two search engines with site:reddit.com
+       and never contacts reddit.com at all; with them the request goes to
+       oauth.reddit.com. Saying "reddit.com" was true of neither. */
+    {"reddit", "Reddit", "search engines, oauth.reddit.com", PG_WEB, 0, 1},
     /* K4: video providers are their own group, because a reader may want
        videos on and every other vertical off. */
     {"dailymotion", "Dailymotion", "api.dailymotion.com", PG_VIDEOS, 0, 1},

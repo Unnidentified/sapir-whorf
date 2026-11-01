@@ -46,8 +46,8 @@ whatever Reddit does to its own endpoints.
 | 2. query-variant ladder | not built | Rung 1 already returns threads; variants would be extra requests per query for a small gain |
 | 3. archive search | not usable as a general rung | Measured above: no whole-of-Reddit search, and text search is throttled. The *listing* endpoint works, so it can serve `r/<sub>` queries — worth adding as an opt-in provider, not as a general rung |
 | 4. Google CSE / SearXNG | config-gated, off | Needs credentials or a bridge instance the owner has not configured |
-| 5. Reddit OAuth | not built | "Public Data API access is reported to end in March 2027"; building a registration flow is not worth it. If the owner already holds a client id and secret, a read-only rung is ~80 lines |
-| 6. Reddit RSS | not built | Reported to end 2026-11-13. A rung that expires in twelve days is not worth the code |
+| 5. Reddit OAuth | **built (round 6 L5)** | This row used to say "not built, ~80 lines, not worth it" because the owner had no key. The owner has one, and it is now the *first* rung rather than a fallback: installed-app token, `/search` through `oauth.reddit.com`, real scores and comment counts. Without credentials it makes no request at all and the two-engine lane below carries the query. `tests/test_l5_reddit.sh`, 22 checks against a local stand-in. |
+| 6. Reddit RSS | not built, and now unnecessary | Reported to end 2026-11-13. With L5 built there is nothing this rung would add |
 | — Redlib | skipped | It depends on Reddit access itself |
 
 ## The canary (next step)
