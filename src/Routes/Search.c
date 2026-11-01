@@ -78,9 +78,6 @@ static int always_true(const char *query) {
 static InfoBox fetch_dict_wrapper(char *query) {
   return fetch_dictionary_data(query);
 }
-static InfoBox fetch_calc_wrapper(char *query) {
-  return fetch_calc_data(query);
-}
 static InfoBox fetch_unit_wrapper(char *query) {
   return fetch_unit_conv_data(query);
 }
@@ -416,7 +413,11 @@ static InfoBox fetch_colour_wrapper(char *query) {
 
 static InfoBoxHandler handlers[] = {
     {"dictionary", is_dictionary_query, fetch_dict_wrapper, NULL},
-    {"arithmetic", is_calculator_query, fetch_calc_wrapper, NULL},
+    /* K8: there is no "arithmetic" handler. It was left behind when the
+       calculator widget was added in J4, so 1+1 rendered a rail card AND the
+       card - the same result twice. The widget is the only path: it is the one
+       that works with the keypad, and with answers off there is no arithmetic
+       answer at all, which is what "answers off" means. */
     {"units", is_unit_conv_query, fetch_unit_wrapper, NULL},
     {"currency", is_currency_query, fetch_currency_wrapper, NULL},
     {"colour", is_colour_code_query, fetch_colour_wrapper, NULL},
