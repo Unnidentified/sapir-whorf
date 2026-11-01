@@ -46,6 +46,12 @@ int provider_id_known(const char *id);
 /* Does this provider need the network? Used to decide whether a row gets a
    switch at all: there is nothing to switch off in a local computation. */
 int provider_uses_network(const char *id);
+
+/* K5.3: a lane provider has a destination but no host of its own - it is
+   reached through another provider's connection (the Reddit lane asks the web
+   engines for site:reddit.com). A test that checks "on means a request to its
+   host" would be checking the wrong thing, so the distinction is printed. */
+int provider_is_lane(const char *id);
 int providers_capacity(void);
 
 const char *provider_group_label(ProviderGroup g);

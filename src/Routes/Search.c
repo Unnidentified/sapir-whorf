@@ -1637,7 +1637,8 @@ int results_handler(UrlParams *params) {
     if (strcasestr(raw_query, "reddit") || strcasestr(raw_query, "r/"))
       reddit_wanted = 1;
   }
-  if (reddit_wanted && page == 1 && engine_idx < ENGINE_COUNT) {
+  if (reddit_wanted && page == 1 && engine_idx < ENGINE_COUNT &&
+      !provider_is_off("reddit")) {
     /* Measured, not assumed (tools/queries-reddit.tsv): of the scraped
        engines only DuckDuckGo Lite actually honours site:reddit.com - it
        returns ~10 Reddit threads, while Yahoo returns a zero-byte body for the

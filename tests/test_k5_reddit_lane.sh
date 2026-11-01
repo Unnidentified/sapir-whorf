@@ -97,6 +97,8 @@ check "best+rust+ide+reddit+probe5" "engines=off=brave" 1 "a saved provider choi
 # ...but switching the lane engines off must
 check "best+rust+ide+probe6" "engines=off=ddg|yahoo|bing|brave" 0 \
       "every lane engine switched off"
+check "best+rust+ide+reddit+probe7" "engines=off=reddit" 0 \
+      "the Reddit provider switched off on its own"
 
 echo "K5.4 reddit lane: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -172,7 +172,9 @@ int main(int argc, char **argv) {
              : st == PS_ON      ? "on"
              : st == PS_OFF     ? "off"
                                 : "unavailable",
-             is_engine ? "engine" : "widget");
+             is_engine ? "engine"
+             : provider_is_lane(rows[i].id) ? "lane"
+                                            : "widget");
     }
     return 0;
   }

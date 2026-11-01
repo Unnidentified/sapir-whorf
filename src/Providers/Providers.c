@@ -22,6 +22,10 @@ static const ProviderRow EXTRA[] = {
     {"units", "Unit conversion", NULL, PG_ANSWERS, 0, 0},
     {"colour", "Colour codes", NULL, PG_ANSWERS, 0, 0},
     {"calculator", "Calculator", NULL, PG_ANSWERS, 0, 0},
+    /* K5.3: the Reddit lane is its own provider - a row the reader can switch
+       off without switching off the engine that fetches it. Its destination is
+       reddit.com, reached through a site: operator, so no new third party. */
+    {"reddit", "Reddit", "reddit.com", PG_WEB, 0, 1},
 };
 enum { EXTRA_COUNT = sizeof(EXTRA) / sizeof(EXTRA[0]) };
 
@@ -143,6 +147,10 @@ int provider_id_known(const char *id) {
     if (strcasecmp(EXTRA[i].id, id) == 0)
       return 1;
   return 0;
+}
+
+int provider_is_lane(const char *id) {
+  return id && strcasecmp(id, "reddit") == 0;
 }
 
 int provider_uses_network(const char *id) {

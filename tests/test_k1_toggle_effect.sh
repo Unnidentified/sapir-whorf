@@ -44,6 +44,7 @@ PROXY_LOG="$LOG" PROXY_PORT="$PROXY_PORT" python3 tests/counting_proxy.py > "$DI
 PROXY_PID=$!
 sleep 0.7
 
+OMNI_PERF=1 \
 HTTPS_PROXY="http://127.0.0.1:$PROXY_PORT" https_proxy="http://127.0.0.1:$PROXY_PORT" \
 HTTP_PROXY="http://127.0.0.1:$PROXY_PORT" http_proxy="http://127.0.0.1:$PROXY_PORT" \
 NO_PROXY="" no_proxy="" \
@@ -126,6 +127,30 @@ while IFS='|' read -r id host group state kind; do
         continue
         ;;
     esac
+
+    # K5.3: a lane provider is reached through another provider's connection,
+    # so "a request to its host" is the wrong question. Its switch shows up in
+    # the lane's own log line, and the query has to be discussion-shaped.
+    if [ "$kind" = "lane" ]; then
+        lanes() { grep -c "\[F3\] reddit lane" "$DIR/server.log" 2>/dev/null || true; }
+        before=$(lanes)
+        ask "best rust ide reddit $id $RANDOM" "" ""
+        sleep 0.4
+        on=$(lanes)
+        if [ "$on" -le "$before" ]; then
+            say_fail "$id: on, but the lane did not run ($before -> $on)"
+            continue
+        fi
+        ask "best rust ide reddit $id $RANDOM" "engines=off=$id" ""
+        sleep 0.4
+        after=$(lanes)
+        if [ "$after" -ne "$on" ]; then
+            say_fail "$id: off, but the lane still ran ($on -> $after)"
+            continue
+        fi
+        say_pass
+        continue
+    fi
 
     # on: the query reaches the host. An engine is named explicitly, because
     # otherwise the router only asks the verticals the query looks like - an
