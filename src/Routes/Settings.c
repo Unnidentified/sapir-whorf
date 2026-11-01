@@ -132,23 +132,28 @@ int settings_handler(UrlParams *params) {
   for (int i = 0; i < provider_row_count; i++) {
     ProviderRow *r = &provider_rows[i];
     if (i == 0 || r->group != provider_rows[i - 1].group) {
-      provider_data[prow] = malloc(sizeof(char *) * 12);
+      provider_data[prow] = malloc(sizeof(char *) * 14);
       provider_data[prow][0] = strdup("group");
       provider_data[prow][1] = strdup("group");
       provider_data[prow][2] = strdup(provider_group_label(r->group));
-      for (int c = 3; c < 12; c++)
+      for (int c = 3; c < 14; c++)
         provider_data[prow][c] = strdup("");
       /* a heading row draws no control: it is disabled so it never submits,
          and the stylesheet hides the box */
       provider_data[prow][4] = strdup("group");
       provider_data[prow][6] = strdup("");
       provider_data[prow][7] = strdup("disabled");
-      provider_inner[prow] = 12;
+      /* L1: a heading row carries no data- attributes, so the page's own
+         script and tests cannot mistake it for a provider */
+      provider_data[prow][12] = strdup("");
+      /* 13: the no-script toggle link, empty on a heading */
+      provider_data[prow][13] = strdup("");
+      provider_inner[prow] = 14;
       prow++;
     }
 
     ProviderState state = provider_state(r);
-    provider_data[prow] = malloc(sizeof(char *) * 12);
+    provider_data[prow] = malloc(sizeof(char *) * 14);
     provider_data[prow][0] = strdup("row");
     provider_data[prow][1] = strdup(r->id);
     provider_data[prow][2] = strdup(r->label);
@@ -163,12 +168,15 @@ int settings_handler(UrlParams *params) {
                : state == PS_ON ? "on"
                                 : "off");
     provider_data[prow][5] = strdup("");
-    /* the box is ticked when the provider is OFF, because the form submits the
-       disabled set - one param per provider that is off, none for one that is
-       on, and the script collapses even that into a single field */
+    /* L1: the box means "on", always - the same meaning every other checkbox
+       on the web has, and the same meaning for an opt-in row as for an engine.
+       It used to be the opposite ("tick to switch off"), because the form
+       submits the disabled set; but that is a fact about the wire, not about
+       what the owner sees. Ticked = this provider will be used.
+       Unavailable rows are unticked and disabled. */
     provider_data[prow][6] =
         strdup(r->opt_in ? (opted_in ? "checked" : "")
-                         : state == PS_OFF ? "checked" : "");
+                         : state == PS_ON ? "checked" : "");
     provider_data[prow][7] = strdup((state == PS_UNAVAILABLE || !r->toggleable) ? "disabled" : "");
     provider_data[prow][8] = strdup(r->toggleable ? "" : "1");
     provider_data[prow][9] = strdup(r->opt_in ? "1" : "");
@@ -177,7 +185,41 @@ int settings_handler(UrlParams *params) {
        a second "off" checkbox for the same row would be two gates with the same
        meaning. The field name says which gate it writes. */
     provider_data[prow][11] = strdup(r->opt_in ? "optin_" : "off_");
-    provider_inner[prow] = 12;
+    /* L1: the attributes the script and the tests read, built here so a
+       heading row can carry none */
+    {
+      char attrs[192];
+      /* beaker's context escapes a value, so the attribute's own quotes would
+         arrive as &quot;. Bare words need no quotes at all, and every value
+         here is an id or a fixed state name. */
+      snprintf(attrs, sizeof(attrs),
+               "data-provider=%s data-optin=%s data-on=%s",
+               r->id, r->opt_in ? "1" : "",
+               !r->toggleable ? "local"
+               : state == PS_UNAVAILABLE
+                   ? (provider_needs_config(r) ? "needs_config" : "unavailable")
+               : r->opt_in ? (opted_in ? "on" : "off")
+               : state == PS_ON ? "on"
+                                : "off");
+      provider_data[prow][12] = strdup(attrs);
+    }
+    /* 13: the no-script toggle, as the three pieces the template needs - the
+       href, the word and whether the row gets one at all. Built here (and not
+       as markup) because the context escapes a value, so an embedded <a> would
+       arrive as text; and not with a nested {{if}}, because beaker's {{if}}
+       does not nest. */
+    if (r->toggleable && state != PS_UNAVAILABLE) {
+      char href[128];
+      snprintf(href, sizeof(href), "/save_settings?toggle=%s", r->id);
+      provider_data[prow][13] = strdup(href);
+      int is_on = (state == PS_ON) || (r->opt_in && opted_in);
+      provider_data[prow][5] =
+          strdup(beaker_get_locale_value(locale, is_on ? "toggle_switch_off"
+                                                       : "toggle_switch_on"));
+    } else {
+      provider_data[prow][13] = strdup("");
+    }
+    provider_inner[prow] = 14;
     prow++;
   }
 

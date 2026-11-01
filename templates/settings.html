@@ -316,13 +316,20 @@
                         <h3 class="settings-section-title">{{l("engines_label")}}</h3>
                         <p class="settings-section-desc">{{l("engines_desc_all")}}</p>
                         <p class="settings-section-desc">{{l("engines_off_explain")}}</p>
+                        <!-- L1: the two state words the script needs, so the
+                             label it writes is the same translation the server
+                             rendered -->
+                        <span id="provider-state-words" hidden
+                              data-on="{{l("provider_state_on")}}"
+                              data-off="{{l("provider_state_off")}}"></span>
                         <div class="settings-providers">
                             {{for p in providers}}
                             <div class="settings-provider kind-{{p[4]}}">
                                 <label class="settings-provider-main" for="prov_{{p[1]}}">
-                                    <input type="checkbox" id="prov_{{p[1]}}" name="{{p[11]}}{{p[1]}}" value="1" class="settings-checkbox" {{p[6]}} {{p[7]}}>
+                                    <input type="checkbox" id="prov_{{p[1]}}" name="{{p[11]}}{{p[1]}}" value="1" class="settings-checkbox" {{p[6]}} {{p[7]}} {{p[12]}}>
                                     <span class="settings-provider-name">{{p[2]}}</span>
                                     <span class="settings-provider-state">{{if p[4] == "on"}}{{l("provider_state_on")}}{{endif}}{{if p[4] == "off"}}{{l("provider_state_off")}}{{endif}}{{if p[4] == "unavailable"}}{{l("provider_state_unavailable")}}{{endif}}{{if p[4] == "needs_config"}}{{l("provider_state_needs_config")}}{{endif}}{{if p[4] == "local"}}{{l("provider_state_local")}}{{endif}}</span>
+                                    {{if p[13]}}<a class="settings-provider-toggle" href="{{p[13]}}">{{p[5]}}</a>{{endif}}
                                 </label>
                                 <span class="settings-provider-host">{{p[3]}}</span>
                                 <span class="settings-provider-disclosure">{{p[10]}}</span>

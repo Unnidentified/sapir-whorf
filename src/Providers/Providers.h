@@ -48,6 +48,12 @@ int provider_id_known(const char *id);
    switch at all: there is nothing to switch off in a local computation. */
 int provider_uses_network(const char *id);
 
+/* L1: the row list by index, and the row by id - so a toggle can rebuild the
+   whole disabled set without a second list of provider names in the save
+   handler. Both return NULL past the end / for an unknown id. */
+const char *provider_id_at(int index);
+const ProviderRow *provider_by_id(const char *id);
+
 /* K1.4: the widget resolver's gate - "is the provider behind this card
    switched off?". One copy, installed by the search page and by the fragment
    endpoint, because /w/<kind> used to reach the providers without any gate. */

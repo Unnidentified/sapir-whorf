@@ -2305,6 +2305,14 @@ input[type="color"]:focus-visible {
   min-width: 0;
 }
 
+/* L1: the box must never be squeezed by a long provider name. It was: a later
+   .settings-checkbox rule took flex-shrink back to its default, and the widest
+   row then rendered its box at 0x0 - a control the owner could not see, let
+   alone click. */
+.settings-provider-main .settings-checkbox {
+  flex: 0 0 auto;
+}
+
 .settings-provider-name {
   color: var(--text-primary);
 }
@@ -2582,5 +2590,17 @@ input[type="color"]:focus-visible {
 }
 .stock-ranges a:hover,
 .stock-ranges a:focus-visible {
+  text-decoration: underline;
+}
+/* L1: the no-script switch. A small link on the row, hidden as soon as the
+   script takes over, because then the checkbox does the same thing in place. */
+.settings-provider-toggle {
+  font-size: 0.75rem;
+  color: var(--link);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.settings-provider-toggle:hover,
+.settings-provider-toggle:focus-visible {
   text-decoration: underline;
 }

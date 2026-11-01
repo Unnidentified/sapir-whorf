@@ -16,23 +16,31 @@
         })(colours[i]);
     }
 
-    /* 2. K1.3: collapse the provider checkboxes into one field.
-       Without this the form submits one off_<id> parameter per provider that is
-       off, and beaker keeps at most 16 URL parameters - it stops parsing
-       silently beyond that, so the seventeenth toggle would be lost and the
-       provider it should have turned off would quietly come back on. The
-       checkboxes keep their names so the form still works with scripts off;
-       when this runs they are disabled at submit time so only "off" is sent. */
+    /* 2. L1/K1.3: the box means "on", and the wire stays compact.
+       A ticked box means the provider is used; an unticked one means it is off.
+       The form still submits the DISABLED set, because beaker keeps at most 16
+       URL parameters and the registry already has more rows than that - so at
+       submit time this collects the unticked, enabled boxes into the single
+       off= field and disables the individual inputs so only that travels.
+       Opt-in rows are in the same set: their box has the same meaning, and the
+       server writes their cookie from the same list. */
     var form = document.getElementById('engines-form');
     var field = document.getElementById('off-field');
     if (!form || !field) return;
 
+    /* the two state words, from the page itself, so a translation cannot drift
+       between the server's render and the script's update */
+    var stateWords = document.getElementById('provider-state-words');
+    var ON_TEXT = stateWords ? stateWords.getAttribute('data-on') : 'On';
+    var OFF_TEXT = stateWords ? stateWords.getAttribute('data-off') : 'Off (by you)';
+
+    var boxes = form.querySelectorAll('.settings-checkbox[data-provider]');
+
     form.addEventListener('submit', function () {
-        var boxes = form.querySelectorAll('input[name^="off_"]');
         var ids = [];
         for (var i = 0; i < boxes.length; i++) {
-            if (boxes[i].checked && !boxes[i].disabled) {
-                ids.push(boxes[i].name.slice(4));
+            if (!boxes[i].checked && !boxes[i].disabled) {
+                ids.push(boxes[i].getAttribute('data-provider'));
             }
         }
         field.value = ids.join('|');
@@ -40,6 +48,48 @@
             boxes[j].disabled = true;
         }
     });
+
+    /* the no-script link stays in the HTML so it works with scripts off; with
+       scripts on the checkbox does the same job in place */
+    var plainLinks = document.querySelectorAll('.settings-provider-toggle');
+    for (var k = 0; k < plainLinks.length; k++) plainLinks[k].hidden = true;
+
+    /* 2b. L1: a click can flip one provider immediately, through the same
+       endpoint the no-script link uses. The label and the row class follow, so
+       the box and the word can never disagree on screen.
+
+       The requests are serialised on purpose. /save_settings?toggle= reads the
+       current policy, flips one id and writes the whole set back, so two
+       requests in flight at once would each write a set computed from the same
+       starting point and one of the two flips would be lost. A queue of one
+       request at a time costs nothing when a person is clicking. */
+    var queue = Promise.resolve();
+    for (var b = 0; b < boxes.length; b++) {
+        (function (box) {
+            if (box.disabled) return;
+            box.addEventListener('change', function () {
+                var id = box.getAttribute('data-provider');
+                var wanted = box.checked;
+                queue = queue.then(function () {
+                    box.setAttribute('aria-busy', 'true');
+                    return fetch('/save_settings?toggle=' + encodeURIComponent(id),
+                                 { credentials: 'same-origin' })
+                        .then(function (r) {
+                            if (!r.ok) throw new Error('save failed');
+                            var row = box.closest('.settings-provider');
+                            var label = row ? row.querySelector('.settings-provider-state') : null;
+                            if (label) label.textContent = box.checked ? ON_TEXT : OFF_TEXT;
+                            if (row) {
+                                row.classList.remove('kind-on', 'kind-off');
+                                row.classList.add(box.checked ? 'kind-on' : 'kind-off');
+                            }
+                        })
+                        .catch(function () { box.checked = !wanted; })
+                        .then(function () { box.removeAttribute('aria-busy'); });
+                });
+            });
+        })(boxes[b]);
+    }
 })();
 
 /* 3. K3: the "Resumes" column counts down, from the server's own instant.

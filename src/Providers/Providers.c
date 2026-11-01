@@ -268,3 +268,31 @@ const char *provider_opt_in_disclosure(const char *id) {
          "copyrighted or licensed. Whether you may use it is governed by the "
          "law where you live and by the provider's own terms.";
 }
+
+/* L1: one build, reused. The table is fixed at startup, so building it twice
+   would only risk the two copies disagreeing. */
+static ProviderRow g_rows[512];
+static int g_row_count = -1;
+
+static void ensure_rows(void) {
+  if (g_row_count >= 0)
+    return;
+  g_row_count = providers_build(g_rows, 512);
+}
+
+const char *provider_id_at(int index) {
+  ensure_rows();
+  if (index < 0 || index >= g_row_count)
+    return NULL;
+  return g_rows[index].id;
+}
+
+const ProviderRow *provider_by_id(const char *id) {
+  ensure_rows();
+  if (!id)
+    return NULL;
+  for (int i = 0; i < g_row_count; i++)
+    if (strcasecmp(g_rows[i].id, id) == 0)
+      return &g_rows[i];
+  return NULL;
+}

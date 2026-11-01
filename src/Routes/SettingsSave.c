@@ -20,6 +20,7 @@ int settings_save_handler(UrlParams *params) {
   int engines_present = 0;
   int engines_seen = 0;
   const char *off_list = NULL; /* K1.3: the single field settings.js writes */
+  const char *toggle_id = NULL; /* L1: /save_settings?toggle=<id> */
   /* K1.5: the opt-in list, one entry per provider this browser switched on */
   char optin_ids[64][32];
   int optin_count = 0;
@@ -111,6 +112,10 @@ int settings_save_handler(UrlParams *params) {
             optin_count++;
           }
         }
+      } else if (strcmp(params->params[i].key, "toggle") == 0) {
+        /* L1: the no-script path. One click flips one provider, so the request
+           carries one parameter and nothing can be truncated. */
+        toggle_id = params->params[i].value;
       } else if (strcmp(params->params[i].key, "off") == 0) {
         off_list = params->params[i].value;
       } else if (strncmp(params->params[i].key, "off_", 4) == 0 &&
@@ -241,6 +246,102 @@ int settings_save_handler(UrlParams *params) {
   if (weights_present)
     set_cookie("engine_weights", weight_spec, "Fri, 31 Dec 2038 23:59:59 GMT",
                "/", false, false);
+
+  /* L1: one provider flipped. Read the current policy, invert that one id,
+     write it back. This is the path that works with no JavaScript, and it is
+     also what the script calls when it toggles in place. */
+  if (toggle_id && toggle_id[0]) {
+    if (!provider_id_known(toggle_id)) {
+      send_status("400 Bad Request");
+      send_response("<h1>Unknown provider</h1>");
+      return 0;
+    }
+    /* the current disabled set, read through the same rules the request path
+       uses, then inverted for this one id */
+    int was_off = provider_is_off(toggle_id);
+    char value[1024];
+    int written = snprintf(value, sizeof(value), "off=");
+    int count = 0;
+    int overflow = 0;
+
+    /* every known provider that is off, minus/plus the one being flipped */
+    int known = providers_capacity();
+    if (known > 512)
+      known = 512;
+    for (int i = 0; i < known && !overflow; i++) {
+      const char *id = provider_id_at(i);
+      if (!id || !id[0])
+        continue;
+      if (!provider_uses_network(id))
+        continue;
+      int off_now = provider_is_off(id);
+      if (strcmp(id, toggle_id) == 0)
+        off_now = !was_off;
+      if (!off_now)
+        continue;
+      size_t need = strlen(id) + 2;
+      if ((size_t)written + need > sizeof(value)) {
+        overflow = 1;
+        break;
+      }
+      if (count > 0)
+        value[written++] = '|';
+      written += (int)snprintf(value + written, sizeof(value) - (size_t)written,
+                               "%s", id);
+      count++;
+    }
+    if (overflow) {
+      fprintf(stderr,
+              "[WARN] toggle refused: the disabled set no longer fits the "
+              "cookie buffer\n");
+      send_status("500 Internal Server Error");
+      send_response("<h1>Not saved</h1>");
+      return 0;
+    }
+    /* the opt-in cookie is a different gate with the same meaning; an opt-in
+       row toggles that one instead */
+    const ProviderRow *row = provider_by_id(toggle_id);
+    if (row && row->opt_in) {
+      char optins[1024];
+      int olen = 0;
+      optins[0] = '\0';
+      int onow = opt_in_enabled_for(toggle_id);
+      int first = 1;
+      for (int i = 0; i < known; i++) {
+        const char *id = provider_id_at(i);
+        if (!id)
+          continue;
+        const ProviderRow *r2 = provider_by_id(id);
+        if (!r2 || !r2->opt_in)
+          continue;
+        int enabled = opt_in_enabled_for(id);
+        if (strcmp(id, toggle_id) == 0)
+          enabled = !onow;
+        if (!enabled)
+          continue;
+        int need = (int)strlen(id) + (first ? 0 : 1);
+        if (olen + need + 1 > (int)sizeof(optins))
+          break;
+        if (!first)
+          optins[olen++] = '|';
+        olen += snprintf(optins + olen, sizeof(optins) - (size_t)olen, "%s", id);
+        first = 0;
+      }
+      optins[olen] = '\0';
+      set_cookie("optin", optins, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false,
+                 false);
+      set_cookie("opt_in", "0", "Thu, 01 Jan 1970 00:00:00 GMT", "/", false,
+                 false);
+    } else {
+      set_cookie("engines", value, "Fri, 31 Dec 2038 23:59:59 GMT", "/", false,
+                 false);
+    }
+    if (getenv("OMNI_PERF"))
+      fprintf(stderr, "[L1] toggled %s to %s\n", toggle_id,
+              was_off ? "on" : "off");
+    send_redirect("/settings");
+    return 0;
+  }
 
   if (engines_present && engines_seen > 0 && params &&
       params->count >= 16 && engines_seen > params->count) {
