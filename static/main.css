@@ -2364,9 +2364,14 @@ input[type="color"]:focus-visible {
   color: var(--text-secondary);
 }
 
-/* the local-only row says why it has nothing to switch */
+/* The local-only row has nothing to switch. The box is hidden with `visibility`
+   and not `display`: the row is a flex line whose first item is the box, and
+   removing it from layout closed the gap the name used to have, so "Unit
+   conversion" sat flush against the left edge while every other row was
+   indented. Hidden, still occupying its place, keeps the column straight. */
 .kind-local .settings-checkbox {
-  display: none;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .settings-provider-disclosure {

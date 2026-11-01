@@ -31,13 +31,19 @@ static const ProviderRow EXTRA[] = {
        and never contacts reddit.com at all; with them the request goes to
        oauth.reddit.com. Saying "reddit.com" was true of neither. */
     {"reddit", "Reddit", "search engines, oauth.reddit.com", PG_WEB, 0, 1},
+    /* K7: this one contacts the result sites themselves, so its disclosure is
+       the sentence that matters most in the table. It is in PG_ANSWERS and so
+       it belongs up there with the others - see the ordering note below. */
+    {"descriptions", "Page descriptions", "result sites", PG_ANSWERS, 0, 1},
     /* K4: video providers are their own group, because a reader may want
        videos on and every other vertical off. */
     {"dailymotion", "Dailymotion", "api.dailymotion.com", PG_VIDEOS, 0, 1},
-    /* K7: this one contacts the result sites themselves, so its disclosure is
-       the sentence that matters most in the table. */
-    {"descriptions", "Page descriptions", "result sites", PG_ANSWERS, 0, 1},
 };
+
+/* THE TABLE ABOVE IS ORDERED BY GROUP. The page walks it once and prints a
+   heading each time the group changes, so a row filed out of order shows up
+   under a second heading of the same name - "Answers" appeared twice when
+   Page descriptions was last. providers_lint() below enforces it. */
 enum { EXTRA_COUNT = sizeof(EXTRA) / sizeof(EXTRA[0]) };
 
 int providers_capacity(void) { return ENGINE_COUNT + EXTRA_COUNT; }
@@ -141,10 +147,13 @@ int providers_build(ProviderRow *rows, int capacity) {
       rows[n].toggleable = 1;
       n++;
     }
-    if (g == PG_ANSWERS) {
-      for (int i = 0; i < EXTRA_COUNT && n < capacity; i++)
+    /* EXTRA holds rows for several groups, so take only the ones filed under
+       the group this pass is drawing. Appending all of it during PG_ANSWERS
+       put Reddit (PG_WEB) and Dailymotion (PG_VIDEOS) under the Answers
+       heading, which is how "Answers" came to appear twice. */
+    for (int i = 0; i < EXTRA_COUNT && n < capacity; i++)
+      if (EXTRA[i].group == g)
         rows[n++] = EXTRA[i];
-    }
   }
   /* the host field can be a whole URL template; the page shows the host only */
   return n;
