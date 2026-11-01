@@ -50,6 +50,7 @@ static const ConfigOption CONFIG_OPTIONS[] = {
     STRING_OPTION("engines", "google_cse_key", google_cse_key),
     STRING_OPTION("engines", "google_cse_cx", google_cse_cx),
     STRING_OPTION("engines", "google_cse_tok", google_cse_tok),
+    STRING_OPTION("engines", "impersonate", impersonate),
     STRING_OPTION("engines", "searxng_url", searxng_url),
     STRING_OPTION("engines", "searxng_engines", searxng_engines),
     BOOLEAN_OPTION("engines", "allow_files", allow_files),
@@ -94,6 +95,10 @@ void config_set_defaults(Config *config) {
       .rate_limit_images_requests = DEFAULT_RATE_LIMIT_IMAGES_REQUESTS,
       .rate_limit_images_interval = DEFAULT_RATE_LIMIT_IMAGES_INTERVAL,
       .infobox_mode = "all",
+      /* K6: empty means "resolve at startup": chrome when the binary has
+         libcurl-impersonate, none otherwise. A default of "chrome" on a
+         stock-libcurl build would be a claim the binary cannot keep. */
+      .impersonate = "",
   };
 }
 

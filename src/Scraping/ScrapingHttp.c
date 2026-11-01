@@ -1,5 +1,6 @@
 #include "../Proxy/Proxy.h"
 #include "Config.h"
+#include "Impersonate.h"
 #include "Scraping.h"
 #include <curl/curl.h>
 #include <stdio.h>
@@ -107,17 +108,33 @@ const char *get_engine_user_agent(const char *engine_id) {
 void configure_curl_handle(CURL *curl, const char *full_url,
                            MemoryBuffer *chunk, struct curl_slist *headers,
                            long timeout_secs, const char *engine_id,
-                           const char *ua_profile, int browser_headers) {
+                           const char *ua_profile, int browser_headers,
+                           const char *impersonate_override) {
   curl_easy_setopt(curl, CURLOPT_URL, full_url);
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)chunk);
-  curl_easy_setopt(curl, CURLOPT_USERAGENT,
-                   get_engine_user_agent_profile(ua_profile, engine_id));
-
-  /* HTTP/1.1 on purpose: Yahoo (and some other front ends) abort the transfer
-     with "Error in the HTTP2 framing layer", which reads as an engine failure */
-  curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+  const char *impersonate_target =
+      impersonate_target_for_engine(impersonate_override);
+#ifdef HAVE_CURL_IMPERSONATE
+  if (impersonate_target) {
+    /* K6: the library sets the UA, Accept, Accept-Language, sec-ch-ua*,
+       Sec-Fetch-* and the header ORDER, and negotiates HTTP/2. Layering our
+       own headers on top would break the point of it, so nothing else is set
+       here - not even the UA - and HTTP/1.1 is not forced. */
+    curl_easy_impersonate(curl, impersonate_target, 1);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
+    headers = NULL;
+  } else
+#endif
+  {
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,
+                     get_engine_user_agent_profile(ua_profile, engine_id));
+    /* HTTP/1.1 on purpose: Yahoo (and some other front ends) abort the
+       transfer with "Error in the HTTP2 framing layer", which reads as an
+       engine failure */
+    curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+  }
   curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
   curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, CURL_DNS_TIMEOUT_SECS);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);

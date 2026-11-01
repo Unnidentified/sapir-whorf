@@ -274,7 +274,8 @@ static int retry_job_with_next_ua(ScrapeJob *job) {
                             job->engine->browser_headers);
   configure_curl_handle(curl, job->full_url, &chunk, headers,
                         job->engine->timeout_secs, job->engine->id, next,
-                        job->engine->browser_headers);
+                        job->engine->browser_headers,
+                        job->engine->impersonate);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
 
@@ -747,7 +748,8 @@ int setup_job(ScrapeJob *job, CURLM *multi_handle) {
                         job->engine ? job->engine->timeout_secs : 0,
                         job->engine ? job->engine->id : NULL,
                         job->ua_profile[0] ? job->ua_profile : NULL,
-                        job->engine ? job->engine->browser_headers : 0);
+                        job->engine ? job->engine->browser_headers : 0,
+                        job->engine ? job->engine->impersonate : NULL);
 
   /* per-engine cookie jar: some engines only answer after a challenge cookie */
   {

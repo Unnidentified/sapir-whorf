@@ -14,6 +14,7 @@
 #include "Infobox/Wikipedia.h"
 #include "Providers/Providers.h"
 #include "Proxy/Proxy.h"
+#include "Scraping/Impersonate.h"
 #include "Routes/History.h"
 #include "Routes/Home.h"
 #include "Routes/ImageProxy.h"
@@ -365,6 +366,27 @@ int main(int argc, char **argv) {
   set_handler("/save_settings", settings_save_handler);
   set_handler("/settings/engine-status.json", engine_status_handler);
 
+  /* K6: say which library the binary has and which target an engine will use.
+     The owner asked whether impersonation is active; a build that cannot
+     impersonate must say so instead of looking like it does. */
+  {
+    const char *target = impersonate_target_for_engine(NULL);
+    fprintf(stderr, "[INFO] impersonation: %s%s%s\n", impersonate_banner(),
+            target ? " · engines use " : "",
+            target ? target : "");
+    if (cfg.impersonate[0] && strcasecmp(cfg.impersonate, "none") != 0 &&
+        !target) {
+      fprintf(stderr,
+              "[WARN] [engines] impersonate = %s ignored: this build links "
+              "stock libcurl. Build with CURL_IMPERSONATE=1 to enable it.\n",
+              cfg.impersonate);
+    }
+    if (cfg.impersonate[0] && !impersonate_target_for(cfg.impersonate))
+      fprintf(stderr,
+              "[WARN] [engines] impersonate = %s is not one of none, chrome, "
+              "firefox, safari\n",
+              cfg.impersonate);
+  }
   fprintf(stderr, "[INFO] Starting Omnisearch on %s:%d\n", cfg.host, cfg.port);
 
   int result = beaker_run(cfg.host, cfg.port);

@@ -3,6 +3,7 @@
 #include "../Scraping/Scraping.h"
 #include "../Scraping/EngineHealth.h"
 #include "../Providers/Providers.h"
+#include "../Scraping/Impersonate.h"
 #include "../Utility/Utility.h"
 #include <beaker.h>
 #include <stdlib.h>
@@ -406,7 +407,7 @@ int settings_handler(UrlParams *params) {
       else
         snprintf(quality, 24, "-");
 
-      char **row = malloc(sizeof(char *) * 8);
+      char **row = malloc(sizeof(char *) * 9);
       row[0] = strdup(ENGINE_REGISTRY[i].name);
       row[1] = strdup(engine_health_state_name(h ? h->state : HEALTH_CLOSED));
       row[2] = why;
@@ -415,8 +416,16 @@ int settings_handler(UrlParams *params) {
       row[5] = quality;
       row[6] = strdup(resume_at);
       row[7] = strdup(reason == SUSPEND_NONE ? "" : "1");
+      /* K6: which TLS fingerprint this engine is using. "stock" is the honest
+         answer on a build without libcurl-impersonate, and it is different
+         from "chrome136" in a way the owner can read. */
+      {
+        const char *target =
+            impersonate_target_for_engine(ENGINE_REGISTRY[i].impersonate);
+        row[8] = strdup(target ? target : "stock");
+      }
       status_rows[status_count] = row;
-      status_inner[status_count] = 8;
+      status_inner[status_count] = 9;
       status_count++;
     }
     if (status_count > 0) {

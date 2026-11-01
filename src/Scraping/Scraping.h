@@ -80,6 +80,9 @@ typedef struct {
   /* send the Sec-Fetch-* navigation headers a browser sends. Measured need:
      DDG's html. endpoint answers a shell without them and results with them. */
   int browser_headers;
+  /* K6: per-engine impersonation target (NULL = the [engines] default). Only
+     used when the binary links libcurl-impersonate. */
+  const char *impersonate;
   /* per-engine outbound rate limit, 0 = the global [health] setting */
   int pace_per_minute;
   /* cookies to seed the jar with on first use (locale selectors and the like) */
@@ -189,7 +192,8 @@ const char *get_random_user_agent(void);
 void configure_curl_handle(CURL *curl, const char *full_url,
                            MemoryBuffer *chunk, struct curl_slist *headers,
                            long timeout_secs, const char *engine_id,
-                           const char *ua_profile, int browser_headers);
+                           const char *ua_profile, int browser_headers,
+                           const char *impersonate_override);
 const char *get_engine_user_agent(const char *engine_id);
 const char *get_engine_user_agent_profile(const char *profile,
                                           const char *engine_id);

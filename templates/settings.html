@@ -249,7 +249,7 @@
                                  wrong still counts down to the right instant. -->
                             <table class="settings-table" id="engine-status" data-now="{{now_epoch}}">
                                 <thead>
-                                    <tr><th>{{l("status_engine")}}</th><th>{{l("status_state")}}</th><th>{{l("status_why")}}</th><th>{{l("status_resumes")}}</th><th>{{l("status_answered")}}</th><th>{{l("status_useful")}}</th></tr>
+                                    <tr><th>{{l("status_engine")}}</th><th>{{l("status_state")}}</th><th>{{l("status_why")}}</th><th>{{l("status_resumes")}}</th><th>{{l("status_answered")}}</th><th>{{l("status_useful")}}</th><th>{{l("status_via")}}</th></tr>
                                 </thead>
                                 <tbody>
                                     {{for row in engine_status}}
@@ -260,6 +260,7 @@
                                         <td class="resume" {{if row[6] != ""}}data-resume-at="{{row[6]}}"{{endif}}>{{row[3]}}</td>
                                         <td>{{row[4]}}</td>
                                         <td>{{row[5]}}</td>
+                                        <td>{{row[8]}}</td>
                                     </tr>
                                     {{endfor}}
                                 </tbody>

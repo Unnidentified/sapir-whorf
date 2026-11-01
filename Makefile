@@ -14,16 +14,31 @@ VERSION := $(if $(GIT_TAG),$(GIT_TAG),$(GIT_DATE)+$(GIT_HASH)_$(GIT_BRANCH))
 
 CFLAGS  := -Wall -Wextra -O2 -Isrc -DVERSION='"$(VERSION)"' -DGIT_REMOTE='"$(GIT_REMOTE)"'
 
+# K6: libcurl-impersonate is a drop-in libcurl with BoringSSL. It is not in
+# Homebrew and the macOS release ships only executables, so the build has to be
+# pointed at one explicitly:
+#
+#   make CURL_IMPERSONATE=1 CURL_IMPERSONATE_PREFIX=/usr/local/curl-impersonate
+#
+# Without it the binary reports "impersonation: off (stock libcurl)" and
+# tests/test_k6_impersonation.sh proves the difference with a local listener.
+CURL_IMPERSONATE ?= 0
+CURL_IMPERSONATE_PREFIX ?= /usr/local
+ifeq ($(CURL_IMPERSONATE),1)
+  CFLAGS += -DHAVE_CURL_IMPERSONATE -I$(CURL_IMPERSONATE_PREFIX)/include
+  LIBS   += -L$(CURL_IMPERSONATE_PREFIX)/lib -lcurl-impersonate
+endif
+
 ifeq ($(UNAME_S),Darwin)
 BREW_PREFIX := $(shell brew --prefix 2>/dev/null || echo /opt/homebrew)
 export PKG_CONFIG_PATH := $(BREW_PREFIX)/opt/openssl@3/lib/pkgconfig:$(BREW_PREFIX)/opt/curl/lib/pkgconfig:$(PKG_CONFIG_PATH)
 DEP_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(PKG_DEPS) 2>/dev/null)
 DEP_LIBS   := $(shell $(PKG_CONFIG) --libs $(PKG_DEPS) 2>/dev/null)
 CFLAGS  += -I$(BREW_PREFIX)/include $(DEP_CFLAGS)
-LIBS    := -L$(BREW_PREFIX)/lib -lbeaker $(DEP_LIBS) -lpthread -lm
+LIBS    += -L$(BREW_PREFIX)/lib -lbeaker $(DEP_LIBS) -lpthread -lm
 else
 CFLAGS  += -I/usr/include/libxml2
-LIBS    := -lbeaker -lcurl -lxml2 -ljansson -lpthread -lm -lssl -lcrypto
+LIBS    += -lbeaker -lcurl -lxml2 -ljansson -lpthread -lm -lssl -lcrypto
 endif
 
 LDFLAGS :=
@@ -361,7 +376,8 @@ answer-check: tests/test_g4_answerbox
 
 # H1: the UA ladder and the profile that survives a restart
 tests/test_h1_ua: tests/test_h1_ua.c src/Scraping/EngineHealth.c \
-                  src/Scraping/ScrapingHttp.c $(LINT_SRCS)
+                  src/Scraping/ScrapingHttp.c src/Scraping/Impersonate.c \
+                  $(LINT_SRCS)
 	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto -lm
 
 ua-check: tests/test_h1_ua
@@ -478,6 +494,11 @@ optin-check:
 k12-check:
 	@./tests/test_k12_zero_body.sh
 
+# K6: the binary says which libcurl it has; a local listener proves the
+# ClientHello difference against a real browser, with no third party
+k6-check:
+	@./tests/test_k6_impersonation.sh
+
 # K3: "Resumes" is an instant the dispatcher honours, not a rendered duration
 k3-check:
 	@./tests/test_k3_resume.sh
@@ -543,6 +564,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check toggle-check k3-check k12-check terms-check hrefs-check defs-check categories-check context-check translate-check places-check weights-check k7-check ua-check answers-check junk-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check toggle-check k6-check k3-check k12-check terms-check hrefs-check defs-check categories-check context-check translate-check places-check weights-check k7-check ua-check answers-check junk-check smoke
 
 .PHONY: k12-check k3-check toggle-check terms-check hrefs-check answersfanout-check widget-check searxng-check optin-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

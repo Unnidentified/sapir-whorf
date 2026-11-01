@@ -1,4 +1,6 @@
 #include "Info.h"
+
+#include "../Scraping/Impersonate.h"
 #include "../Config.h"
 #include "../Scraping/EngineHealth.h"
 #include "../Scraping/Scraping.h"
@@ -52,6 +54,10 @@ int info_handler(UrlParams *params) {
                   local ? GIT_REMOTE : "") != 0 ||
       append_json(json, sizeof(json), &used, "\"locale\":\"%s\",",
                   global_config.default_locale) != 0 ||
+      /* K6: the same sentence the startup line prints, so the owner can see
+         whether impersonation is active without reading the log */
+      append_json(json, sizeof(json), &used, "\"impersonation\":\"%s\",",
+                  impersonate_banner()) != 0 ||
       append_json(json, sizeof(json), &used, "\"engines\":[") != 0) {
     send_response("Failed to build instance info");
     return -1;
@@ -73,7 +79,7 @@ int info_handler(UrlParams *params) {
                     "\"never_succeeded\":%s,\"cancelled\":%lu,"
                     "\"suspend_reason\":\"%s\",\"paused_seconds_left\":%d,"
                     "\"last_ok\":%ld,\"last_error\":%ld,\"ua_profile\":\"%s\","
-                    "\"junk\":%lu}",
+                    "\"impersonate\":\"%s\",\"junk\":%lu}",
                     first ? "" : ",", ENGINE_REGISTRY[i].id,
                     ENGINE_REGISTRY[i].name,
                     health ? engine_health_state_name(health->state) : "unknown",
@@ -94,6 +100,10 @@ int info_handler(UrlParams *params) {
                     health ? (long)health->last_ok : 0L,
                     health ? (long)health->last_error : 0L,
                     health && health->ua_profile[0] ? health->ua_profile : "-",
+                    impersonate_target_for_engine(ENGINE_REGISTRY[i].impersonate)
+                        ? impersonate_target_for_engine(
+                              ENGINE_REGISTRY[i].impersonate)
+                        : "stock",
                     health ? health->total_junk : 0UL) != 0) {
       send_response("Failed to build instance info");
       return -1;

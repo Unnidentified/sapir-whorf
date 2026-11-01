@@ -81,6 +81,9 @@ typedef struct {
      Supplying one is an explicit opt-in, and the engine stays off without it. */
   char google_cse_tok[512];
   char searxng_url[256];
+  /* K6: none | chrome | firefox | safari. Only meaningful when the binary is
+     linked against libcurl-impersonate; the startup line says which. */
+  char impersonate[16];
   /* J5.1: where a definition file becomes an engine. Relative to the working
      directory, which is what a source install expects; empty means
      "static/engines.d". */
