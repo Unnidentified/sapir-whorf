@@ -468,6 +468,14 @@ int is_engine_id_enabled(const char *engine_id) {
   return 0;
 }
 
+/* K1.1: the cookie stores the DISABLED set ("off=bing|brave"); older cookies
+   store the enabled set as a bare comma-separated list. Both are accepted, so
+   a browser that saved before this change keeps its choice, and the legacy
+   engine ids that were renamed in the F round are mapped on both paths.
+
+   Returns 0 when a preference exists (even if it disables everything) and -1
+   when there is none, which is what the callers use to mean "use the server's
+   set". */
 int get_user_engines(char ***out_ids, int *out_count) {
   *out_ids = NULL;
   *out_count = 0;
@@ -478,29 +486,35 @@ int get_user_engines(char ***out_ids, int *out_count) {
     return -1;
   }
 
+  int is_disabled_set = strncmp(cookie, "off=", 4) == 0;
+  const char *body = is_disabled_set ? cookie + 4 : cookie;
+
   char **ids = NULL;
   int count = 0;
 
-  char *copy = strdup(cookie);
+  char *copy = strdup(body);
   if (!copy) {
     free(cookie);
     return -1;
   }
 
-  char *saveptr;
-  char *token = strtok_r(copy, ",", &saveptr);
+  /* '|' is the current separator; ',' is what older cookies were written with
+     (and what the reader used to split on) */
+  char *saveptr = NULL;
+  char *token = strtok_r(copy, "|,", &saveptr);
   while (token) {
     while (*token == ' ' || *token == '\t')
       token++;
 
-    /* saved preferences from before the engine swap keep working */
+    /* saved preferences from before the engine swap keep working. In the
+       disabled set the old name means the engine it became. */
     if (strcmp(token, "startpage") == 0)
       token = "bing";
     else if (strcmp(token, "mojeek") == 0)
       token = "brave";
 
     if (token[0] != '\0' && is_engine_id_enabled(token)) {
-      char **new_ids = realloc(ids, sizeof(char *) * (count + 1));
+      char **new_ids = realloc(ids, sizeof(char *) * (size_t)(count + 1));
       if (new_ids) {
         ids = new_ids;
         ids[count] = strdup(token);
@@ -508,19 +522,50 @@ int get_user_engines(char ***out_ids, int *out_count) {
       }
     }
 
-    token = strtok_r(NULL, ",", &saveptr);
+    token = strtok_r(NULL, "|,", &saveptr);
   }
 
   free(copy);
   free(cookie);
 
-  if (count == 0) {
-    free(ids);
-    return -1;
+  if (!is_disabled_set) {
+    /* legacy: the list IS the enabled set */
+    if (count == 0) {
+      free(ids);
+      return -1;
+    }
+    *out_ids = ids;
+    *out_count = count;
+    return 0;
   }
 
-  *out_ids = ids;
-  *out_count = count;
+  /* current: everything the server enables, minus what the owner turned off */
+  int enabled = 0;
+  char **list = NULL;
+  for (int i = 0; i < ENGINE_COUNT; i++) {
+    if (!ENGINE_REGISTRY[i].enabled)
+      continue;
+    int off = 0;
+    for (int j = 0; j < count; j++) {
+      if (strcmp(ids[j], ENGINE_REGISTRY[i].id) == 0) {
+        off = 1;
+        break;
+      }
+    }
+    if (off)
+      continue;
+    char **grown = realloc(list, sizeof(char *) * (size_t)(enabled + 1));
+    if (!grown)
+      break;
+    list = grown;
+    list[enabled++] = strdup(ENGINE_REGISTRY[i].id);
+  }
+
+  for (int i = 0; i < count; i++)
+    free(ids[i]);
+  free(ids);
+  *out_ids = list;
+  *out_count = enabled;
   return 0;
 }
 

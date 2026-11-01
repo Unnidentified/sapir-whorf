@@ -169,18 +169,56 @@ int settings_save_handler(UrlParams *params) {
                "/", false, false);
 
   if (engines_present) {
-    char cookie_value[512];
-    cookie_value[0] = '\0';
-    for (int i = 0; i < selected_count; i++) {
-      size_t used = strlen(cookie_value);
-      if (i > 0 && used + 1 < sizeof(cookie_value))
-        cookie_value[used++] = ',', cookie_value[used] = '\0';
-      if (used + strlen(selected_ids[i]) < sizeof(cookie_value))
-        memcpy(cookie_value + used, selected_ids[i],
-               strlen(selected_ids[i]) + 1);
+    /* K1.1: two changes, both of them consequences of the same report.
+
+       1. The cookie is joined with '|'. Beaker silently drops a cookie whose
+          value contains a comma - measured while building the weights editor -
+          so "two engines selected" saved nothing at all while one worked. The
+          read path still accepts commas, because cookies already in browsers
+          use them.
+       2. It stores the DISABLED set, not the enabled one. A provider added in
+          a later release then defaults to on without the cookie having to know
+          it exists, and the value stays short as the registry grows. */
+    char cookie_value[1024];
+    int written = snprintf(cookie_value, sizeof(cookie_value), "off=");
+    int overflow = 0;
+    int disabled = 0;
+    for (int i = 0; i < ENGINE_COUNT && !overflow; i++) {
+      if (!ENGINE_REGISTRY[i].enabled)
+        continue; /* the server already decides this one; not ours to store */
+      int selected = 0;
+      for (int j = 0; j < selected_count; j++)
+        if (strcmp(selected_ids[j], ENGINE_REGISTRY[i].id) == 0) {
+          selected = 1;
+          break;
+        }
+      if (selected)
+        continue;
+      size_t need = strlen(ENGINE_REGISTRY[i].id) + 2; /* separator + NUL */
+      if ((size_t)written + need > sizeof(cookie_value)) {
+        overflow = 1;
+        break;
+      }
+      if (disabled > 0)
+        cookie_value[written++] = '|';
+      written += (int)snprintf(cookie_value + written,
+                               sizeof(cookie_value) - (size_t)written, "%s",
+                               ENGINE_REGISTRY[i].id);
+      disabled++;
+      if (written < 0)
+        overflow = 1;
     }
-    set_cookie("engines", cookie_value, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
-               false, false);
+    if (overflow) {
+      /* fail loudly: a truncated list would silently re-enable providers the
+         owner turned off, which is the same class of bug as the comma */
+      fprintf(stderr,
+              "[WARN] engines cookie would overflow (%d providers); not saved. "
+              "Raise the buffer before adding more providers.\n",
+              disabled);
+    } else {
+      set_cookie("engines", cookie_value, "Fri, 31 Dec 2038 23:59:59 GMT", "/",
+                 false, false);
+    }
   }
 
   if (default_engine_present) {
