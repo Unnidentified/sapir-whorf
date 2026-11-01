@@ -440,6 +440,17 @@ categories-check:
 weights-check:
 	@./tests/test_j5_weights.sh
 
+# K7 step 1: the placeholder table, and the merge rule that let it win
+tests/test_k7_placeholders: tests/test_k7_placeholders.c src/Query/Placeholders.c
+	@$(CC) -Isrc -o $@ $^
+
+tests/test_k7_merge: tests/test_k7_merge.c src/Query/Placeholders.c
+	@$(CC) -Isrc -o $@ $^
+
+k7-check: tests/test_k7_placeholders tests/test_k7_merge
+	@./tests/test_k7_placeholders
+	@./tests/test_k7_merge
+
 # J4.0: /w/<kind> serves one card, and the keypad protocol works through it
 widgets-check:
 	@./tests/test_widget_endpoints.sh
@@ -513,6 +524,6 @@ dist:
 	@tar tzf /tmp/omnisearch-$(VERSION).tar.gz | grep -cE "^\./|obj/|bin/omnisearch$|\.DS_Store" \
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 
-check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check terms-check hrefs-check ua-check answers-check junk-check smoke
+check: check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check terms-check hrefs-check defs-check categories-check context-check translate-check places-check weights-check k7-check ua-check answers-check junk-check smoke
 
 .PHONY: terms-check hrefs-check answersfanout-check widget-check searxng-check optin-check all run clean rebuild info verify asan dist check check-themes registry-lint fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall

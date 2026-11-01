@@ -10,6 +10,7 @@
 #include "../Limiter/RateLimit.h"
 #include "../Scraping/EngineHealth.h"
 #include "../Infobox/AnswerBox.h"
+#include "../Query/Placeholders.h"
 #include "../Query/QueryAnalysis.h"
 #include "../Query/Tokens.h"
 #include "../Ranking/Ranker.h"
@@ -295,6 +296,14 @@ static void clean_snippet(const char *in, char *out, size_t size) {
   out[0] = '\0';
   if (!in || size == 0)
     return;
+
+  /* K7: a placeholder is not a description. Emptied here so the merge below
+     can treat it as "no snippet" rather than as the longest one. */
+  if (snippet_is_placeholder(in)) {
+    if (size > 0)
+      out[0] = '\0';
+    return;
+  }
 
   const char *p = skip_date_prefix(in);
   size_t o = 0;
@@ -1954,9 +1963,22 @@ int results_handler(UrlParams *params) {
                     : (jobs[i].engine ? jobs[i].engine->index_group : NULL);
             cands[existing].engine_weights[i] = engine_weight;
           }
-          if (strlen(cleaned) > strlen(cands[existing].snippet)) {
-            free(cands[existing].snippet);
-            cands[existing].snippet = strdup(cleaned);
+          /* K7: a real snippet always beats an empty one, and only then does
+             the longer win. The old rule was "longer wins", so any boilerplate
+             beat a short real description. */
+          {
+            const char *have = cands[existing].snippet ? cands[existing].snippet : "";
+            int take = 0;
+            if (cleaned[0] && !have[0])
+              take = 1;
+            else if (cleaned[0] && have[0] && strlen(cleaned) > strlen(have))
+              take = 1;
+            else if (!cleaned[0] && !have[0])
+              take = 0;
+            if (take) {
+              free(cands[existing].snippet);
+              cands[existing].snippet = strdup(cleaned);
+            }
           }
           free(raw_url);
           free(raw_title);

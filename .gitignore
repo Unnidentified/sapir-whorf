@@ -28,3 +28,5 @@ tests/test_j4_places_stocks
 # J1/J2: measured artefacts, reproducible with make layout-check / theme-shots
 docs/layout/*.png
 docs/themes/*.png
+tests/test_k7_placeholders
+tests/test_k7_merge
