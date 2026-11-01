@@ -149,7 +149,14 @@ static void classify_job_response(ScrapeJob *job, const char *response,
   maybe_dump_response(job, response);
 
   if (!response || response_size == 0) {
-    job->status = SCRAPE_STATUS_FETCH_ERROR;
+    /* K12.6: a 200 with nothing in it is the upstream declining to serve the
+       query, not "no results" and not a transport failure. Classified as a
+       block, it reaches the breaker and the status page; classified as a
+       transport error it needed twice the failure threshold and usually never
+       suspended anything. */
+    job->status = (job->http_status > 0 && job->http_status < 400)
+                      ? SCRAPE_STATUS_BLOCKED
+                      : SCRAPE_STATUS_FETCH_ERROR;
     return;
   }
 
@@ -162,6 +169,11 @@ static void classify_job_response(ScrapeJob *job, const char *response,
     }
     if (job->http_status >= 400) {
       job->status = SCRAPE_STATUS_FETCH_ERROR;
+      return;
+    }
+    /* K12.6: an empty 200 is a block signal, not a clean zero-result search */
+    if (response_is_empty_body(response, response_size)) {
+      job->status = SCRAPE_STATUS_BLOCKED;
       return;
     }
     if (response_is_blocked_for_engine(response, job->results_count)) {
@@ -203,6 +215,12 @@ static void classify_job_response(ScrapeJob *job, const char *response,
 
   if (job->http_status >= 400) {
     job->status = SCRAPE_STATUS_FETCH_ERROR;
+    return;
+  }
+
+  /* K12.6: same rule for the scraped engines */
+  if (response_is_empty_body(response, response_size)) {
+    job->status = SCRAPE_STATUS_BLOCKED;
     return;
   }
 
@@ -376,7 +394,12 @@ static int load_stale_results(ScrapeJob *job) {
 void parse_and_cache_response(ScrapeJob *job) {
   if (job->response.size == 0) {
     job->results_count = 0;
-    job->status = SCRAPE_STATUS_FETCH_ERROR;
+    /* K12.6: a 200 with an empty body is a block signal, not a transport
+       failure. This is the guard the SearXNG bridge hits, because its body is
+       empty and curl reports the transfer as successful. */
+    job->status = (job->http_status > 0 && job->http_status < 400)
+                      ? SCRAPE_STATUS_BLOCKED
+                      : SCRAPE_STATUS_FETCH_ERROR;
     return;
   }
 
@@ -447,6 +470,15 @@ void process_response(ScrapeJob *job, CURL *handle, CURLMsg *msg) {
     case CURLE_OPERATION_TIMEDOUT:
     case CURLE_SSL_CONNECT_ERROR:
     case CURLE_GOT_NOTHING:
+      /* K12.6: curl reports an empty reply as CURLE_GOT_NOTHING. Behind a 200
+         that is the upstream declining to serve the query (Yahoo's answer to
+         site:reddit.com), not our network failing - so it is a block, which
+         feeds the breaker, rather than a transport error, which does not. */
+      if (job->http_status == 200) {
+        job->status = SCRAPE_STATUS_BLOCKED;
+        job->failure_kind = FETCH_FAIL_REFUSED;
+        break;
+      }
     case CURLE_SEND_ERROR:
     case CURLE_RECV_ERROR:
     case CURLE_PARTIAL_FILE:

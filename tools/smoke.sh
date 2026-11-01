@@ -44,7 +44,9 @@ done
 expect_status "/search?q=linux"
 expect_body   "/search?q=linux" 'class="result"\|no-results' "results page renders hits or empty state"
 expect_body   "/search?q=linux" 'nav-tabs'          "shared chrome rendered"
-expect_body   "/search?q=linux" 'nav-settings-icon' "settings icon present"
+# K12.1: one Settings link, in the tab bar. The header gear was the second
+# link to the same page and is gone, so the smoke test asserts the tab.
+expect_body   "/search?q=linux" 'nav-settings-link' "settings tab present"
 expect_status "/search?q=linux&p=2"
 expect_status "/images?q=cat"
 expect_body   "/images?q=cat" 'image-grid' "images grid renders"

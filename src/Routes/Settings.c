@@ -389,10 +389,15 @@ int settings_handler(UrlParams *params) {
       if (reason == SUSPEND_NONE)
         snprintf(resumes, 48, "-");
       else if (left > 0) {
-        snprintf(resumes, 48, "in %dm %02ds", left / 60, left % 60);
+        /* K12.2: the words come from the locale; the numbers are numbers */
+        const char *in_word = beaker_get_locale_value(locale, "status_in");
+        snprintf(resumes, 48, "%s %dm %02ds", in_word ? in_word : "in",
+                 left / 60, left % 60);
         snprintf(resume_at, sizeof(resume_at), "%lld", (long long)open_until);
-      } else
-        snprintf(resumes, 48, "ready to retry");
+      } else {
+        const char *ready = beaker_get_locale_value(locale, "status_ready");
+        snprintf(resumes, 48, "%s", ready ? ready : "ready to retry");
+      }
       snprintf(stats, 96, "%lu ok / %lu blocked / %lu errors",
                h ? h->total_ok : 0UL, h ? h->total_blocked : 0UL,
                h ? h->total_errors : 0UL);

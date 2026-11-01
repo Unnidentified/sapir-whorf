@@ -42,11 +42,6 @@
                 value="{{query}}">
             </form>
             {{endif}}
-            {{if query != ""}}
-            <a href="/search?q={{query}}" class="nav-settings-icon active" title="{{l("settings_tab")}}"></a>
-            {{else}}
-            <a href="/" class="nav-settings-icon active" title="{{l("settings_tab")}}"></a>
-            {{endif}}
         </header>
         {{if query != ""}}
         <nav class="nav-tabs">
@@ -254,7 +249,7 @@
                                  wrong still counts down to the right instant. -->
                             <table class="settings-table" id="engine-status" data-now="{{now_epoch}}">
                                 <thead>
-                                    <tr><th>Engine</th><th>State</th><th>Why</th><th>Resumes</th><th>Answered</th><th>Useful</th></tr>
+                                    <tr><th>{{l("status_engine")}}</th><th>{{l("status_state")}}</th><th>{{l("status_why")}}</th><th>{{l("status_resumes")}}</th><th>{{l("status_answered")}}</th><th>{{l("status_useful")}}</th></tr>
                                 </thead>
                                 <tbody>
                                     {{for row in engine_status}}

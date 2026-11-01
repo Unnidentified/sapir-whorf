@@ -73,6 +73,17 @@ int response_is_blocked_page(const char *response) {
 /* The stronger form used by the scraper: a page is only "blocked" if it also
    produced no results. A real SERP can contain the word "captcha" in a snippet
    or a challenge markup fragment in an ad slot. */
+int response_is_empty_body(const char *body, size_t len) {
+  if (!body || len == 0)
+    return 1;
+  for (size_t i = 0; i < len; i++) {
+    unsigned char c = (unsigned char)body[i];
+    if (c != ' ' && c != '\t' && c != '\r' && c != '\n')
+      return 0;
+  }
+  return 1;
+}
+
 int response_is_blocked_for_engine(const char *response, int parsed_results) {
   if (parsed_results > 0)
     return 0;

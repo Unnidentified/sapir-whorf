@@ -56,6 +56,12 @@ class Handler(BaseHTTPRequestHandler):
             body = json.dumps({"results": results}).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+        elif m == "zero":
+            # K12.6: HTTP 200 with nothing in it, the shape Yahoo returns when
+            # it decides not to serve a query
+            body = b""
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
         elif m == "empty":
             body = json.dumps({"results": []}).encode()
             self.send_response(200)
