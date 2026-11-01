@@ -33,6 +33,8 @@ static const SecretSpec SPECS[SK_COUNT] = {
      "OMNI_REDDIT_REDIRECT_URI"},
     {SK_REDDIT_REFRESH_TOKEN, "reddit_refresh_token", "reddit", 1,
      "OMNI_REDDIT_REFRESH_TOKEN"},
+    {SK_REDDIT_USER_AGENT, "reddit_user_agent", "reddit", 0,
+     "OMNI_REDDIT_USER_AGENT"},
     {SK_SEARXNG_URL, "searxng_url", "bridges", 0, "OMNI_SEARXNG_URL"},
     {SK_SEARXNG_ENGINES, "searxng_engines", "bridges", 0, "OMNI_SEARXNG_ENGINES"},
     {SK_YACY_INSTANCE, "yacy_instance", "bridges", 0, "OMNI_YACY_INSTANCE"},
@@ -220,11 +222,18 @@ SecretSource secrets_get(SecretKey key, const char **value) {
   pthread_mutex_unlock(&g_lock);
   if (present && copy[0]) {
     if (value) {
-      /* a per-key static so the caller can hold the pointer without copying;
-         the file is read once, and a save reloads it */
-      static __thread char thread_copy[1024];
-      snprintf(thread_copy, sizeof(thread_copy), "%s", copy);
-      *value = thread_copy;
+      /* ONE buffer PER KEY, not one per thread.
+       *
+       * A single thread_copy meant two secrets read in the same expression
+       * aliased each other: reddit_authorize_url() read the client id and the
+       * redirect URI, and both came back as the redirect URI - so the
+       * authorisation URL carried client_id=redreader://rr_oauth_redir. Every
+       * caller that holds two secrets at once had the same fault, which is 17
+       * of them in Reddit.c alone. The file is read once and a save reloads
+       * it, so per-key static storage is enough and needs no allocation. */
+      static __thread char thread_copy[SK_COUNT][1024];
+      snprintf(thread_copy[key], sizeof(thread_copy[key]), "%s", copy);
+      *value = thread_copy[key];
     }
     return SECRET_SOURCE_FILE;
   }

@@ -283,7 +283,10 @@ int settings_handler(UrlParams *params) {
   context_set(&ctx, "page_scale_css", get_page_scale_css());
   CustomTheme custom_theme;
   get_custom_theme(&custom_theme);
+  /* the page has nine colour pickers, so it needs the colours individually -
+     set as one array key, because nine separate keys did not fit the budget */
   context_set_custom_theme_compact(&ctx, &custom_theme);
+  context_set_custom_colours(&ctx, &custom_theme);
   context_set(&ctx, "locale", locale);
   {
     extern Config global_config;

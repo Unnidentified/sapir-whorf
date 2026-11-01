@@ -55,6 +55,23 @@ void reddit_free_posts(RedditPost *posts, int count);
 int reddit_test_credentials(const char *client_id, const char *client_secret,
                             char *out, size_t cap);
 
+/* The URL the owner opens in a browser to authorise the app. Built from the
+   saved client id and redirect URI; read-only scope, because nothing here
+   writes to Reddit. Returns 0 and fills out, or -1 with a reason when either
+   is missing. */
+int reddit_authorize_url(char *out, size_t cap, char *why, size_t why_cap);
+
+/* L5 rung B: trade the code Reddit appends to the redirect URI for a token, and
+   keep the refresh token so later searches need no browser. This is the step
+   the redirect URI is for; without it the field would be decoration. */
+int reddit_exchange_code(const char *code, char *why, size_t why_cap);
+
+/* 1 when a refresh token is stored, i.e. searches can run without a browser. */
+int reddit_has_refresh_token(void);
+
+/* Forget the stored refresh token (the page's "clear" on that field). */
+void reddit_forget_refresh_token(void);
+
 /* For the status table: "ok", "needs setup", or "blocked since <time>". */
 const char *reddit_status_word(void);
 time_t reddit_blocked_until(void);

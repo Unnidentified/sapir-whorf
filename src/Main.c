@@ -383,6 +383,8 @@ int main(int argc, char **argv) {
   set_handler("/settings/account-save", accounts_save_handler);
   set_handler("/settings/account-clear", accounts_clear_handler);
   set_handler("/settings/account-test", accounts_test_handler);
+  set_handler("/settings/account-authorize", accounts_authorize_handler);
+  set_handler("/settings/account-code", accounts_code_handler);
   /* J4.0: a card is a thing with a URL */
   register_widget_routes();
   set_handler("/proxy", image_proxy_handler);

@@ -32,6 +32,21 @@ def mode():
         return "ok"
 
 
+UA_LOG = os.environ.get("FAKE_UA_LOG", "")
+
+
+def record_ua(value):
+    """The User-Agent is not a secret, and asserting it reached the wire is the
+    only way to prove the saved string is what Reddit sees."""
+    if not UA_LOG or not value:
+        return
+    try:
+        with open(UA_LOG, "a") as f:
+            f.write(value + "\n")
+    except OSError:
+        pass
+
+
 def hit(line):
     try:
         with open(HITS, "a") as f:
@@ -78,6 +93,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        record_ua(self.headers.get("User-Agent"))
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length).decode("utf-8", "replace") if length else ""
         hit("POST " + self.path)
@@ -96,6 +112,7 @@ class Handler(BaseHTTPRequestHandler):
         }))
 
     def do_GET(self):
+        record_ua(self.headers.get("User-Agent"))
         hit("GET " + self.path)
         m = mode()
         if m == "unauthorized":

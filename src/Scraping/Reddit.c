@@ -85,18 +85,31 @@ static size_t header_cb(char *buffer, size_t size, size_t nitems,
 int reddit_configured(void) {
   const char *id = "";
   const char *user = "";
+  const char *agent = "";
   secrets_get(SK_REDDIT_CLIENT_ID, &id);
   secrets_get(SK_REDDIT_USERNAME, &user);
-  return id[0] && user[0];
+  secrets_get(SK_REDDIT_USER_AGENT, &agent);
+  /* a client id, and something that names the app honestly: either the app's
+     own User-Agent string, or a username we can put in the format Reddit
+     documents. Neither is optional, because the rules forbid lying about it. */
+  return id[0] && (agent[0] || user[0]);
 }
 
 void reddit_user_agent(char *out, size_t cap) {
   if (!out || cap == 0)
     return;
+  const char *agent = "";
+  secrets_get(SK_REDDIT_USER_AGENT, &agent);
+  if (agent[0]) {
+    /* the app's own string, sent unchanged. Never a browser's: Reddit's rules
+       say the agent must identify the app and must not lie about it. */
+    snprintf(out, cap, "%s", agent);
+    return;
+  }
   const char *user = "";
   secrets_get(SK_REDDIT_USERNAME, &user);
-  /* Reddit's format, verbatim: <platform>:<app ID>:<version> (by /u/<user>).
-     A browser string here would be a lie, and Reddit bans for it. */
+  /* otherwise the format Reddit documents:
+     <platform>:<app ID>:<version> (by /u/<user>) */
   snprintf(out, cap, "omnisearch:omnisearch:%s (by /u/%s)", REDDIT_VERSION,
            user[0] ? user : "none");
 }
@@ -136,10 +149,12 @@ static int fetch_token_locked(char *why, size_t why_cap) {
     snprintf(why, why_cap, "no client id saved");
     return -1;
   }
-  if (!user[0]) {
+  const char *agent = "";
+  secrets_get(SK_REDDIT_USER_AGENT, &agent);
+  if (!user[0] && !agent[0]) {
     snprintf(why, why_cap,
-             "no Reddit username saved (Reddit's rules require it in the "
-             "User-Agent, so no request is made)");
+             "no User-Agent saved (Reddit's rules require the app to identify "
+             "itself, so no request is made)");
     return -1;
   }
 
@@ -175,11 +190,20 @@ static int fetch_token_locked(char *why, size_t why_cap) {
   char auth_header[800];
   snprintf(auth_header, sizeof(auth_header), "Authorization: Basic %s", auth);
 
-  char post[256];
-  snprintf(post, sizeof(post),
-           "grant_type=https://oauth.reddit.com/grants/installed_client"
-           "&device_id=%s",
-           device);
+  /* A stored refresh token is the better grant: it identifies the owner's app
+     rather than an anonymous device, and Reddit's quota is per app either way.
+     The app-only grant is the fallback for an app with no code flow done yet. */
+  const char *refresh = "";
+  secrets_get(SK_REDDIT_REFRESH_TOKEN, &refresh);
+  char post[1024];
+  if (refresh[0])
+    snprintf(post, sizeof(post),
+             "grant_type=refresh_token&refresh_token=%s", refresh);
+  else
+    snprintf(post, sizeof(post),
+             "grant_type=https://oauth.reddit.com/grants/installed_client"
+             "&device_id=%s",
+             device);
 
   char ua[256];
   reddit_user_agent(ua, sizeof(ua));
@@ -254,6 +278,167 @@ static int fetch_token_locked(char *why, size_t why_cap) {
   snprintf(g_why, sizeof(g_why), "ok");
   json_decref(root);
   return 0;
+}
+
+/* L5 rung B: the authorisation URL. Reddit's read scope only - this client
+   never posts, votes or messages, so asking for write would be more than the
+   job needs. */
+int reddit_authorize_url(char *out, size_t cap, char *why, size_t why_cap) {
+  if (why && why_cap)
+    why[0] = '\0';
+  if (!out || cap < 64) {
+    if (why)
+      snprintf(why, why_cap, "no room for the URL");
+    return -1;
+  }
+  const char *id = "";
+  const char *redirect = "";
+  secrets_get(SK_REDDIT_CLIENT_ID, &id);
+  secrets_get(SK_REDDIT_REDIRECT_URI, &redirect);
+  if (!id[0]) {
+    if (why)
+      snprintf(why, why_cap, "save the client id first");
+    return -1;
+  }
+  if (!redirect[0]) {
+    if (why)
+      snprintf(why, why_cap, "save the redirect URI first");
+    return -1;
+  }
+  char enc_redirect[512];
+  url_encode(redirect, enc_redirect, sizeof(enc_redirect));
+  snprintf(out, cap,
+           "https://www.reddit.com/api/v1/authorize?client_id=%s"
+           "&response_type=code&state=omnisearch&redirect_uri=%s"
+           "&duration=permanent&scope=read",
+           id, enc_redirect);
+  return 0;
+}
+
+/* rung B, second half: the code becomes a token, and the refresh token is kept
+   so later searches need no browser. Reddit's installed-app code flow uses
+   Basic auth with an EMPTY secret - the id alone. */
+int reddit_exchange_code(const char *code, char *why, size_t why_cap) {
+  if (why && why_cap)
+    why[0] = '\0';
+  if (!code || !code[0]) {
+    if (why)
+      snprintf(why, why_cap, "no code given");
+    return -1;
+  }
+  const char *id = "";
+  secrets_get(SK_REDDIT_CLIENT_ID, &id);
+  const char *redirect = "";
+  secrets_get(SK_REDDIT_REDIRECT_URI, &redirect);
+  if (!id[0] || !redirect[0]) {
+    if (why)
+      snprintf(why, why_cap, "client id and redirect URI are both needed");
+    return -1;
+  }
+
+  char auth[700];
+  basic_auth(auth, sizeof(auth), id, "");
+  char auth_header[800];
+  snprintf(auth_header, sizeof(auth_header), "Authorization: Basic %s", auth);
+
+  char enc_redirect[512];
+  url_encode(redirect, enc_redirect, sizeof(enc_redirect));
+  char enc_code[1024];
+  url_encode(code, enc_code, sizeof(enc_code));
+
+  char post[1800];
+  snprintf(post, sizeof(post),
+           "grant_type=authorization_code&code=%s&redirect_uri=%s",
+           enc_code, enc_redirect);
+
+  char ua[256];
+  reddit_user_agent(ua, sizeof(ua));
+
+  CURL *curl = curl_easy_init();
+  if (!curl) {
+    if (why)
+      snprintf(why, why_cap, "curl init failed");
+    return -1;
+  }
+  Buf buf = {0};
+  struct curl_slist *headers = NULL;
+  headers = curl_slist_append(headers, auth_header);
+  headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
+  curl_easy_setopt(curl, CURLOPT_URL, token_url());
+  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, buf_write);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, REDDIT_TIMEOUT_MS);
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, ua);
+  CURLcode rc = curl_easy_perform(curl);
+  long status = 0;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
+
+  if (rc != CURLE_OK) {
+    if (why)
+      snprintf(why, why_cap, "Reddit did not answer (%s)",
+               curl_easy_strerror(rc));
+    free(buf.data);
+    return -1;
+  }
+  json_error_t err;
+  json_t *root = buf.data ? json_loads(buf.data, 0, &err) : NULL;
+  free(buf.data);
+  if (!root) {
+    if (why)
+      snprintf(why, why_cap, "Reddit sent unreadable JSON (%ld)", status);
+    return -1;
+  }
+  const char *error_field = json_string_value(json_object_get(root, "error"));
+  if (error_field && error_field[0]) {
+    if (why)
+      snprintf(why, why_cap, "Reddit refused the code: %.120s", error_field);
+    json_decref(root);
+    return -1;
+  }
+  const char *access = json_string_value(json_object_get(root, "access_token"));
+  const char *refresh = json_string_value(json_object_get(root, "refresh_token"));
+  if (!access || !access[0]) {
+    if (why)
+      snprintf(why, why_cap, "Reddit's reply has no access_token");
+    json_decref(root);
+    return -1;
+  }
+  if (refresh && refresh[0]) {
+    secrets_set(SK_REDDIT_REFRESH_TOKEN, refresh);
+    secrets_reload_after_save();
+  }
+  pthread_mutex_lock(&g_token_lock);
+  snprintf(g_token.value, sizeof(g_token.value), "%s", access);
+  json_t *expires = json_object_get(root, "expires_in");
+  long ttl = json_is_integer(expires) ? (long)json_integer_value(expires) : 3600;
+  g_token.expires_at = time(NULL) + ttl;
+  g_token.have = 1;
+  g_blocked_until = 0;
+  snprintf(g_why, sizeof(g_why), "ok");
+  pthread_mutex_unlock(&g_token_lock);
+  json_decref(root);
+  return 0;
+}
+
+int reddit_has_refresh_token(void) {
+  const char *refresh = "";
+  secrets_get(SK_REDDIT_REFRESH_TOKEN, &refresh);
+  return refresh[0] != '\0';
+}
+
+void reddit_forget_refresh_token(void) {
+  secrets_set(SK_REDDIT_REFRESH_TOKEN, "");
+  secrets_reload_after_save();
+  /* the cached access token came from that refresh token, so it goes too */
+  pthread_mutex_lock(&g_token_lock);
+  g_token.have = 0;
+  g_token.value[0] = '\0';
+  pthread_mutex_unlock(&g_token_lock);
 }
 
 /* the token, refreshed when it is within 60 s of expiry. One lock, so N

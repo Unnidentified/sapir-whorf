@@ -30,6 +30,11 @@ typedef enum {
   SK_REDDIT_DEVICE_ID,
   SK_REDDIT_REDIRECT_URI,
   SK_REDDIT_REFRESH_TOKEN,
+  /* the app's own User-Agent string, used verbatim when set. Reddit's rules
+     only ask that it identifies the app and does not lie; an app that already
+     ships one (RedReader's is org.quantumbadger.redreader/1.27) should send
+     that rather than a synthesised string. */
+  SK_REDDIT_USER_AGENT,
   SK_SEARXNG_URL,
   SK_SEARXNG_ENGINES,
   SK_YACY_INSTANCE,

@@ -121,38 +121,12 @@
                                 <span class="settings-colours-hint">Applies when Colour scheme is <strong>Custom</strong>.</span>
                             </div>
                             <div class="settings-colours">
-                                <label class="settings-colour" for="c_bg_main">
-                                    <span class="settings-colour-name">Background</span>
-                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_bg_main" name="c_bg_main" value="{{custom_bg_main}}" style="background:#{{custom_bg_main}}"><span class="settings-colour-hex" data-for="c_bg_main">{{custom_bg_main}}</span></span>
+                                {{for c in custom_colours}}
+                                <label class="settings-colour" for="c_{{c[0]}}">
+                                    <span class="settings-colour-name">{{c[2]}}</span>
+                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_{{c[0]}}" name="c_{{c[0]}}" value="#{{c[1]}}" style="background:#{{c[1]}}" aria-label="{{c[2]}}"><span class="settings-colour-hex" data-for="c_{{c[0]}}">{{c[1]}}</span></span>
                                 </label>
-                                <label class="settings-colour" for="c_bg_card">
-                                    <span class="settings-colour-name">Card</span>
-                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_bg_card" name="c_bg_card" value="{{custom_bg_card}}" style="background:#{{custom_bg_card}}"><span class="settings-colour-hex" data-for="c_bg_card">{{custom_bg_card}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_border">
-                                    <span class="settings-colour-name">Border</span>
-                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_border" name="c_border" value="{{custom_border}}" style="background:#{{custom_border}}"><span class="settings-colour-hex" data-for="c_border">{{custom_border}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_text_primary">
-                                    <span class="settings-colour-name">Text</span>
-                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_text_primary" name="c_text_primary" value="{{custom_text_primary}}" style="background:#{{custom_text_primary}}"><span class="settings-colour-hex" data-for="c_text_primary">{{custom_text_primary}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_text_secondary">
-                                    <span class="settings-colour-name">Text secondary</span>
-                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_text_secondary" name="c_text_secondary" value="{{custom_text_secondary}}" style="background:#{{custom_text_secondary}}"><span class="settings-colour-hex" data-for="c_text_secondary">{{custom_text_secondary}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_text_muted">
-                                    <span class="settings-colour-name">Text muted</span>
-                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_text_muted" name="c_text_muted" value="{{custom_text_muted}}" style="background:#{{custom_text_muted}}"><span class="settings-colour-hex" data-for="c_text_muted">{{custom_text_muted}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_accent">
-                                    <span class="settings-colour-name">Accent</span>
-                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_accent" name="c_accent" value="{{custom_accent}}" style="background:#{{custom_accent}}"><span class="settings-colour-hex" data-for="c_accent">{{custom_accent}}</span></span>
-                                </label>
-                                <label class="settings-colour" for="c_text_dim">
-                                    <span class="settings-colour-name">Text dim</span>
-                                    <span class="settings-colour-control"><input type="color" form="colours-form" id="c_text_dim" name="c_text_dim" value="{{custom_text_dim}}" style="background:#{{custom_text_dim}}"><span class="settings-colour-hex" data-for="c_text_dim">{{custom_text_dim}}</span></span>
-                                </label>
+                                {{endfor}}
                             </div>
                             <div class="settings-colours-actions">
                                 <button type="submit" form="colours-form" class="btn-secondary">Save colours</button>
@@ -285,47 +259,56 @@
                     </div>
                 </form>
 
-                    <section class="settings-section" id="accounts">
-                        <h3 class="settings-section-title">{{l("accounts_label")}}</h3>
-                        <p class="settings-section-desc">{{l("accounts_desc")}}</p>
+                <section class="settings-section" id="accounts">
+                    <h3 class="settings-section-title">{{l("accounts_label")}}</h3>
+                    <p class="settings-section-desc">{{l("accounts_desc")}}</p>
+                    <div class="settings-accounts">
                         {{for a in accounts}}
                         {{if a[10]}}
-                        <div class="account-card">
-                            <h4 class="account-title">{{a[1]}}</h4>
-                            <p class="account-why">{{a[2]}}</p>
-                            <p class="account-links">{{a[3]}}</p>
-                            {{if a[4]}}<p class="account-test-result">{{a[4]}}</p>{{endif}}
-                            <form action="/settings/account-save" method="GET" class="account-form" autocomplete="off">
+                        <div class="settings-account">
+                            <div class="settings-account-head">
+                                <h4 class="settings-account-name">{{a[1]}}</h4>
+                                <span class="settings-account-why">{{a[2]}}</span>
+                            </div>
+                            {{if a[4]}}<p class="settings-account-test">{{a[4]}}</p>{{endif}}
+                            {{if a[15]}}<div class="settings-account-auth"><a class="btn-secondary" href="{{a[15]}}&amp;admin=" target="_blank" rel="noopener noreferrer">{{l("authorize_button")}}</a><span class="settings-account-hint">{{l("authorize_hint")}}</span></div>
+                            <form action="/settings/account-code" method="GET" class="settings-account-code" autocomplete="off">
+                                <input type="hidden" name="card" value="{{a[0]}}">
+                                <input class="settings-account-input" type="text" name="code" placeholder="code" aria-label="{{l("authorize_code_label")}}">
+                                <input class="settings-account-input" type="password" name="admin" placeholder="{{l("admin_token_placeholder")}}" aria-label="{{l("admin_token_label")}}">
+                                <button type="submit" class="btn-secondary">{{l("authorize_finish")}}</button>
+                            </form>
+                            {{endif}}
+                            <p class="settings-account-links">{{a[3]}} {{if a[16]}}<a href="{{a[16]}}" target="_blank" rel="noopener noreferrer">{{a[17]}}</a>{{endif}}</p>
+                            <form action="/settings/account-save" method="GET" class="settings-account-form" autocomplete="off">
                                 <input type="hidden" name="card" value="{{a[0]}}">
                         {{endif}}
-                                <div class="account-field">
-                                    <label class="settings-label" for="f_{{a[0]}}_{{a[5]}}">{{a[6]}}</label>
-                                    <input class="settings-input" type="{{a[11]}}" id="f_{{a[0]}}_{{a[5]}}"
+                                <div class="settings-account-field">
+                                    <label class="settings-account-label" for="f_{{a[0]}}_{{a[5]}}">{{a[6]}}<span class="settings-account-optional">{{a[14]}}</span></label>
+                                    <input class="settings-account-input" type="{{a[11]}}" id="f_{{a[0]}}_{{a[5]}}"
                                            name="{{a[5]}}" autocomplete="off" value=""
                                            placeholder="{{a[7]}}">
-                                    <span class="account-source">{{a[8]}}</span>
+                                    <span class="settings-account-hint">{{a[13]}}</span>
                                 </div>
                         {{if a[12]}}
-                                <div class="account-row">
-                                    <label class="settings-label" for="admin_{{a[0]}}">{{l("admin_token_label")}}</label>
-                                    <input class="settings-input" type="password" id="admin_{{a[0]}}"
+                                <div class="settings-account-admin">
+                                    <label class="settings-account-label" for="admin_{{a[0]}}">{{l("admin_token_label")}}</label>
+                                    <input class="settings-account-input" type="password" id="admin_{{a[0]}}"
                                            name="admin" autocomplete="off"
                                            placeholder="{{l("admin_token_placeholder")}}">
+                                    <span class="settings-account-hint">{{l("admin_token_hint")}}</span>
                                 </div>
-                                <div class="account-buttons">
+                                <div class="settings-account-actions">
                                     <button type="submit" class="btn-primary">{{l("save_button")}}</button>
+                                    <a class="btn-secondary settings-account-testbtn" href="/settings/account-test?card={{a[0]}}&amp;admin=" id="test_{{a[0]}}">{{l("test_button")}}</a>
                                 </div>
                             </form>
-                            <p class="account-test">
-                                <a class="btn-secondary" href="/settings/account-test?card={{a[0]}}&amp;admin=" id="test_{{a[0]}}">{{l("test_button")}}</a>
-                                <a class="account-clear" href="/settings/account-clear?card={{a[0]}}&amp;field=first&amp;admin=">{{l("clear_button")}}</a>
-                            </p>
                         </div>
                         {{endif}}
                         {{endfor}}
-                    </section>
+                    </div>
+                </section>
 
-                <!-- K1.2b: its own form, so the parameter count stays under beaker's 16 -->
                 <form action="/save_settings" method="GET" id="weights-form" class="settings-form" novalidate>
                     <input type="hidden" name="q" value="{{query}}">
 <section class="settings-section">

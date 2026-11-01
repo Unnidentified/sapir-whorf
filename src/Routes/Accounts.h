@@ -31,6 +31,8 @@ int accounts_save_handler(UrlParams *params);
 /* GET /settings/account-test?card=reddit&admin=... - the smallest real call.
    Rate-limited to one per 30 s per card, and it never prints a token. */
 int accounts_test_handler(UrlParams *params);
+int accounts_authorize_handler(UrlParams *params);
+int accounts_code_handler(UrlParams *params);
 
 /* The admin gate's answer, kept here so both handlers use one rule. */
 int accounts_require_admin(UrlParams *params);

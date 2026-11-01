@@ -380,6 +380,50 @@ void context_set_custom_theme_compact(TemplateContext *ctx,
   context_set(ctx, "custom_vars", block);
 }
 
+/* The nine colours as ONE array key, for the settings page.
+ *
+ * The page needs each colour on its own - a colour input's value, and the hex
+ * printed beside it - but nine separate keys cost nine context slots out of
+ * beaker's thirty-two, and the page was already at twenty-five. It therefore
+ * used to call the compact variant above, which sets only the combined CSS
+ * string: the pickers then read keys nobody set, so every one showed #000000
+ * and an empty hex label.
+ *
+ * An array carries all nine in a single slot, and the template indexes it. */
+void context_set_custom_colours(TemplateContext *ctx, const CustomTheme *theme) {
+  if (!ctx || !theme)
+    return;
+  /* the field id the save handler reads, and the label beside it */
+  static const char *IDS[CUSTOM_COLOUR_COUNT] = {
+      "bg_main", "bg_card", "border", "text_primary",
+      "text_secondary", "text_muted", "accent", "text_dim"};
+  static const char *LABELS[CUSTOM_COLOUR_COUNT] = {
+      "Background", "Card", "Border", "Text",
+      "Text secondary", "Text muted", "Accent", "Text dim"};
+  char values[CUSTOM_COLOUR_COUNT][16];
+  custom_colour_strings(theme, values, CUSTOM_COLOUR_COUNT);
+
+  /* beaker duplicates every string it is handed, but it reads them through the
+     pointer table first: both the table and the strings must be live at the
+     call. The strings were a static buffer and that is fine; the crash was the
+     pointer table being a VLA-ish static with a stale inner-count argument.
+     Built on the heap here, like the provider table the page already renders. */
+  char **rows_local[CUSTOM_COLOUR_COUNT];
+  char ***rows = rows_local;
+  char *cells[CUSTOM_COLOUR_COUNT][3];
+  for (int i = 0; i < CUSTOM_COLOUR_COUNT; i++) {
+    cells[i][0] = (char *)IDS[i];
+    cells[i][1] = values[i] + 1; /* drop the "#": the page adds it for CSS */
+    cells[i][2] = (char *)LABELS[i];
+    rows[i] = cells[i];
+  }
+  int inner[CUSTOM_COLOUR_COUNT];
+  for (int i = 0; i < CUSTOM_COLOUR_COUNT; i++)
+    inner[i] = 3;
+  context_set_array_of_arrays(ctx, "custom_colours", rows, CUSTOM_COLOUR_COUNT,
+                              inner);
+}
+
 void context_set_custom_theme(TemplateContext *ctx, const CustomTheme *theme) {
   if (!ctx || !theme)
     return;

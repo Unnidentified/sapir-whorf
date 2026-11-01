@@ -5,6 +5,7 @@
 #include "../Utility/Secrets.h"
 #include "../Utility/HttpClient.h"
 #include "../Utility/Utility.h"
+#include "../Scraping/Reddit.h"
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,36 +18,44 @@ typedef struct {
   const char *why;       /* one line: what it is for */
   const char *fields[6]; /* SecretKey names, in display order */
   int secret[6];         /* 1 = write-only */
-  const char *links;     /* helper links, as HTML (static, from this file) */
+  const char *links;     /* one line of plain text under the title */
+  const char *doc_url;   /* where to register the app, if anywhere */
+  const char *doc_label; /* what that link is called */
 } AccountCard;
 
 static const AccountCard CARDS[] = {
+    /* L5: three fields, and three is enough. The client id, the redirect URI
+       the app was registered with, and the app's User-Agent. No secret: an
+       installed app has none, and Reddit's app-only grant authenticates with
+       the id alone. The username field stays for an app that has no UA of its
+       own, where the documented UA format needs one. */
     {"reddit", "Reddit",
-     "Search Reddit with your own registered app. App-only access needs no login.",
-     {"reddit_client_id", "reddit_client_secret", "reddit_username",
-      "reddit_redirect_uri", NULL},
-     {0, 1, 0, 0, 0, 0},
-     "Read the client id at https://www.reddit.com/prefs/apps — it is the "
-     "string under the app's name. Use a client id you registered yourself; "
-     "never paste another app's."},
+     "Search Reddit with the app you registered. Three fields, no secret.",
+     {"reddit_client_id", "reddit_redirect_uri", "reddit_user_agent",
+      "reddit_username", "reddit_client_secret", NULL},
+     {0, 0, 0, 0, 1, 0},
+     "Choose \"installed app\". The client id is the string under the app's "
+     "name; the redirect URI must match the one you typed there; the "
+     "User-Agent is your app's own, e.g. org.example.app/1.0."},
     {"searxng", "SearXNG",
      "A SearXNG instance is the documented low-risk route to Google's index.",
      {"searxng_url", "searxng_engines", NULL, NULL, NULL, NULL},
      {0, 0, 0, 0, 0, 0},
-     "Run one with: docker compose up searxng. Its URL is then "
-     "http://127.0.0.1:8888, and the JSON format must be enabled there."},
+     "Run it with docker compose up searxng; the JSON format must be enabled "
+     "there.", NULL, NULL},
     {"yacy", "YaCy",
      "A YaCy peer you run yourself. Off by default; most people do not have one.",
      {"yacy_instance", NULL, NULL, NULL, NULL, NULL},
      {0, 0, 0, 0, 0, 0},
-     "A peer you run yourself: https://yacy.net/"},
+     "A peer you run yourself.", "https://yacy.net/", "yacy.net"},
     {"google", "Google",
      "The JSON API closed to new customers in January 2026. Only a key issued "
      "before then works.",
      {"google_cse_cx", "google_cse_key", NULL, NULL, NULL, NULL},
      {0, 1, 0, 0, 0, 0},
-     "A cx comes from https://programmablesearchengine.google.com/ and is the "
-     "only thing the Element endpoint needs."},
+     "The Element endpoint needs only the cx.",
+     "https://programmablesearchengine.google.com/",
+     "programmablesearchengine.google.com"},
 };
 enum { CARD_COUNT = sizeof(CARDS) / sizeof(CARDS[0]) };
 
@@ -58,6 +67,35 @@ int accounts_require_admin(UrlParams *params) {
         token = params->params[i].value;
   }
   return secrets_admin_token_matches(token);
+}
+
+/* A field's human label and a one-line hint, keyed by the secret name. The
+   page used to print the raw key with underscores swapped ("reddit client id"),
+   which reads like a variable and names no product. */
+typedef struct {
+  const char *key;
+  const char *label;
+  const char *hint;
+} FieldText;
+
+static const FieldText FIELD_TEXT[] = {
+    {"reddit_client_id", "Client ID", "Under the app's name at reddit.com/prefs/apps"},
+    {"reddit_redirect_uri", "Redirect URI", "Exactly as registered, e.g. myapp://callback"},
+    {"reddit_user_agent", "User-Agent", "Your app's own string, e.g. org.example.app/1.0"},
+    {"reddit_username", "Reddit username", "Optional: only if your app has no User-Agent of its own"},
+    {"reddit_client_secret", "Client secret", "Not needed for an installed app"},
+    {"searxng_url", "Instance URL", "e.g. http://127.0.0.1:8888"},
+    {"searxng_engines", "Engines", "Comma-separated, e.g. google,brave,qwant"},
+    {"yacy_instance", "Instance URL", "e.g. http://127.0.0.1:8090"},
+    {"google_cse_cx", "Search engine ID (cx)", "From programmablesearchengine.google.com"},
+    {"google_cse_key", "API key", "Only a key issued before January 2026 works"},
+};
+
+static const FieldText *field_text(const char *name) {
+  for (size_t i = 0; i < sizeof(FIELD_TEXT) / sizeof(FIELD_TEXT[0]); i++)
+    if (strcmp(FIELD_TEXT[i].key, name) == 0)
+      return &FIELD_TEXT[i];
+  return NULL;
 }
 
 static const AccountCard *card_by_id(const char *id) {
@@ -102,7 +140,11 @@ static void test_result_text(const AccountCard *card, char *out, size_t cap) {
    says "start of a card", so the template is a single loop.
    Columns: card id | card title | why | links | test text | field name |
             field label | masked value | source | credential | first-in-card */
-enum { ACCOUNT_COLS = 13 };
+enum { ACCOUNT_COLS = 18 };
+/* 0 card id | 1 title | 2 why | 3 links | 4 test text | 5 field name |
+   6 label | 7 masked value | 8 source | 9 credential | 10 first-in-card |
+   11 input type | 12 last-in-card | 13 hint | 14 optional marker |
+   15 authorise link (Reddit only) | 16 doc URL | 17 doc label */
 
 AccountCards accounts_build(const char *locale_id) {
   (void)locale_id;
@@ -110,7 +152,7 @@ AccountCards accounts_build(const char *locale_id) {
   cards.count = 0;
   int total = 0;
   for (size_t c = 0; c < CARD_COUNT; c++)
-    for (int f = 0; f < 4 && CARDS[c].fields[f]; f++)
+    for (int f = 0; f < 6 && CARDS[c].fields[f]; f++)
       total++;
   cards.rows = calloc((size_t)total + 1, sizeof(char **));
   cards.inner = calloc((size_t)total + 1, sizeof(int));
@@ -127,7 +169,7 @@ AccountCards accounts_build(const char *locale_id) {
     char test_text[320];
     test_result_text(card, test_text, sizeof(test_text));
     int first = 1;
-    for (int f = 0; f < 4 && card->fields[f]; f++) {
+    for (int f = 0; f < 6 && card->fields[f]; f++) {
       SecretKey key = secrets_key_from_name(card->fields[f]);
       if (key == SK_COUNT)
         continue;
@@ -136,11 +178,10 @@ AccountCards accounts_build(const char *locale_id) {
       char masked[64] = "";
       if (value[0])
         secrets_mask(key, masked, sizeof(masked));
-      char label[64];
-      snprintf(label, sizeof(label), "%s", card->fields[f]);
-      for (char *p = label; *p; p++)
-        if (*p == '_')
-          *p = ' ';
+      const FieldText *ft = field_text(card->fields[f]);
+      char label[96];
+      snprintf(label, sizeof(label), "%s",
+               ft && ft->label ? ft->label : card->fields[f]);
       EffectiveSource eff = src == SECRET_SOURCE_ENV
                                 ? EFFECTIVE_FROM_ENV
                             : src == SECRET_SOURCE_FILE ? EFFECTIVE_FROM_FILE
@@ -165,6 +206,18 @@ AccountCards accounts_build(const char *locale_id) {
       /* 12: the last field of a card closes the card's markup */
       cards.rows[row][12] =
           strdup(card->fields[f + 1] ? "" : "1");
+      /* 13: the hint under the field; 14: "optional" when a blank is fine */
+      cards.rows[row][13] = strdup(ft && ft->hint ? ft->hint : "");
+      cards.rows[row][14] = strdup(card->secret[f] ? "optional" : "");
+      /* 15: the Authorise link rides on the first row of the Reddit card */
+      if (first && strcmp(card->id, "reddit") == 0)
+        cards.rows[row][15] = strdup("/settings/account-authorize?card=reddit");
+      else
+        cards.rows[row][15] = strdup("");
+      /* 16/17: the doc link, repeated on every row of the card so the template
+         needs no second lookup. Only the first row renders it. */
+      cards.rows[row][16] = strdup(card->doc_url ? card->doc_url : "");
+      cards.rows[row][17] = strdup(card->doc_label ? card->doc_label : "");
       cards.inner[row] = ACCOUNT_COLS;
       first = 0;
       row++;
@@ -270,6 +323,54 @@ int accounts_clear_handler(UrlParams *params) {
    card, so a stuck button cannot hammer Reddit or a bridge. */
 static void reddit_test(const char *client_id, const char *secret, char *out,
                         size_t cap);
+
+/* L5: the Authorise button. Sends the browser to Reddit's authorisation page
+   built from the saved client id and redirect URI - the browser talks to
+   Reddit, this server never sees the login. */
+int accounts_authorize_handler(UrlParams *params) {
+  if (!accounts_require_admin(params)) {
+    send_status("403 Forbidden");
+    send_response("<h1>Forbidden</h1><p>This needs the admin token. Save one "
+                  "field with it first, then press Authorise again.</p>");
+    return 0;
+  }
+  char url[1200];
+  char why[192] = "";
+  if (reddit_authorize_url(url, sizeof(url), why, sizeof(why)) != 0) {
+    send_redirect("/settings?authwhy=1#accounts");
+    return 0;
+  }
+  send_redirect(url);
+  return 0;
+}
+
+/* L5: the code Reddit appends to the redirect URI comes back here (the owner
+   pastes it, or the app forwards it). It becomes a refresh token, so every
+   later search runs without a browser. */
+int accounts_code_handler(UrlParams *params) {
+  if (!accounts_require_admin(params)) {
+    send_status("403 Forbidden");
+    send_response("<h1>Forbidden</h1>");
+    return 0;
+  }
+  const char *code = "";
+  for (int i = 0; params && i < params->count; i++)
+    if (strcmp(params->params[i].key, "code") == 0)
+      code = params->params[i].value;
+  char why[192] = "";
+  char text[256];
+  size_t idx = 0;
+  for (size_t c = 0; c < CARD_COUNT; c++)
+    if (strcmp(CARDS[c].id, "reddit") == 0)
+      idx = c;
+  if (reddit_exchange_code(code, why, sizeof(why)) == 0)
+    snprintf(text, sizeof(text), "Authorised. Searches now use your app.");
+  else
+    snprintf(text, sizeof(text), "Could not finish: %.160s", why);
+  remember_test(&CARDS[idx], text);
+  send_redirect("/settings#accounts");
+  return 0;
+}
 
 int accounts_test_handler(UrlParams *params) {
   if (!accounts_require_admin(params)) {
