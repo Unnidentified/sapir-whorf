@@ -70,7 +70,15 @@
                     <input type="hidden" name="theme" value="custom">
                 </form>
 
-                <form action="/save_settings" method="GET" id="settings-form">
+                <!-- K1.2: novalidate on purpose. HTML constraint validation
+                     refuses to submit a form containing a control that fails
+                     its own step, and the registry's default weights (0.95,
+                     1.15, 1.2, 1.3) are not on a 0.5 grid - so every toggle
+                     and select on this page was unsaveable, with the only
+                     signal a tooltip on a number box. The server clamps to
+                     0.5..5 and drops what it cannot parse, which is the real
+                     validation. -->
+                <form action="/save_settings" method="GET" id="settings-form" novalidate>
                     <input type="hidden" name="q" value="{{query}}">
 
                     <section class="settings-section">
@@ -276,7 +284,7 @@
                         <div class="settings-fields settings-weights">
                             {{for wt in engine_weights}}
                             <label class="settings-field" for="w_{{wt[0]}}">
-                                <input type="number" id="w_{{wt[0]}}" name="w_{{wt[0]}}" value="{{wt[1]}}" min="0.5" max="5" step="0.5">
+                                <input type="number" id="w_{{wt[0]}}" name="w_{{wt[0]}}" value="{{wt[1]}}" min="0.5" max="5" step="0.05">
                                 <span class="settings-label">{{wt[0]}}</span>
                             </label>
                             {{endfor}}
