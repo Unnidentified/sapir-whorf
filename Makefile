@@ -371,6 +371,16 @@ tests/test_g4_answerbox: tests/test_g4_answerbox.c $(LINT_SRCS) \
                          src/Infobox/Infobox.c
 	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto -lm
 
+# K11: name -> symbol resolution, with no network (the bundled SEC table)
+tests/test_k11_stocks: tests/test_k11_stocks.c src/Infobox/Stocks.c \
+                       $(LINT_SRCS) src/Cache/Cache.c src/Config.c \
+                       src/Proxy/Proxy.c src/Utility/JsonHelper.c \
+                       src/Utility/HttpClient.c
+	@$(CC) -Isrc -I$(BREW_PREFIX)/include -o $@ $^ $(LINT_LIBS) -lcrypto -lm
+
+k11check: tests/test_k11_stocks
+	@OMNI_STOCK_TABLE=static/stocks/company_tickers.tsv ./tests/test_k11_stocks
+
 answer-check: tests/test_g4_answerbox
 	@./tests/test_g4_answerbox
 
