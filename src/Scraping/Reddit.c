@@ -109,6 +109,19 @@ int reddit_agent_is_foreign(const char *agent) {
   return 0;
 }
 
+int reddit_api_enabled(void) {
+  const char *flag = "";
+  secrets_get(SK_REDDIT_API, &flag);
+  /* unset means on: the owner who saved three fields expects it to work */
+  if (!flag[0])
+    return 1;
+  return !(flag[0] == 'o' && flag[1] == 'f' && flag[2] == 'f');
+}
+
+/* set when a 401/403 said API access has ended, so the card can say so instead
+   of reporting a generic refusal */
+static int g_api_ended;
+
 int reddit_configured(void) {
   const char *id = "";
   const char *user = "";
@@ -119,7 +132,7 @@ int reddit_configured(void) {
   /* a client id, and something that names the app honestly: either the app's
      own User-Agent string, or a username we can put in the format Reddit
      documents. Neither is optional, because the rules forbid lying about it. */
-  return id[0] && (agent[0] || user[0]);
+  return reddit_api_enabled() && id[0] && (agent[0] || user[0]);
 }
 
 void reddit_user_agent(char *out, size_t cap) {
@@ -265,6 +278,7 @@ static int fetch_token_locked(char *why, size_t why_cap) {
     return -1;
   }
   if (status == 401 || status == 403) {
+    g_api_ended = 1;
     snprintf(why, why_cap, "Reddit has refused this app's client id (%ld)", status);
     g_blocked_until = time(NULL) + 900;
     free(buf.data);
@@ -889,6 +903,10 @@ void reddit_free_posts(RedditPost *posts, int count) {
 }
 
 const char *reddit_status_word(void) {
+  if (!reddit_api_enabled())
+    return "off (lane only)";
+  if (g_api_ended)
+    return "api access ended - using the lane";
   if (!reddit_configured())
     return "needs setup";
   if (g_blocked_until && time(NULL) < g_blocked_until)

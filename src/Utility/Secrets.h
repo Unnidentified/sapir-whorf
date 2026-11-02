@@ -35,6 +35,10 @@ typedef enum {
      ships one should send that rather than a synthesised string. Never another
      project's identity: that is impersonation and it is refused. */
   SK_REDDIT_USER_AGENT,
+  /* M2.3: "on"/"off". Off means the OAuth path is not tried at all and the
+     site:reddit.com lane carries the query - the documented exit for when
+     Reddit ends API access. */
+  SK_REDDIT_API,
   SK_SEARXNG_URL,
   SK_SEARXNG_ENGINES,
   SK_YACY_INSTANCE,

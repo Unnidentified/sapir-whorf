@@ -35,7 +35,7 @@ static const AccountCard CARDS[] = {
     {"reddit", "Reddit",
      "Search Reddit with the app you registered. Three fields, no secret.",
      {"reddit_client_id", "reddit_redirect_uri", "reddit_user_agent",
-      "reddit_username", "reddit_client_secret", NULL},
+      "reddit_username", "reddit_client_secret", "reddit_api"},
      {0, 0, 0, 0, 1, 0},
      "Choose \"installed app\". The client id is the string under the app's "
      "name; the redirect URI must match the one you typed there; the "
@@ -116,6 +116,7 @@ static const FieldText FIELD_TEXT[] = {
     {"reddit_user_agent", "User-Agent", "Your app's own string, e.g. org.example.app/1.0"},
     {"reddit_username", "Reddit username", "Optional: only if your app has no User-Agent of its own"},
     {"reddit_client_secret", "Client secret", "Not needed for an installed app"},
+    {"reddit_api", "Use Reddit's API", "\"on\" (default) or \"off\" to use the site:reddit.com lane only"},
     {"searxng_url", "Instance URL", "e.g. http://127.0.0.1:8888"},
     {"searxng_engines", "Engines", "Comma-separated, e.g. google,brave,qwant"},
     {"yacy_instance", "Instance URL", "e.g. http://127.0.0.1:8090"},

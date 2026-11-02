@@ -39,6 +39,10 @@ typedef struct {
    say the agent must not lie. */
 int reddit_configured(void);
 
+/* M2.3: "reddit_api = on|off". Off stops the OAuth path entirely and leaves the
+   site:reddit.com lane to carry the query - the documented exit for a shutdown. */
+int reddit_api_enabled(void);
+
 /* The User-Agent this client sends. Exposed so a test can assert the format. */
 void reddit_user_agent(char *out, size_t cap);
 

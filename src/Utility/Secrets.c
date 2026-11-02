@@ -35,6 +35,7 @@ static const SecretSpec SPECS[SK_COUNT] = {
      "OMNI_REDDIT_REFRESH_TOKEN"},
     {SK_REDDIT_USER_AGENT, "reddit_user_agent", "reddit", 0,
      "OMNI_REDDIT_USER_AGENT"},
+    {SK_REDDIT_API, "reddit_api", "reddit", 0, "OMNI_REDDIT_API"},
     {SK_SEARXNG_URL, "searxng_url", "bridges", 0, "OMNI_SEARXNG_URL"},
     {SK_SEARXNG_ENGINES, "searxng_engines", "bridges", 0, "OMNI_SEARXNG_ENGINES"},
     {SK_YACY_INSTANCE, "yacy_instance", "bridges", 0, "OMNI_YACY_INSTANCE"},
