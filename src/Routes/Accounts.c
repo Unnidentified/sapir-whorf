@@ -7,6 +7,8 @@
 #include "../Utility/Utility.h"
 #include "../Scraping/Reddit.h"
 #include "Guard.h"
+#include "../Scraping/CseId.h"
+#include "../Scraping/ApiEngines.h"
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,12 +51,16 @@ static const AccountCard CARDS[] = {
      {"yacy_instance", NULL, NULL, NULL, NULL, NULL},
      {0, 0, 0, 0, 0, 0},
      "A peer you run yourself.", "https://yacy.net/", "yacy.net"},
+    /* M4: one field. The entry point accepts the id, the public URL or the
+       embed code, extracts the cx, and enables the engine immediately. The API
+       key is behind Advanced because the JSON API behind it closed to new
+       customers in January 2026 and cannot be obtained now. */
     {"google", "Google",
-     "The JSON API closed to new customers in January 2026. Only a key issued "
-     "before then works.",
+     "Your Programmable Search Engine. Paste the id, the public URL or the embed code.",
      {"google_cse_cx", "google_cse_key", NULL, NULL, NULL, NULL},
      {0, 1, 0, 0, 0, 0},
-     "The Element endpoint needs only the cx.",
+     "Turn on \"Search the entire web\" in your engine's settings, or it will "
+     "have nothing to search.",
      "https://programmablesearchengine.google.com/",
      "programmablesearchengine.google.com"},
 };
@@ -308,8 +314,10 @@ AccountCards accounts_build(const char *locale_id) {
          behind "Advanced". 25/26 mark the first and last advanced row. */
       cards.rows[row][25] = strdup("");
       cards.rows[row][26] = strdup("");
-      if (strcmp(card->id, "reddit") == 0) {
-        int primary = 3; /* client id, redirect uri, user agent */
+      {
+        /* each card names how many of its fields are primary */
+        int primary = (strcmp(card->id, "reddit") == 0) ? 3
+                    : (strcmp(card->id, "google") == 0) ? 1 : ACCOUNT_FIELD_SLOTS;
         if (f == primary && card->fields[f]) {
           free(cards.rows[row][25]);
           cards.rows[row][25] = strdup("1"); /* opens the block */
@@ -399,6 +407,18 @@ int accounts_save_handler(UrlParams *params) {
                           "- register one at reddit.com/prefs/apps.");
       continue;
     }
+    /* M4.1: one field, three accepted forms. Extract the cx before storing, so
+       a pasted URL or embed tag is not stored verbatim as a broken id. */
+    char cse_id[128];
+    if (sk == SK_GOOGLE_CSE_CX) {
+      if (cse_extract_id(value, cse_id, sizeof(cse_id)) != 0) {
+        remember_test(card, "That does not look like a search engine id. Paste "
+                            "the Search engine ID, its public URL, or the "
+                            "embed code.");
+        continue;
+      }
+      value = cse_id;
+    }
     if (secrets_set(sk, value) != 0)
       fprintf(stderr, "[WARN] account save failed for %s\n", key);
   }
@@ -406,6 +426,13 @@ int accounts_save_handler(UrlParams *params) {
   {
     extern Config global_config;
     apply_effective_settings(&global_config);
+    /* M4.4: saving a cx must take effect while the process runs. The engine was
+       configured only at startup, so an owner who saved one saw nothing and had
+       no way to know a restart was needed. Do the same work here, and undo it
+       on clear. */
+    extern void omnisearch_apply_google_cse(const char *cx, const char *tok);
+    omnisearch_apply_google_cse(global_config.google_cse_cx,
+                                global_config.google_cse_tok);
   }
   /* M1.3: the same form posts Save and Test. Test runs after the values are
      stored, so it tests what was just entered rather than what was there. */
@@ -416,7 +443,11 @@ int accounts_save_handler(UrlParams *params) {
       size_t idx = (size_t)(card - CARDS);
       if (strcmp(card->id, "reddit") == 0)
         reddit_test_now(text, sizeof(text));
-      else
+      else if (strcmp(card->id, "google") == 0) {
+        const char *cx = "";
+        secrets_get(SK_GOOGLE_CSE_CX, &cx);
+        api_google_cse_element_selftest(cx, text, sizeof(text));
+      } else
         snprintf(text, sizeof(text), "Saved. Press Test again to check it.");
       remember_test(card, text);
       (void)idx;
@@ -444,6 +475,16 @@ int accounts_clear_handler(UrlParams *params) {
         secrets_set(secrets_key_from_name(field), "");
   }
   secrets_reload_after_save();
+  {
+    /* M4.4: clearing the cx turns the engine off live, the same way saving it
+       turns it on. Without this the engine kept answering with a cx that the
+       page no longer showed. */
+    extern Config global_config;
+    extern void omnisearch_apply_google_cse(const char *cx, const char *tok);
+    apply_effective_settings(&global_config);
+    omnisearch_apply_google_cse(global_config.google_cse_cx,
+                                global_config.google_cse_tok);
+  }
   send_redirect("/settings#accounts");
   return 0;
 }

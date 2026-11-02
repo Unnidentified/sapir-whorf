@@ -119,6 +119,24 @@ int handle_opensearch(UrlParams *params) {
   return 0;
 }
 
+/* M4.4: one place that turns the Programmable Search Element engine on or off
+   from a cx. Called at startup and by the settings save, so the two cannot
+   disagree about whether a saved cx is live. */
+void omnisearch_apply_google_cse(const char *cx, const char *tok) {
+  const char *real_cx = (cx && cx[0]) ? cx : "";
+  const char *real_tok = (tok && tok[0]) ? tok : "";
+  if (real_cx[0]) {
+    api_google_cse_element_configure(real_cx, real_tok);
+    engine_set_enabled("google_cse_element", 1);
+    engine_health_set_engine_pace("google_cse_element", 10);
+    fprintf(stderr,
+            "[INFO] Google Programmable Search Element enabled for cx=%.16s "
+            "(experimental, 10 req/min)\n", real_cx);
+  } else {
+    engine_set_enabled("google_cse_element", 0);
+  }
+}
+
 int main(int argc, char **argv) {
   sigset_t mask;
   sigemptyset(&mask);
@@ -275,21 +293,12 @@ int main(int argc, char **argv) {
     engine_set_enabled("google", 1);
     fprintf(stderr, "[INFO] Google Programmable Search enabled\n");
   }
-  /* H3: the element protocol mints its own token from
+  /* H3/M4: the element protocol mints its own token from
      www.google.com/cse/cse.js, so a cx alone is enough. A pasted
-     google_cse_tok is an override for when that endpoint changes. Disabled by
-     default either way: it is an undocumented endpoint and it borrows another
-     site's CX, which is the owner's call. */
-  if (cfg.google_cse_cx[0] != '\0') {
-    api_google_cse_element_configure(cfg.google_cse_cx, cfg.google_cse_tok);
-    engine_set_enabled("google_cse_element", 1);
-    engine_health_set_engine_pace("google_cse_element", 10);
-    fprintf(stderr,
-            "[INFO] Google Programmable Search Element enabled for cx=%s%s "
-            "(experimental, 10 req/min)\n",
-            cfg.google_cse_cx,
-            cfg.google_cse_tok[0] ? " using the supplied token" : "");
-  }
+     google_cse_tok is an override for when that endpoint changes. Off until a
+     cx is set, then on - and omnisearch_apply_google_cse() is the same code the
+     save path calls, so saving takes effect without a restart. */
+  omnisearch_apply_google_cse(cfg.google_cse_cx, cfg.google_cse_tok);
   if (cfg.searxng_url[0] != '\0') {
     api_searxng_configure(cfg.searxng_url, cfg.searxng_engines);
     engine_set_enabled("searxng", 1);

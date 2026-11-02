@@ -37,6 +37,8 @@ char *api_url_google_cse(const char *encoded_query, int page, const char *lang);
    unless the operator supplies one. Disabled by default. */
 void api_google_cse_element_configure(const char *cx, const char *tok);
 int api_google_cse_element_available(void);
+/* M4.5: the card's Test, in one plain sentence. */
+int api_google_cse_element_selftest(const char *cx, char *out, size_t cap);
 int api_parse_google_cse_element(const char *body, size_t len, const char *lang,
                                  SearchResult **out, int max);
 char *api_url_google_cse_element(const char *encoded_query, int page,

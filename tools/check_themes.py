@@ -306,6 +306,55 @@ def check(path):
 
     return problems
 
+
+def check_button_family(root):
+    """M3: .btn-primary and .btn-secondary are defined once, at top level.
+
+    They used to live inside a dozen scopes (.settings-actions, .view-home,
+    .settings-colours-actions, .settings-account, ...), each section copying the
+    last because the class was not global. A button in a section that had not
+    been added to the list silently fell through to the generic input rule -
+    which is why the Accounts Save buttons were not in the palette. A scoped
+    definition is now a failure."""
+    css = strip_comments((root / "static" / "main.css").read_text(encoding="utf-8"), "css")
+    problems = []
+    # a selector block that mentions a btn class but is scoped by a prefix
+    for m in re.finditer(r"(?m)^([^{}\n]*\.btn-(?:primary|secondary)[^{}\n]*)\{", css):
+        selector = m.group(1).strip()
+        line = css[:m.start()].count("\n") + 1
+        for part in selector.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if part.startswith(".btn-primary") or part.startswith(".btn-secondary"):
+                continue
+            if ":hover" in part or ":active" in part or ":focus" in part or ":disabled" in part:
+                continue  # state rules on the family itself are fine
+            problems.append(
+                f"main.css:{line} scoped button definition {part[:50]!r} "
+                f"(define it once, at top level)")
+    # A button that acts on a form - Save, Test, Finish, Clear - must use the
+    # family. Widget keys, the calculator keypad and the history clear control
+    # are their own controls by design and are not in scope.
+    ACTION_WORDS = ("save", "test", "finish", "clear", "authorise", "authorize")
+    stray = []
+    for tpl in sorted((root / "templates").glob("*.html")):
+        text = tpl.read_text(encoding="utf-8")
+        for m in re.finditer(r"<button\b[^>]*>([^<]*)", text):
+            tag, label = m.group(0), m.group(1)
+            # a button with its own styled class is its own control; only one
+            # with no class at all falls through to the generic rule
+            if 'class=' in tag:
+                continue
+            blob = (tag + " " + label).lower()
+            if any(w in blob for w in ACTION_WORDS):
+                line = text[:m.start()].count("\n") + 1
+                stray.append(f"{tpl.name}:{line} action button without the "
+                             f"button family: {tag[:50]}")
+    if stray:
+        problems.extend(stray[:6])
+    return problems
+
 def main():
     root = Path(__file__).resolve().parent.parent
     themes = sorted((root / "static" / "themes").glob("*.css"))
@@ -332,6 +381,7 @@ def main():
             ("no literal colours", check_no_literal_colour(root)),
             ("form controls", check_form_control_tokens(root)),
             ("one layout", check_layout_once(root)),
+            ("one button family", check_button_family(root)),
             ("contrast", check_contrast(root))):
         if problems:
             lint_failed += 1

@@ -103,15 +103,6 @@ img[src=""] {
     touch-action: manipulation;
 }
 
-.view-home .btn-secondary {
-    color: var(--text-primary);
-    border-color: var(--border);
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-    transition: all 0.2s;
-}
 
 .home-settings-btn {
     position: fixed;
@@ -840,30 +831,8 @@ header .logo-link:hover {
     border-top: 1px solid var(--border);
 }
 
-.settings-actions .btn-primary {
-    padding: 10px 24px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    touch-action: manipulation;
-}
 
-.settings-actions .btn-secondary {
-    background: var(--bg-card);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    padding: 10px 24px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    touch-action: manipulation;
-}
 
-.settings-actions .btn-secondary:hover {
-    background: var(--border);
-    border-color: var(--text-secondary);
-}
 
 @media (max-width:768px) {
     .settings-layout {
@@ -899,10 +868,6 @@ header .logo-link:hover {
     .settings-actions {
         flex-direction: column;
     }
-    .settings-actions .btn-primary, .settings-actions .btn-secondary {
-        width: 100%;
-        text-align: center;
-    }
 }
 
 [dir="rtl"] {
@@ -934,9 +899,6 @@ header .logo-link:hover {
     margin-inline-end: auto;
 }
 
-[dir="rtl"] .settings-actions .btn-primary {
-    margin-inline-end: auto;
-}
 
 @media (max-width: 768px) {
     [dir="rtl"] header {
@@ -1015,30 +977,9 @@ body {
     padding: 8px 16px;
 }
 
-.view-home .btn-primary {
-    background: transparent;
-    color: var(--text-primary);
-}
 
-.view-home .btn-primary:hover {
-    filter: none;
-    transform: none;
-    background: transparent;
-    border-color: var(--text-secondary);
-}
 
-.view-home .btn-secondary {
-    background: transparent;
-    border: 1px solid var(--border);
-    font-size: 0.85rem;
-    font-weight: 500;
-    padding: 8px 16px;
-}
 
-.view-home .btn-secondary:hover {
-    background: transparent;
-    border-color: var(--text-secondary);
-}
 
 /* ---------- header / nav ---------- */ header {
     background: var(--bg-main);
@@ -1178,18 +1119,7 @@ h1 span {
     background: transparent;
 }
 
-.settings-actions .btn-primary {
-    background: transparent;
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    font-weight: 500;
-}
 
-.settings-actions .btn-primary:hover {
-    filter: none;
-    transform: none;
-    border-color: var(--text-secondary);
-}
 
 .home-footer, .version-link {
     color: var(--text-dim);
@@ -1349,9 +1279,6 @@ header .search-box {
     }
 }
 
-/* ================================================================ buttons — Search carries the same dim border as Surprise me ================================================================ */ .view-home .btn-primary {
-    border: 1px solid var(--border);
-}
 
 /* ================================================================ empty result set ================================================================ */ .no-results {
     padding: 48px 0 40px;
@@ -1772,9 +1699,6 @@ input[type="color"]:focus-visible {
     margin: 14px 0 30px;
 }
 
-.settings-actions .btn-primary {
-    min-width: 132px;
-}
 
 /* ---------- selects: explicit chevron and padding ---------- */
 
@@ -1840,17 +1764,7 @@ input[type="color"]:focus-visible {
     margin-top: 12px;
 }
 
-.settings-colours-actions .btn-secondary {
-    padding: 8px 18px;
-    font-size: 0.85rem;
-    background: transparent;
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-}
 
-.settings-colours-actions .btn-secondary:hover {
-    border-color: var(--text-secondary);
-}
 
 @media (max-width: 720px) {
     .settings-colours-head {
@@ -2795,35 +2709,8 @@ input[type="color"]:focus-visible {
    cards put Save and Test on the same action line, and an <a class="btn-secondary">
    outside that scope rendered as a bare link. Same colours, same metrics as the
    rule above, so the two lines look like one control family. */
-.settings-account .btn-secondary,
-.settings-account-code .btn-secondary {
-    display: inline-block;
-    background: var(--bg-card);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-family: inherit;
-    font-weight: 600;
-    font-size: 0.82rem;
-    line-height: 1.2;
-    text-decoration: none;
-    cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
-    touch-action: manipulation;
-}
 
-.settings-account .btn-secondary:hover,
-.settings-account-code .btn-secondary:hover {
-    background: var(--border);
-    border-color: var(--text-secondary);
-    text-decoration: none;
-}
 
-.settings-account .btn-primary {
-    padding: 7px 14px;
-    font-size: 0.82rem;
-}
 
 /* Long tokens - a redirect URI, a doc host, a client id - must break rather
    than widen the card. At 390 px the doc link was 293 px wide inside a 226 px
@@ -2882,4 +2769,82 @@ input[type="color"]:focus-visible {
 
 .settings-account-advanced .settings-account-field:first-of-type {
     border-top: none;
+}
+
+/* ===== M3: ONE button family =====
+
+   .btn-primary and .btn-secondary used to be defined inside a dozen scopes -
+   .settings-actions, .view-home, .settings-colours-actions, .settings-account,
+   .settings-account-code - because each new section needed them and copied the
+   last one. The copies had drifted (two different paddings, one with a filter,
+   one without a border), and a <button class="btn-primary"> in a section that
+   had not been added to the list fell through to the generic input rule and
+   looked like nothing at all. That is why the Accounts Save buttons were not in
+   the palette.
+
+   One definition, tokens only, no scope. Both an <a class="btn-*"> and a
+   <button class="btn-*"> resolve to exactly the same metrics. */
+
+.btn-primary,
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-sizing: border-box;
+    padding: 8px 18px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    touch-action: manipulation;
+}
+
+.btn-primary {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--text-primary);
+}
+
+.btn-primary:hover,
+.btn-secondary:hover {
+    border-color: var(--text-secondary);
+    background: var(--bg-card);
+    text-decoration: none;
+}
+
+.btn-primary:active,
+.btn-secondary:active {
+    background: var(--border);
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-primary[aria-disabled="true"],
+.btn-secondary[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: transparent;
+    border-color: var(--border);
+}
+
+.btn-primary:disabled:hover,
+.btn-secondary:disabled:hover {
+    border-color: var(--border);
+    background: transparent;
 }

@@ -6,6 +6,7 @@
 #include "Config.h"
 #include <jansson.h>
 #include <stdio.h>
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1038,4 +1039,59 @@ int api_parse_searxng(const char *body, size_t len, const char *lang,
 
   json_decref(root);
   return count;
+}
+
+/* M4.5: the Test button, in plain words. One token fetch and one query, and
+   the five outcomes the review asks for. Never prints a token or a header. */
+int api_google_cse_element_selftest(const char *cx, char *out, size_t cap) {
+  if (!out || cap == 0)
+    return -1;
+  if (!cx || !cx[0]) {
+    snprintf(out, cap, "Paste your search engine id first.");
+    return -1;
+  }
+  api_google_cse_element_configure(cx, "");
+  if (!api_google_cse_element_available()) {
+    snprintf(out, cap,
+             "Google does not know that id - check you copied the Search "
+             "engine ID.");
+    return -1;
+  }
+  char *url = api_url_google_cse_element("linux+kernel", 1, "en");
+  if (!url) {
+    snprintf(out, cap,
+             "Could not get a token for that engine. Check the id, then try "
+             "again.");
+    return -1;
+  }
+  struct timespec t0, t1;
+  clock_gettime(CLOCK_MONOTONIC, &t0);
+  HttpResponse resp = http_get(url, "omnisearch/1.0");
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  free(url);
+  double secs = (double)(t1.tv_sec - t0.tv_sec) +
+                (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
+  if (!resp.memory || resp.size == 0) {
+    snprintf(out, cap, "Could not reach google.com.");
+    free(resp.memory);
+    return -1;
+  }
+  SearchResult *results = NULL;
+  int n = api_parse_google_cse_element(resp.memory, resp.size, "en", &results,
+                                       API_PAGE_SIZE);
+  free(resp.memory);
+  if (n <= 0) {
+    snprintf(out, cap,
+             "Your engine returned nothing - switch on \"Search the entire "
+             "web\" in its settings.");
+    return -1;
+  }
+  snprintf(out, cap, "Working - %d results in %.1f s", n, secs);
+  for (int i = 0; i < n; i++) {
+    free(results[i].url);
+    free(results[i].title);
+    free(results[i].snippet);
+  }
+  free(results);
+  return 0;
 }
