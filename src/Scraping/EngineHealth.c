@@ -250,6 +250,20 @@ void engine_health_init(const char *cache_dir) {
   memset(entries, 0, sizeof(entries));
   snprintf(health_file, sizeof(health_file), "%s/engine_health.tsv",
            cache_dir ? cache_dir : ".");
+  /* A missing directory used to mean the persist silently failed and every
+     restart began with no memory of which profiles were refused. Create it. */
+  if (cache_dir && cache_dir[0]) {
+    char dir[512];
+    snprintf(dir, sizeof(dir), "%s", cache_dir);
+    for (char *p = dir + 1; *p; p++) {
+      if (*p == '/') {
+        *p = '\0';
+        mkdir(dir, 0755);
+        *p = '/';
+      }
+    }
+    mkdir(dir, 0755);
+  }
 
   FILE *file = fopen(health_file, "r");
   if (file) {

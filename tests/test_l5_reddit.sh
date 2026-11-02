@@ -64,11 +64,18 @@ start_server() {
 }
 
 # save credentials the way the page does, with the admin token
+# M1: every write needs the form nonce that /settings renders, exactly as a
+# browser gets it. Fetching one here is what makes these tests honest.
+fetch_nonce() {
+    curl -sS -m 10 "http://127.0.0.1:$PORT/settings?cb=$RANDOM" \
+        | grep -o 'name="n" value="[a-f0-9]*"' | head -1 | sed 's/.*value="//;s/"//'
+}
+
 save() {
     local_token=$(grep '^admin_token' "$DIR/secrets.ini" | cut -d= -f2 | tr -d ' ')
     for field in "$@"; do
-        curl -sS -o /dev/null -m 10 \
-            "http://127.0.0.1:$PORT/settings/account-save?card=reddit&${field}&admin=$local_token"
+        curl -sS -H "Sec-Fetch-Site: same-origin" -o /dev/null -m 10 \
+            "http://127.0.0.1:$PORT/settings/account-save?card=reddit&${field}&admin=$local_token&n=$(fetch_nonce)"
     done
 }
 
@@ -194,18 +201,22 @@ grep -q "^com.example.omnisearch-test/2.0$" "$DIR/ua" && say_pass \
 # and reddit_configired() must agree without a client secret
 grep -q "reddit_configured" "$DIR/srv.log" 2>/dev/null || true
 
-# 11. the Authorise URL is built from those two fields and asks only for read
-ADMIN=$(grep '^admin_token' "$DIR/secrets.ini" | cut -d= -f2 | tr -d ' ')
-loc=$(curl -sS -o /dev/null -m 10 -D - \
-      "http://127.0.0.1:$PORT/settings/account-authorize?card=reddit&admin=$ADMIN" \
-      2>/dev/null | grep -i "^location:")
+# 11. M1.3: the Authorise URL is built when the PAGE renders, so the browser
+#     goes straight to Reddit and this server is not in the path at all.
+page=$(curl -sS -m 15 "http://127.0.0.1:$PORT/settings?cb=$RANDOM")
+loc=$(echo "$page" | grep -o 'href="https://www.reddit.com/api/v1/authorize[^"]*"' | head -1)
+[ -n "$loc" ] && say_pass || say_fail "the page carries no Authorise link"
 echo "$loc" | grep -q "client_id=test-client-id" && say_pass \
     || say_fail "the Authorise URL has no client id"
 echo "$loc" | grep -q "redirect_uri=myapp%3A%2F%2Fcallback" && say_pass \
     || say_fail "the Authorise URL has no redirect URI"
 echo "$loc" | grep -q "scope=read" && say_pass || say_fail "the scope is not read-only"
-echo "$loc" | grep -qi "scope=\(read%20\)\?write" && say_fail "the scope asks for write" \
+echo "$loc" | grep -qi "scope=.*write" && say_fail "the scope asks for write" \
     || say_pass
+# M2: the state is a per-render nonce, not a constant
+echo "$loc" | grep -q "state=omnisearch&" && say_fail "the state is a constant" \
+    || say_pass
+echo "$loc" | grep -qE "state=[a-f0-9]{32}" && say_pass || say_fail "no state nonce"
 
 echo "L5 reddit: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

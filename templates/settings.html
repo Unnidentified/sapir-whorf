@@ -272,11 +272,16 @@
                                 <span class="settings-account-why">{{a[2]}}</span>
                             </div>
                             {{if a[4]}}<p class="settings-account-test">{{a[4]}}</p>{{endif}}
-                            {{if a[15]}}<div class="settings-account-auth"><a class="btn-secondary" href="{{a[15]}}&amp;admin=" target="_blank" rel="noopener noreferrer">{{l("authorize_button")}}</a><span class="settings-account-hint">{{l("authorize_hint")}}</span></div>
+                            <div class="settings-account-auth">
+                                {{if a[23]}}<a class="btn-secondary" href="{{a[15]}}" target="_blank" rel="noopener noreferrer">{{l("authorize_button")}}</a><span class="settings-account-hint">{{l("authorize_hint")}}</span>{{endif}}
+                                {{if a[24]}}<button type="button" class="btn-secondary" disabled>{{l("authorize_button")}}</button><span class="settings-account-hint">{{a[22]}}</span>{{endif}}
+                            </div>
+                            {{if a[23]}}
                             <form action="/settings/account-code" method="GET" class="settings-account-code" autocomplete="off">
                                 <input type="hidden" name="card" value="{{a[0]}}">
                                 <input type="hidden" name="n" value="{{form_nonce}}">
-                                <input class="settings-account-input" type="text" name="code" placeholder="code" aria-label="{{l("authorize_code_label")}}">
+                                <input type="hidden" name="state" value="{{a[21]}}">
+                                <input class="settings-account-input" type="text" name="code" placeholder="{{l("authorize_code_placeholder")}}" aria-label="{{l("authorize_code_label")}}">
                                 <button type="submit" class="btn-secondary">{{l("authorize_finish")}}</button>
                             </form>
                             {{endif}}
@@ -285,13 +290,15 @@
                                 <input type="hidden" name="card" value="{{a[0]}}">
                                 <input type="hidden" name="n" value="{{form_nonce}}">
                         {{endif}}
+                                {{if a[25]}}<details class="settings-account-advanced"><summary>{{l("advanced_label")}}</summary>{{endif}}
                                 <div class="settings-account-field">
                                     <label class="settings-account-label" for="f_{{a[0]}}_{{a[5]}}">{{a[6]}}<span class="settings-account-optional">{{a[14]}}</span></label>
                                     <input class="settings-account-input" type="{{a[11]}}" id="f_{{a[0]}}_{{a[5]}}"
-                                           name="{{a[5]}}" autocomplete="off" value=""
+                                           name="{{a[5]}}" autocomplete="off" value="{{a[20]}}"
                                            placeholder="{{a[7]}}">
                                     <span class="settings-account-hint">{{a[13]}}</span>
                                 </div>
+                                {{if a[26]}}</details>{{endif}}
                         {{if a[12]}}
                                 {{if a[19]}}
                                 <div class="settings-account-admin">

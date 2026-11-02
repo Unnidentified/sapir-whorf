@@ -117,6 +117,17 @@ static const FieldText FIELD_TEXT[] = {
     {"google_cse_key", "API key", "Only a key issued before January 2026 works"},
 };
 
+/* "is this value only punctuation/masks?" - "*", "****", "••••" and the like */
+static int no_letters_or_digits(const char *v) {
+  if (!v || !v[0])
+    return 0;
+  for (const char *p = v; *p; p++)
+    if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+        (*p >= '0' && *p <= '9'))
+      return 0;
+  return 1;
+}
+
 static const FieldText *field_text(const char *name) {
   for (size_t i = 0; i < sizeof(FIELD_TEXT) / sizeof(FIELD_TEXT[0]); i++)
     if (strcmp(FIELD_TEXT[i].key, name) == 0)
@@ -166,12 +177,16 @@ static void test_result_text(const AccountCard *card, char *out, size_t cap) {
    says "start of a card", so the template is a single loop.
    Columns: card id | card title | why | links | test text | field name |
             field label | masked value | source | credential | first-in-card */
-enum { ACCOUNT_COLS = 20 };
+enum { ACCOUNT_COLS = 27 };
 /* 0 card id | 1 title | 2 why | 3 links | 4 test text | 5 field name |
    6 label | 7 masked value | 8 source | 9 credential | 10 first-in-card |
    11 input type | 12 last-in-card | 13 hint | 14 optional marker |
    15 authorise link (Reddit only) | 16 doc URL | 17 doc label |
-   18 "local"/"remote" | 19 "1" when the admin token must be asked for */
+   18 "local"/"remote" | 19 "1" when the admin token must be asked for |
+   20 the value to show (empty for a secret) |
+   21 the state nonce this link carries | 22 why Authorise is unavailable |
+   23 "1" when the Authorise link exists | 24 "1" when it must be disabled |
+   25 "1" opens the Advanced block | 26 "1" closes it */
 
 AccountCards accounts_build(const char *locale_id) {
   (void)locale_id;
@@ -203,8 +218,20 @@ AccountCards accounts_build(const char *locale_id) {
       const char *value = "";
       SecretSource src = secrets_get(key, &value);
       char masked[64] = "";
-      if (value[0])
-        secrets_mask(key, masked, sizeof(masked));
+      /* X4: only a SECRET is masked. A client id, a redirect URI, a User-Agent
+         and an instance URL are not secrets - the client id travels in a URL
+         Reddit documents - so masking them hid a typo without protecting
+         anything, and the owner saw **** where they needed to check a value. */
+      if (value[0]) {
+        if (card->secret[f])
+          secrets_mask(key, masked, sizeof(masked));
+        else
+          snprintf(masked, sizeof(masked), "%s", value);
+      }
+      /* X4: a value made only of mask characters is junk that an earlier
+         submission saved; never show it back, and never treat it as set. */
+      if (value[0] && !card->secret[f] && no_letters_or_digits(value))
+        masked[0] = '\0';
       const FieldText *ft = field_text(card->fields[f]);
       char label[96];
       snprintf(label, sizeof(label), "%s",
@@ -214,6 +241,11 @@ AccountCards accounts_build(const char *locale_id) {
                             : src == SECRET_SOURCE_FILE ? EFFECTIVE_FROM_FILE
                                                         : EFFECTIVE_FROM_DEFAULT;
 
+      /* every column index this builder writes must be < ACCOUNT_COLS. A
+         marker added at 25/26 while ACCOUNT_COLS was 25 wrote two pointers past
+         the allocation, and the {{if}} that read them silently never fired. */
+      _Static_assert(ACCOUNT_COLS >= 27,
+                     "raise ACCOUNT_COLS when adding a column");
       cards.rows[row] = calloc(ACCOUNT_COLS + 1, sizeof(char *));
       if (!cards.rows[row])
         break;
@@ -236,11 +268,34 @@ AccountCards accounts_build(const char *locale_id) {
       /* 13: the hint under the field; 14: "optional" when a blank is fine */
       cards.rows[row][13] = strdup(ft && ft->hint ? ft->hint : "");
       cards.rows[row][14] = strdup(card->secret[f] ? "optional" : "");
-      /* 15: the Authorise link rides on the first row of the Reddit card */
-      if (first && strcmp(card->id, "reddit") == 0)
-        cards.rows[row][15] = strdup("/settings/account-authorize?card=reddit");
-      else
-        cards.rows[row][15] = strdup("");
+      /* 15: the Authorise link, built here rather than routed through this
+         server - the browser goes straight to Reddit. Empty when the fields it
+         needs are not saved yet, and 22 then says why. */
+      cards.rows[row][15] = strdup("");
+      cards.rows[row][22] = strdup("");
+      cards.rows[row][23] = strdup(""); /* "1" when Authorise can be offered */
+      cards.rows[row][24] = strdup(""); /* "1" when it must be drawn disabled */
+      if (first && strcmp(card->id, "reddit") == 0) {
+        char url[1200];
+        char state[40] = "";
+        char why[192] = "";
+        guard_new_nonce(state, sizeof(state)); /* a state nonce, same TTL store */
+        if (reddit_authorize_url(state, url, sizeof(url), why, sizeof(why)) == 0) {
+          free(cards.rows[row][15]);
+          cards.rows[row][15] = strdup(url);
+          free(cards.rows[row][21]);
+          cards.rows[row][21] = strdup(state);
+          free(cards.rows[row][23]);
+          cards.rows[row][23] = strdup("1");
+          free(cards.rows[row][24]);
+          cards.rows[row][24] = strdup(""); /* no disabled twin */
+        } else {
+          free(cards.rows[row][22]);
+          cards.rows[row][22] = strdup(why);
+          free(cards.rows[row][24]);
+          cards.rows[row][24] = strdup("1");
+        }
+      }
       /* 16/17: the doc link, repeated on every row of the card so the template
          needs no second lookup. Only the first row renders it. */
       cards.rows[row][16] = strdup(card->doc_url ? card->doc_url : "");
@@ -249,6 +304,24 @@ AccountCards accounts_build(const char *locale_id) {
           strdup(guard_peer_is_loopback() ? "local" : "remote");
       /* 19: "1" when this card must ask for the admin token, i.e. not loopback */
       cards.rows[row][19] = strdup(guard_peer_is_loopback() ? "" : "1");
+      /* M2: the Reddit card shows three fields by default and puts the rest
+         behind "Advanced". 25/26 mark the first and last advanced row. */
+      cards.rows[row][25] = strdup("");
+      cards.rows[row][26] = strdup("");
+      if (strcmp(card->id, "reddit") == 0) {
+        int primary = 3; /* client id, redirect uri, user agent */
+        if (f == primary && card->fields[f]) {
+          free(cards.rows[row][25]);
+          cards.rows[row][25] = strdup("1"); /* opens the block */
+        }
+        if (f > primary && !card->fields[f + 1]) {
+          free(cards.rows[row][26]);
+          cards.rows[row][26] = strdup("1"); /* closes it */
+        }
+      }
+      /* 20: what the input displays. A secret leaves this empty and shows the
+         mask as a placeholder, so the real value never enters the HTML. */
+      cards.rows[row][20] = strdup(card->secret[f] ? "" : masked);
       cards.inner[row] = ACCOUNT_COLS;
       first = 0;
       row++;
@@ -319,6 +392,13 @@ int accounts_save_handler(UrlParams *params) {
     /* blank means "keep the old value", which is what a masked field shows */
     if (!value[0])
       continue;
+    /* M2: a User-Agent naming another project is impersonation. Refuse it here,
+       where it is typed, rather than sending it to Reddit. */
+    if (sk == SK_REDDIT_USER_AGENT && reddit_agent_is_foreign(value)) {
+      remember_test(card, "That User-Agent belongs to another app. Use your own "
+                          "- register one at reddit.com/prefs/apps.");
+      continue;
+    }
     if (secrets_set(sk, value) != 0)
       fprintf(stderr, "[WARN] account save failed for %s\n", key);
   }
@@ -383,7 +463,7 @@ int accounts_authorize_handler(UrlParams *params) {
     return refuse(guard_check_write(params));
   char url[1200];
   char why[192] = "";
-  if (reddit_authorize_url(url, sizeof(url), why, sizeof(why)) != 0) {
+  if (reddit_authorize_url("", url, sizeof(url), why, sizeof(why)) != 0) {
     send_redirect("/settings?authwhy=1#accounts");
     return 0;
   }
@@ -398,19 +478,31 @@ int accounts_code_handler(UrlParams *params) {
   if (!require_write(params))
     return refuse(guard_check_write(params));
   const char *code = "";
-  for (int i = 0; params && i < params->count; i++)
+  const char *state = "";
+  for (int i = 0; params && i < params->count; i++) {
     if (strcmp(params->params[i].key, "code") == 0)
       code = params->params[i].value;
-  char why[192] = "";
-  char text[256];
+    else if (strcmp(params->params[i].key, "state") == 0)
+      state = params->params[i].value;
+  }
+  char why[256] = "";
+  char who[64] = "";
+  char text[320];
   size_t idx = 0;
   for (size_t c = 0; c < CARD_COUNT; c++)
     if (strcmp(CARDS[c].id, "reddit") == 0)
       idx = c;
-  if (reddit_exchange_code(code, why, sizeof(why)) == 0)
-    snprintf(text, sizeof(text), "Authorised. Searches now use your app.");
-  else
-    snprintf(text, sizeof(text), "Could not finish: %.160s", why);
+  if (reddit_exchange_code(code, state, why, sizeof(why), who, sizeof(who)) == 0) {
+    /* M2: say who, not just "authorised" */
+    if (!who[0])
+      reddit_whoami(who, sizeof(who), why, sizeof(why));
+    if (who[0])
+      snprintf(text, sizeof(text), "Connected as u/%s", who);
+    else
+      snprintf(text, sizeof(text), "Connected. Searches now use your app.");
+  } else {
+    snprintf(text, sizeof(text), "Could not finish: %.200s", why);
+  }
   remember_test(&CARDS[idx], text);
   send_redirect("/settings#accounts");
   return 0;

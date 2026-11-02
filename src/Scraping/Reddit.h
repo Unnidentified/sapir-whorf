@@ -42,6 +42,10 @@ int reddit_configured(void);
 /* The User-Agent this client sends. Exposed so a test can assert the format. */
 void reddit_user_agent(char *out, size_t cap);
 
+/* 1 when this string names another project's app. Sending one is
+   impersonation, so it is refused rather than sent. */
+int reddit_agent_is_foreign(const char *agent);
+
 /* Search. subreddit may be NULL (whole of Reddit) or "rust" (r/rust, with
    restrict_sr=1). Returns 0 on success and fills *out/*count, or -1 with a
    reason in why[] - never a silent empty list. */
@@ -59,12 +63,21 @@ int reddit_test_credentials(const char *client_id, const char *client_secret,
    saved client id and redirect URI; read-only scope, because nothing here
    writes to Reddit. Returns 0 and fills out, or -1 with a reason when either
    is missing. */
-int reddit_authorize_url(char *out, size_t cap, char *why, size_t why_cap);
+int reddit_authorize_url(const char *state, char *out, size_t cap, char *why,
+                         size_t why_cap);
 
 /* L5 rung B: trade the code Reddit appends to the redirect URI for a token, and
    keep the refresh token so later searches need no browser. This is the step
    the redirect URI is for; without it the field would be decoration. */
-int reddit_exchange_code(const char *code, char *why, size_t why_cap);
+int reddit_exchange_code(const char *input, const char *expected_state, char *why,
+                         size_t why_cap, char *who, size_t who_cap);
+
+/* Who this token belongs to, for "Connected as u/<name>". */
+int reddit_whoami(char *who, size_t cap, char *why, size_t why_cap);
+
+/* Revoke the token at Reddit, then forget it here. Returns 0 when Reddit
+   confirmed, 1 when it did not, -1 on a local failure. */
+int reddit_revoke(char *why, size_t why_cap);
 
 /* 1 when a refresh token is stored, i.e. searches can run without a browser. */
 int reddit_has_refresh_token(void);

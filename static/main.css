@@ -2758,8 +2758,8 @@ input[type="color"]:focus-visible {
     border-top: 1px solid var(--border);
 }
 
-.settings-account-actions .btn-primary {
-    margin-left: auto;
+.settings-account-actions {
+    justify-content: flex-end;
 }
 
 
@@ -2860,4 +2860,26 @@ input[type="color"]:focus-visible {
     color: var(--text-primary);
     font-size: 0.85rem;
     line-height: 1.5;
+}
+
+/* M2: the two Reddit fields most owners never touch sit behind a summary. */
+.settings-account-advanced {
+    border-top: 1px solid var(--border);
+    padding-top: 4px;
+}
+
+.settings-account-advanced > summary {
+    cursor: pointer;
+    padding: 7px 0;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    list-style-position: inside;
+}
+
+.settings-account-advanced > summary:hover {
+    color: var(--text-primary);
+}
+
+.settings-account-advanced .settings-account-field:first-of-type {
+    border-top: none;
 }

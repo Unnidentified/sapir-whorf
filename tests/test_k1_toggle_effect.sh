@@ -38,7 +38,7 @@ trap cleanup EXIT INT TERM
 rm -rf "$DIR"; mkdir -p "$DIR/cache"
 # breaker_threshold high: every query must reach every engine, so a provider
 # that stopped being asked cannot be mistaken for one the breaker opened
-printf '[server]\nport = %s\nhost = 127.0.0.1\n[engines]\nengines = ddg,bing,yahoo,brave,openalex,crossref,arxiv,stackexchange,hn,wikipedia\ndefinitions_dir = static/engines.d\n[answers]\nmode = all\n[health]\nbreaker_threshold = 1000\npace_requests_per_minute = 6000\npace_burst = 2000\n[cache]\ndir = %s/cache\n' "$PORT" "$DIR" > "$DIR/t.ini"
+printf '[server]\nport = %s\nhost = 127.0.0.1\n[engines]\nengines = ddg,bing,yahoo,brave,openalex,crossref,arxiv,stackexchange,hn,wikipedia,openlibrary\ndefinitions_dir = static/engines.d\n[answers]\nmode = all\n[health]\nbreaker_threshold = 1000\npace_requests_per_minute = 6000\npace_burst = 2000\n[cache]\ndir = %s/cache\n' "$PORT" "$DIR" > "$DIR/t.ini"
 
 PROXY_LOG="$LOG" PROXY_PORT="$PROXY_PORT" python3 tests/counting_proxy.py > "$DIR/proxy.out" 2>&1 &
 PROXY_PID=$!
