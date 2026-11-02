@@ -140,8 +140,14 @@ void configure_curl_handle(CURL *curl, const char *full_url,
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT,
                    timeout_secs > 0 ? timeout_secs : CURL_TIMEOUT_SECS);
-  /* a dead endpoint (silent TLS handshake) must not hold the batch */
-  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 700L);
+  /* X3: a dead endpoint (silent TLS handshake) must not hold the batch, but
+     700 ms also kills endpoints that are merely slow to connect. Open Library
+     measured 1.1-1.4 s to complete its TLS handshake from here, so every
+     request was cut off at 700 ms and recorded as "Timeout was reached" - a
+     transport failure for a host that answers fine. 2 s still bounds a dead
+     engine (the page deadline is the real ceiling) and lets a slow one answer.
+     The whole-request timeout below is what stops a hanging body. */
+  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2000L);
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
   curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
 

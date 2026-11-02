@@ -47,6 +47,13 @@ SRC_DIR := src
 BIN_DIR := bin
 OBJ_DIR := obj
 
+# X2: a Finder duplicate ("Foo 1.c") is compiled as a second definition, and the
+# filename contains a space, so the build fails in a way that reads like a
+# mystery. Refuse to start rather than glob them in.
+DUPE_SRCS := $(shell find $(SRC_DIR) -name '*.c' | grep -E ' [0-9]+\.c$$' || true)
+ifneq ($(DUPE_SRCS),)
+$(error duplicated source files in $(SRC_DIR) (Finder copies?): $(DUPE_SRCS))
+endif
 SRCS := $(shell find $(SRC_DIR) -name '*.c')
 OBJS := $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
