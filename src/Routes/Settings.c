@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "Guard.h"
 #include "Accounts.h"
 #include "../Config.h"
 #include "../Scraping/Scraping.h"
@@ -276,6 +277,32 @@ int settings_handler(UrlParams *params) {
      server's parameter limit. Say so on the page the owner is sent back to,
      instead of the blank 500 they used to get. */
   context_set(&ctx, "too_many_notice", (toomany && toomany[0]) ? "1" : "");
+
+  /* M1: the write nonce, and the banner for a refusal that came back as one.
+     The nonce costs one context slot; the banner reuses it by carrying the
+     message rather than a flag. */
+  {
+    char nonce[40];
+    if (guard_new_nonce(nonce, sizeof(nonce)) == 0)
+      context_set(&ctx, "form_nonce", nonce);
+    else
+      context_set(&ctx, "form_nonce", "");
+    const char *err = "";
+    if (params)
+      for (int i = 0; i < params->count; i++)
+        if (strcmp(params->params[i].key, "err") == 0)
+          err = params->params[i].value;
+    const char *message = "";
+    if (strcmp(err, "expired") == 0)
+      message = beaker_get_locale_value(locale, "err_form_expired");
+    else if (strcmp(err, "cross") == 0)
+      message = beaker_get_locale_value(locale, "err_cross_site");
+    else if (strcmp(err, "token") == 0)
+      message = beaker_get_locale_value(locale, "err_needs_token");
+    else if (strcmp(err, "authwhy") == 0)
+      message = beaker_get_locale_value(locale, "err_auth_why");
+    context_set(&ctx, "write_error", message ? message : "");
+  }
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "title_font", get_title_font());
   /* one key: the templates want the multiplier, and nothing else read the

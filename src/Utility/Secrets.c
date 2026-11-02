@@ -227,7 +227,7 @@ SecretSource secrets_get(SecretKey key, const char **value) {
        * A single thread_copy meant two secrets read in the same expression
        * aliased each other: reddit_authorize_url() read the client id and the
        * redirect URI, and both came back as the redirect URI - so the
-       * authorisation URL carried client_id=redreader://rr_oauth_redir. Every
+       * authorisation URL carried the redirect URI in the client-id slot. Every
        * caller that holds two secrets at once had the same fault, which is 17
        * of them in Reddit.c alone. The file is read once and a save reloads
        * it, so per-key static storage is enough and needs no allocation. */

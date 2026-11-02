@@ -6,6 +6,7 @@
 #include "../Utility/HttpClient.h"
 #include "../Utility/Utility.h"
 #include "../Scraping/Reddit.h"
+#include "Guard.h"
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,15 +59,40 @@ static const AccountCard CARDS[] = {
      "programmablesearchengine.google.com"},
 };
 enum { CARD_COUNT = sizeof(CARDS) / sizeof(CARDS[0]) };
+/* one definition of "how many fields a card may have", used by the save path,
+   the clear path and the row builder alike */
+enum { ACCOUNT_FIELD_SLOTS = 6 };
 
-int accounts_require_admin(UrlParams *params) {
-  const char *token = "";
-  if (params) {
-    for (int i = 0; i < params->count; i++)
-      if (strcmp(params->params[i].key, "admin") == 0)
-        token = params->params[i].value;
+/* M1: every refusal goes back to the page with a code, never to a blank body.
+   send_status + send_response emits Content-Length: 0 in this beaker, which is
+   why the owner saw the browser's own "Access to localhost was denied" page. */
+static const char *guard_error_code(GuardResult r) {
+  switch (r) {
+  case GUARD_ERR_EXPIRED: return "expired";
+  case GUARD_ERR_CROSS_SITE: return "cross";
+  case GUARD_ERR_NEEDS_TOKEN: return "token";
+  default: return "";
   }
-  return secrets_admin_token_matches(token);
+}
+
+static int refuse(GuardResult r) {
+  char where[96];
+  snprintf(where, sizeof(where), "/settings?err=%s#accounts", guard_error_code(r));
+  send_redirect(where);
+  return 0;
+}
+
+/* the one gate every write goes through */
+static int require_write(UrlParams *params) {
+  GuardResult r = guard_check_write(params);
+  return r == GUARD_OK ? 1 : 0;
+}
+
+/* kept because Accounts.h declares it, but every route now goes through
+   guard_check_write(); a second gate with different rules is how the two
+   drifted apart in the first place */
+int accounts_require_admin(UrlParams *params) {
+  return guard_check_write(params) == GUARD_OK;
 }
 
 /* A field's human label and a one-line hint, keyed by the secret name. The
@@ -140,11 +166,12 @@ static void test_result_text(const AccountCard *card, char *out, size_t cap) {
    says "start of a card", so the template is a single loop.
    Columns: card id | card title | why | links | test text | field name |
             field label | masked value | source | credential | first-in-card */
-enum { ACCOUNT_COLS = 18 };
+enum { ACCOUNT_COLS = 20 };
 /* 0 card id | 1 title | 2 why | 3 links | 4 test text | 5 field name |
    6 label | 7 masked value | 8 source | 9 credential | 10 first-in-card |
    11 input type | 12 last-in-card | 13 hint | 14 optional marker |
-   15 authorise link (Reddit only) | 16 doc URL | 17 doc label */
+   15 authorise link (Reddit only) | 16 doc URL | 17 doc label |
+   18 "local"/"remote" | 19 "1" when the admin token must be asked for */
 
 AccountCards accounts_build(const char *locale_id) {
   (void)locale_id;
@@ -218,6 +245,10 @@ AccountCards accounts_build(const char *locale_id) {
          needs no second lookup. Only the first row renders it. */
       cards.rows[row][16] = strdup(card->doc_url ? card->doc_url : "");
       cards.rows[row][17] = strdup(card->doc_label ? card->doc_label : "");
+      cards.rows[row][18] =
+          strdup(guard_peer_is_loopback() ? "local" : "remote");
+      /* 19: "1" when this card must ask for the admin token, i.e. not loopback */
+      cards.rows[row][19] = strdup(guard_peer_is_loopback() ? "" : "1");
       cards.inner[row] = ACCOUNT_COLS;
       first = 0;
       row++;
@@ -244,17 +275,14 @@ void accounts_free(AccountCards *cards) {
   cards->count = 0;
 }
 
+static void reddit_test_now(char *out, size_t cap);
+
 int accounts_save_handler(UrlParams *params) {
-  if (!accounts_require_admin(params)) {
-    send_status("403 Forbidden");
-    send_response(
-        "<h1>Forbidden</h1><p>Writing server settings needs the admin token. "
-        "It is in <code>~/.omnisearch/secrets.ini</code> and was printed once "
-        "at startup.</p><p><a href=\"/settings\">Back to settings</a></p>");
-    return 0;
-  }
+  if (!require_write(params))
+    return refuse(guard_check_write(params));
 
   const char *card_id = "";
+  const char *action = "";
   for (int i = 0; params && i < params->count; i++) {
     const char *key = params->params[i].key;
     const char *value = params->params[i].value;
@@ -262,6 +290,14 @@ int accounts_save_handler(UrlParams *params) {
       card_id = value;
       continue;
     }
+    /* M1.3: Test is a submit button inside the card's form so that it carries
+       the nonce; the action decides what runs after the fields are read. */
+    if (strcmp(key, "action") == 0) {
+      action = value;
+      continue;
+    }
+    if (strcmp(key, "n") == 0)
+      continue;
     if (strcmp(key, "admin") == 0 || strcmp(key, "cb") == 0)
       continue;
     /* a field is only accepted when the card owns it, so this endpoint cannot
@@ -270,7 +306,9 @@ int accounts_save_handler(UrlParams *params) {
     if (!card)
       continue;
     int owned = 0;
-    for (int f = 0; f < 4 && card->fields[f]; f++)
+    /* X1: this was a literal 4 while a card may declare six fields, so the
+       fifth and sixth could never be saved. Use the array's own size. */
+    for (int f = 0; f < ACCOUNT_FIELD_SLOTS && card->fields[f]; f++)
       if (strcmp(card->fields[f], key) == 0)
         owned = 1;
     if (!owned)
@@ -289,17 +327,29 @@ int accounts_save_handler(UrlParams *params) {
     extern Config global_config;
     apply_effective_settings(&global_config);
   }
+  /* M1.3: the same form posts Save and Test. Test runs after the values are
+     stored, so it tests what was just entered rather than what was there. */
+  if (strcmp(action, "test") == 0 && card_id[0]) {
+    const AccountCard *card = card_by_id(card_id);
+    if (card) {
+      char text[256];
+      size_t idx = (size_t)(card - CARDS);
+      if (strcmp(card->id, "reddit") == 0)
+        reddit_test_now(text, sizeof(text));
+      else
+        snprintf(text, sizeof(text), "Saved. Press Test again to check it.");
+      remember_test(card, text);
+      (void)idx;
+    }
+  }
   send_redirect("/settings#accounts");
   return 0;
 }
 
 /* the "Clear" button: one field, no value at all */
 int accounts_clear_handler(UrlParams *params) {
-  if (!accounts_require_admin(params)) {
-    send_status("403 Forbidden");
-    send_response("<h1>Forbidden</h1>");
-    return 0;
-  }
+  if (!require_write(params))
+    return refuse(guard_check_write(params));
   const char *card_id = "", *field = "";
   for (int i = 0; params && i < params->count; i++) {
     if (strcmp(params->params[i].key, "card") == 0)
@@ -309,7 +359,7 @@ int accounts_clear_handler(UrlParams *params) {
   }
   const AccountCard *card = card_by_id(card_id);
   if (card) {
-    for (int f = 0; f < 4 && card->fields[f]; f++)
+    for (int f = 0; f < ACCOUNT_FIELD_SLOTS && card->fields[f]; f++)
       if (strcmp(card->fields[f], field) == 0)
         secrets_set(secrets_key_from_name(field), "");
   }
@@ -323,17 +373,14 @@ int accounts_clear_handler(UrlParams *params) {
    card, so a stuck button cannot hammer Reddit or a bridge. */
 static void reddit_test(const char *client_id, const char *secret, char *out,
                         size_t cap);
+static void reddit_test_now(char *out, size_t cap);
 
 /* L5: the Authorise button. Sends the browser to Reddit's authorisation page
    built from the saved client id and redirect URI - the browser talks to
    Reddit, this server never sees the login. */
 int accounts_authorize_handler(UrlParams *params) {
-  if (!accounts_require_admin(params)) {
-    send_status("403 Forbidden");
-    send_response("<h1>Forbidden</h1><p>This needs the admin token. Save one "
-                  "field with it first, then press Authorise again.</p>");
-    return 0;
-  }
+  if (!require_write(params))
+    return refuse(guard_check_write(params));
   char url[1200];
   char why[192] = "";
   if (reddit_authorize_url(url, sizeof(url), why, sizeof(why)) != 0) {
@@ -348,11 +395,8 @@ int accounts_authorize_handler(UrlParams *params) {
    pastes it, or the app forwards it). It becomes a refresh token, so every
    later search runs without a browser. */
 int accounts_code_handler(UrlParams *params) {
-  if (!accounts_require_admin(params)) {
-    send_status("403 Forbidden");
-    send_response("<h1>Forbidden</h1>");
-    return 0;
-  }
+  if (!require_write(params))
+    return refuse(guard_check_write(params));
   const char *code = "";
   for (int i = 0; params && i < params->count; i++)
     if (strcmp(params->params[i].key, "code") == 0)
@@ -373,11 +417,8 @@ int accounts_code_handler(UrlParams *params) {
 }
 
 int accounts_test_handler(UrlParams *params) {
-  if (!accounts_require_admin(params)) {
-    send_status("403 Forbidden");
-    send_response("<h1>Forbidden</h1>");
-    return 0;
-  }
+  if (!require_write(params))
+    return refuse(guard_check_write(params));
   const char *card_id = "";
   for (int i = 0; params && i < params->count; i++)
     if (strcmp(params->params[i].key, "card") == 0)
@@ -531,6 +572,17 @@ int searxng_test(const char *base_url, char *out, size_t cap) {
 /* Reddit: fetch an app-only token and ask one question. This is the evidence
    the owner runs once with their own key; it prints a sentence and a status,
    never the token, the header or the body. */
+/* reads the stored credentials and tests them; used by the card's Test button */
+static void reddit_test_now(char *out, size_t cap) {
+  const char *id = "";
+  const char *secret = "";
+  secrets_get(SK_REDDIT_CLIENT_ID, &id);
+  secrets_get(SK_REDDIT_CLIENT_SECRET, &secret);
+  extern void reddit_test(const char *client_id, const char *secret, char *out,
+                          size_t cap);
+  reddit_test(id, secret, out, cap);
+}
+
 static void reddit_test(const char *client_id, const char *secret, char *out,
                         size_t cap) {
   if (!client_id || !client_id[0]) {

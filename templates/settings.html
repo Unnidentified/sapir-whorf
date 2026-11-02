@@ -261,6 +261,7 @@
 
                 <section class="settings-section" id="accounts">
                     <h3 class="settings-section-title">{{l("accounts_label")}}</h3>
+                    {{if write_error}}<p class="settings-write-error" role="alert">{{write_error}}</p>{{endif}}
                     <p class="settings-section-desc">{{l("accounts_desc")}}</p>
                     <div class="settings-accounts">
                         {{for a in accounts}}
@@ -274,14 +275,15 @@
                             {{if a[15]}}<div class="settings-account-auth"><a class="btn-secondary" href="{{a[15]}}&amp;admin=" target="_blank" rel="noopener noreferrer">{{l("authorize_button")}}</a><span class="settings-account-hint">{{l("authorize_hint")}}</span></div>
                             <form action="/settings/account-code" method="GET" class="settings-account-code" autocomplete="off">
                                 <input type="hidden" name="card" value="{{a[0]}}">
+                                <input type="hidden" name="n" value="{{form_nonce}}">
                                 <input class="settings-account-input" type="text" name="code" placeholder="code" aria-label="{{l("authorize_code_label")}}">
-                                <input class="settings-account-input" type="password" name="admin" placeholder="{{l("admin_token_placeholder")}}" aria-label="{{l("admin_token_label")}}">
                                 <button type="submit" class="btn-secondary">{{l("authorize_finish")}}</button>
                             </form>
                             {{endif}}
                             <p class="settings-account-links">{{a[3]}} {{if a[16]}}<a href="{{a[16]}}" target="_blank" rel="noopener noreferrer">{{a[17]}}</a>{{endif}}</p>
                             <form action="/settings/account-save" method="GET" class="settings-account-form" autocomplete="off">
                                 <input type="hidden" name="card" value="{{a[0]}}">
+                                <input type="hidden" name="n" value="{{form_nonce}}">
                         {{endif}}
                                 <div class="settings-account-field">
                                     <label class="settings-account-label" for="f_{{a[0]}}_{{a[5]}}">{{a[6]}}<span class="settings-account-optional">{{a[14]}}</span></label>
@@ -291,6 +293,7 @@
                                     <span class="settings-account-hint">{{a[13]}}</span>
                                 </div>
                         {{if a[12]}}
+                                {{if a[19]}}
                                 <div class="settings-account-admin">
                                     <label class="settings-account-label" for="admin_{{a[0]}}">{{l("admin_token_label")}}</label>
                                     <input class="settings-account-input" type="password" id="admin_{{a[0]}}"
@@ -298,9 +301,10 @@
                                            placeholder="{{l("admin_token_placeholder")}}">
                                     <span class="settings-account-hint">{{l("admin_token_hint")}}</span>
                                 </div>
+                                {{endif}}
                                 <div class="settings-account-actions">
-                                    <button type="submit" class="btn-primary">{{l("save_button")}}</button>
-                                    <a class="btn-secondary settings-account-testbtn" href="/settings/account-test?card={{a[0]}}&amp;admin=" id="test_{{a[0]}}">{{l("test_button")}}</a>
+                                    <button type="submit" class="btn-secondary" name="action" value="test" id="test_{{a[0]}}">{{l("test_button")}}</button>
+                                    <button type="submit" class="btn-primary" name="action" value="save">{{l("save_button")}}</button>
                                 </div>
                             </form>
                         </div>

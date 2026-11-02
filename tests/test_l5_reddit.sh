@@ -180,16 +180,16 @@ grep -q "test-client-id" "$DIR/hits" && say_fail "the client id appears in the h
 #     and the app's User-Agent. No secret, no username.
 : > "$DIR/secrets.ini"
 start_server
-save "reddit_client_id=yH0aTnJEt6qUgGn835B4vg"
-save "reddit_redirect_uri=redreader%3A%2F%2Frr_oauth_redir"
-save "reddit_user_agent=org.quantumbadger.redreader%2F1.27"
+save "reddit_client_id=test-client-id"
+save "reddit_redirect_uri=myapp%3A%2F%2Fcallback"
+save "reddit_user_agent=com.example.omnisearch-test/2.0"
 grep -q "reddit_client_secret" "$DIR/secrets.ini" && say_fail "a secret was written" || say_pass
 grep -q "reddit_username" "$DIR/secrets.ini" && say_fail "a username was needed" || say_pass
 : > "$DIR/hits"; : > "$DIR/ua"
 curl -sS -o "$DIR/p3.html" -m 30 "http://127.0.0.1:$PORT/search?q=best+rust+ide+reddit&nc=$RANDOM"
 grep -q "\[L5\] reddit oauth delivered" "$DIR/srv.log" && say_pass \
     || say_fail "three fields were not enough to run the OAuth path"
-grep -q "^org.quantumbadger.redreader/1.27$" "$DIR/ua" && say_pass \
+grep -q "^com.example.omnisearch-test/2.0$" "$DIR/ua" && say_pass \
     || say_fail "the saved User-Agent did not reach the wire verbatim"
 # and reddit_configired() must agree without a client secret
 grep -q "reddit_configured" "$DIR/srv.log" 2>/dev/null || true
@@ -199,9 +199,9 @@ ADMIN=$(grep '^admin_token' "$DIR/secrets.ini" | cut -d= -f2 | tr -d ' ')
 loc=$(curl -sS -o /dev/null -m 10 -D - \
       "http://127.0.0.1:$PORT/settings/account-authorize?card=reddit&admin=$ADMIN" \
       2>/dev/null | grep -i "^location:")
-echo "$loc" | grep -q "client_id=yH0aTnJEt6qUgGn835B4vg" && say_pass \
+echo "$loc" | grep -q "client_id=test-client-id" && say_pass \
     || say_fail "the Authorise URL has no client id"
-echo "$loc" | grep -q "redirect_uri=redreader%3A%2F%2Frr_oauth_redir" && say_pass \
+echo "$loc" | grep -q "redirect_uri=myapp%3A%2F%2Fcallback" && say_pass \
     || say_fail "the Authorise URL has no redirect URI"
 echo "$loc" | grep -q "scope=read" && say_pass || say_fail "the scope is not read-only"
 echo "$loc" | grep -qi "scope=\(read%20\)\?write" && say_fail "the scope asks for write" \
