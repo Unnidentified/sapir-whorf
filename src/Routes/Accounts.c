@@ -400,6 +400,20 @@ int accounts_save_handler(UrlParams *params) {
     /* blank means "keep the old value", which is what a masked field shows */
     if (!value[0])
       continue;
+    /* X4: secrets.ini held a one-character reddit_username, which is a mask
+       character from an earlier submission. Saving that again would store junk
+       the owner cannot see. Refuse it. */
+    {
+      int is_secret = 0;
+      for (int sf = 0; sf < ACCOUNT_FIELD_SLOTS && card->fields[sf]; sf++)
+        if (strcmp(card->fields[sf], key) == 0)
+          is_secret = card->secret[sf];
+      if (!is_secret && no_letters_or_digits(value)) {
+        remember_test(card, "That value is punctuation only - it looks like a "
+                            "mask, not something you typed. Nothing was saved.");
+        continue;
+      }
+    }
     /* M2: a User-Agent naming another project is impersonation. Refuse it here,
        where it is typed, rather than sending it to Reddit. */
     if (sk == SK_REDDIT_USER_AGENT && reddit_agent_is_foreign(value)) {
