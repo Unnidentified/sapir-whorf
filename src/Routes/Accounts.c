@@ -9,6 +9,7 @@
 #include "Guard.h"
 #include "../Scraping/CseId.h"
 #include "../Scraping/ApiEngines.h"
+#include "FormBody.h"
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -89,6 +90,24 @@ static int refuse(GuardResult r) {
 }
 
 /* the one gate every write goes through */
+/* M1.5: a settings form cannot ride in a URL - beaker caps the request path at
+   255 characters (docs/probe-log.tsv, beaker-path-limit) and eight fields plus a
+   nonce go over it, which is the HTTP ERROR 400 the owner saw. The forms are
+   POST now and their body is merged in here, body fields winning over query
+   fields of the same name. */
+static UrlParams *with_body(UrlParams *query) {
+  static __thread UrlParams merged;
+  memset(&merged, 0, sizeof(merged));
+  if (query) {
+    for (int i = 0; i < query->count && merged.count < MAX_URL_PARAMS; i++)
+      merged.params[merged.count++] = query->params[i];
+  }
+  FormBody body;
+  if (form_body_parse(&body) == 0)
+    form_to_params(&body, &merged);
+  return &merged;
+}
+
 static int require_write(UrlParams *params) {
   GuardResult r = guard_check_write(params);
   return r == GUARD_OK ? 1 : 0;
@@ -323,7 +342,13 @@ AccountCards accounts_build(const char *locale_id) {
           free(cards.rows[row][25]);
           cards.rows[row][25] = strdup("1"); /* opens the block */
         }
-        if (f > primary && !card->fields[f + 1]) {
+        /* The close marker belongs on the card's LAST field, whenever an
+           advanced block was opened on it. The earlier rule asked for
+           f > primary, which is unreachable when the advanced block holds a
+           single field - that left <details> unclosed, so it swallowed the
+           Test and Save buttons and the owner saw them vanish on the Google
+           card, whose only advanced field is also its last. */
+        if (f >= primary && (!card->fields[f + 1] || f + 1 >= ACCOUNT_FIELD_SLOTS)) {
           free(cards.rows[row][26]);
           cards.rows[row][26] = strdup("1"); /* closes it */
         }
@@ -359,7 +384,8 @@ void accounts_free(AccountCards *cards) {
 
 static void reddit_test_now(char *out, size_t cap);
 
-int accounts_save_handler(UrlParams *params) {
+int accounts_save_handler(UrlParams *query) {
+  UrlParams *params = with_body(query);
   if (!require_write(params))
     return refuse(guard_check_write(params));
 
@@ -451,6 +477,18 @@ int accounts_save_handler(UrlParams *params) {
   }
   /* M1.3: the same form posts Save and Test. Test runs after the values are
      stored, so it tests what was just entered rather than what was there. */
+  if (strcmp(action, "clear") == 0 && card_id[0]) {
+    const AccountCard *card = card_by_id(card_id);
+    if (card) {
+      for (int f = 0; f < ACCOUNT_FIELD_SLOTS && card->fields[f]; f++) {
+        SecretKey sk = secrets_key_from_name(card->fields[f]);
+        if (sk != SK_COUNT)
+          secrets_set(sk, "");
+      }
+      secrets_reload_after_save();
+      remember_test(card, "Cleared this card's saved values.");
+    }
+  }
   if (strcmp(action, "test") == 0 && card_id[0]) {
     const AccountCard *card = card_by_id(card_id);
     if (card) {
@@ -473,7 +511,8 @@ int accounts_save_handler(UrlParams *params) {
 }
 
 /* the "Clear" button: one field, no value at all */
-int accounts_clear_handler(UrlParams *params) {
+int accounts_clear_handler(UrlParams *query) {
+  UrlParams *params = with_body(query);
   if (!require_write(params))
     return refuse(guard_check_write(params));
   const char *card_id = "", *field = "";
@@ -514,7 +553,8 @@ static void reddit_test_now(char *out, size_t cap);
 /* L5: the Authorise button. Sends the browser to Reddit's authorisation page
    built from the saved client id and redirect URI - the browser talks to
    Reddit, this server never sees the login. */
-int accounts_authorize_handler(UrlParams *params) {
+int accounts_authorize_handler(UrlParams *query) {
+  UrlParams *params = with_body(query);
   if (!require_write(params))
     return refuse(guard_check_write(params));
   char url[1200];
@@ -530,7 +570,8 @@ int accounts_authorize_handler(UrlParams *params) {
 /* L5: the code Reddit appends to the redirect URI comes back here (the owner
    pastes it, or the app forwards it). It becomes a refresh token, so every
    later search runs without a browser. */
-int accounts_code_handler(UrlParams *params) {
+int accounts_code_handler(UrlParams *query) {
+  UrlParams *params = with_body(query);
   if (!require_write(params))
     return refuse(guard_check_write(params));
   const char *code = "";
@@ -564,7 +605,8 @@ int accounts_code_handler(UrlParams *params) {
   return 0;
 }
 
-int accounts_test_handler(UrlParams *params) {
+int accounts_test_handler(UrlParams *query) {
+  UrlParams *params = with_body(query);
   if (!require_write(params))
     return refuse(guard_check_write(params));
   const char *card_id = "";

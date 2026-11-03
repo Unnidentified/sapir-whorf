@@ -94,12 +94,43 @@ sed -i '' 's/^engines = .*/engines = arxiv/' /tmp/j5cat.ini
 pkill -9 -f "j5cat.ini" 2>/dev/null
 sleep 0.5
 ./bin/omnisearch --config /tmp/j5cat.ini > /tmp/j5cat2.log 2>&1 &
-sleep 3
+# wait for the port rather than for a fixed sleep: with one engine configured the
+# binary finishes its own startup work at its own pace, and a 3 s sleep raced it
+for _ in $(seq 1 40); do
+  curl -sS -o /dev/null -m 1 "http://127.0.0.1:$PORT/" 2>/dev/null && break
+  sleep 0.5
+done
 body "q=linux+kernel&cat=media"
 grep -q 'no-engines\|No enabled engine serves this category' /tmp/j5cat.html \
   || fail "empty category did not say why"
 grep -q 'class="result"' /tmp/j5cat.html \
   && fail "empty category rendered results anyway"
+
+# 7. the cache key must carry the category. Without it cat=media and cat=web
+#    shared one entry, so a media request was answered from a cached web set.
+#    This needs a warmed cache to be meaningful: a web engine answers, we search
+#    the same query again under cat=media, and the cached web rows must not come
+#    back. Measured before the fix: 10 cached web rows for ?cat=media.
+sed -i '' 's/^engines = .*/engines = ddg/' /tmp/j5cat.ini
+pkill -9 -f "j5cat.ini" 2>/dev/null
+sleep 0.5
+rm -rf /tmp/j5cat && mkdir -p /tmp/j5cat
+./bin/omnisearch --config /tmp/j5cat.ini > /tmp/j5cat3.log 2>&1 &
+for _ in $(seq 1 40); do
+  curl -sS -o /dev/null -m 1 "http://127.0.0.1:$PORT/" 2>/dev/null && break
+  sleep 0.5
+done
+WARM_Q="cachekeyprobe$RANDOM"
+curl -sS -m 40 "http://127.0.0.1:$PORT/search?q=$WARM_Q" -o /tmp/j5cat-warm.html
+warm_rows=$(grep -c 'class="result"' /tmp/j5cat-warm.html)
+if [ "$warm_rows" -gt 0 ]; then
+  media_rows=$(curl -sS -m 40 "http://127.0.0.1:$PORT/search?q=$WARM_Q&cat=media" | grep -c 'class="result"')
+  [ "$media_rows" = "0" ] \
+    || fail "an empty category served $media_rows cached web rows (the cache key lost the category)"
+  echo "  note: warmed cache with $warm_rows web rows, cat=media returned $media_rows"
+else
+  echo "  note: the web engine answered nothing, so the cache was never warmed"
+fi
 
 pkill -9 -f "j5cat.ini" 2>/dev/null
 [ "$FAIL" = "0" ] && echo "J5 categories: PASS" || { echo "J5 categories: FAIL"; exit 1; }

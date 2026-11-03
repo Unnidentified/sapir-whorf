@@ -104,28 +104,31 @@ img[src=""] {
 }
 
 
+/* Inline SVG painted with currentColor: the mask this used to be turned the
+   glyph into a solid block at 26x18, because a mask reads the alpha channel and
+   the SVG fills its paths opaquely. */
 .home-settings-btn {
     position: fixed;
     top: 24px;
     inset-inline-end: 24px;
-    width: 26px;
-    height: 18px;
-    display: block;
-    background-color: var(--text-secondary);
-    -webkit-mask-image: url('/static/settings.svg');
-    mask-image: url('/static/settings.svg');
-    -webkit-mask-size: contain;
-    mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: top right;
-    mask-position: top right;
-    transition: background-color .2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: color .2s;
     text-decoration: none;
+    line-height: 0;
 }
 
-.home-settings-btn:hover {
-    background-color: var(--text-primary);
+.home-settings-btn svg {
+    display: block;
+    width: 21px;
+    height: 14px;
+}
+
+.home-settings-btn:hover,
+.home-settings-btn:focus-visible {
+    color: var(--text-primary);
 }
 
 .home-footer {
@@ -968,10 +971,13 @@ body {
     font-size: 1rem;
 }
 
-.view-home button {
-    background: transparent;
-    color: var(--text-primary);
-    border: 1px solid transparent;
+/* The home page once carried its own button paint here: a transparent
+   background and a transparent border. .view-home button (0,1,1) outranked
+   .btn-primary (0,1,0), so the Search button on the front page had no fill and
+   no edge at all - it read as loose text beside "Surprise me". The family owns
+   the paint now; this rule only keeps the home page's slightly smaller type. */
+.view-home .buttons .btn-primary,
+.view-home .buttons .btn-secondary {
     font-size: 0.85rem;
     font-weight: 500;
     padding: 8px 16px;
@@ -1472,7 +1478,11 @@ html.title-blackout .view-home .hero-logo {
     font-size: 0.82rem;
     margin: 0 0 14px;
     line-height: 1.5;
-    max-width: 60ch;
+    /* 60ch measured ~503 px in a 700 px column, so every section's explanation
+       wrapped into a narrow ribbon well short of the controls beneath it. The
+       section is already bounded by .settings-container; the measure only has
+       to stay readable, not short. */
+    max-width: 72ch;
 }
 
 .settings-fields {
@@ -2545,24 +2555,37 @@ input[type="color"]:focus-visible {
    the right, one action line at the end, and the theme's own tokens so the
    section looks like the rest of the page in every palette.
    --------------------------------------------------------------------------- */
+/* The Accounts section used to be its own visual dialect: 12/14 px padding, a
+   1.4fr input column, hints dropping to a second grid line, and a separate
+   card border around every provider. It read as heavier and looser than the
+   sections above it. It now borrows their rhythm - the same 240 px control
+   column as .settings-field, the same hairline between rows, one heading per
+   card - so the page scans as one form. Compact on purpose: the owner's word
+   was "ugly", and most of that was bulk, not colour. */
+
 .settings-accounts {
-    margin-top: 14px;
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
 }
 
 .settings-account {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    background: var(--bg-card);
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 16px 0 14px;
+    margin: 0;
+    background: transparent;
+    min-width: 0;
+    max-width: 100%;
 }
 
+/* the name and the one-line explanation share a line, like a .settings-field */
 .settings-account-head {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px 10px;
-    margin-bottom: 2px;
+    gap: 2px 10px;
+    margin-bottom: 10px;
 }
 
 .settings-account-name {
@@ -2574,23 +2597,28 @@ input[type="color"]:focus-visible {
 
 .settings-account-why {
     font-size: 0.82rem;
-    color: var(--text-muted);
+    color: var(--text-dim);
+    line-height: 1.45;
 }
 
 .settings-account-test,
 .settings-account-auth,
 .settings-account-links {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     font-size: 0.82rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     line-height: 1.5;
+}
+
+.settings-account-test {
+    color: var(--text-dim);
 }
 
 .settings-account-auth {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 8px 10px;
 }
 
 .settings-account-links a,
@@ -2599,18 +2627,27 @@ input[type="color"]:focus-visible {
 }
 
 .settings-account-form {
-    margin-top: 10px;
+    margin: 0;
+    min-width: 0;
+    max-width: 100%;
 }
 
-/* the row grid: label and hint on the left, the input on the right */
+/* one row per field: label left, control right - the 240 px column the rest of
+   the page already uses, so every control on the settings page lines up */
 .settings-account-field,
 .settings-account-admin {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    grid-template-columns: minmax(0, 1fr) 240px;
     align-items: center;
-    gap: 1px 14px;
-    padding: 7px 0;
+    gap: 0 24px;
+    padding: 10px 0;
     border-top: 1px solid var(--border);
+    min-width: 0;
+}
+
+.settings-account-form .settings-account-field:first-of-type {
+    border-top: 0;
+    padding-top: 4px;
 }
 
 .settings-account-label {
@@ -2635,13 +2672,14 @@ input[type="color"]:focus-visible {
 .settings-account-input {
     width: 100%;
     box-sizing: border-box;
-    padding: 7px 10px;
+    padding: 6px 9px;
     font-family: inherit;
     font-size: 0.85rem;
     color: var(--text-primary);
     background: var(--bg-main);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 5px;
+    min-width: 0;
 }
 
 .settings-account-input:focus {
@@ -2653,29 +2691,33 @@ input[type="color"]:focus-visible {
     color: var(--text-dim);
 }
 
-/* the hint sits under the label, in the left column, so it never pushes the
-   input out of line with the rows above it */
+/* the hint sits under the whole row, so it never pushes the control out of the
+   240 px column and every input stays on the same right edge */
 .settings-account-field .settings-account-hint,
 .settings-account-admin .settings-account-hint {
     grid-column: 1 / -1;
     font-size: 0.75rem;
     color: var(--text-dim);
     line-height: 1.45;
-    margin-top: 1px;
+    margin-top: 3px;
 }
 
 .settings-account-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 8px;
-    padding-top: 10px;
+    padding-top: 12px;
+    margin-top: 2px;
     border-top: 1px solid var(--border);
 }
 
-.settings-account-actions {
-    justify-content: flex-end;
+.settings-account-actions .btn-primary,
+.settings-account-actions .btn-secondary {
+    padding: 6px 14px;
+    font-size: 0.82rem;
 }
-
 
 @media (max-width: 720px) {
     .settings-account-field,
@@ -2687,30 +2729,36 @@ input[type="color"]:focus-visible {
     .settings-account-admin .settings-account-hint {
         grid-column: 1;
     }
+    /* Three buttons in one 358 px row leaves ~110 px each, which is not enough
+       for "Save server settings": nowrap then made them overlap. Let the action
+       that commits take its own full-width row, with Test and Clear sharing the
+       row above it. */
+    .settings-account-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    .settings-account-actions .btn-primary {
+        grid-column: 1 / -1;
+    }
+    .settings-account-actions .btn-primary,
+    .settings-account-actions .btn-secondary {
+        padding: 7px 10px;
+        font-size: 0.8rem;
+    }
 }
 
 .settings-account-code {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 8px;
+    margin: 8px 0 0;
 }
 
 .settings-account-code .settings-account-input {
-    flex: 1 1 160px;
+    flex: 1 1 200px;
     width: auto;
 }
-
-.settings-account-code .settings-account-input[type="password"] {
-    flex: 0 1 200px;
-}
-
-/* A secondary button anywhere, not only inside .settings-actions: the accounts
-   cards put Save and Test on the same action line, and an <a class="btn-secondary">
-   outside that scope rendered as a bare link. Same colours, same metrics as the
-   rule above, so the two lines look like one control family. */
-
-
 
 /* Long tokens - a redirect URI, a doc host, a client id - must break rather
    than widen the card. At 390 px the doc link was 293 px wide inside a 226 px

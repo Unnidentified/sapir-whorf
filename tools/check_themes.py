@@ -330,9 +330,35 @@ def check_button_family(root):
                 continue
             if ":hover" in part or ":active" in part or ":focus" in part or ":disabled" in part:
                 continue  # state rules on the family itself are fine
+            # A scoped rule that only adjusts type or spacing is fine: the family
+            # owns the paint, a section may ask for slightly smaller type.
+            body_m = re.match(r"[^{}]*\{([^}]*)\}", css[m.end() - 1:])
+            body = body_m.group(1) if body_m else ""
+            if body and not any(
+                    re.search(rf"(?m)^\s*{k}[\w-]*\s*:", body)
+                    for k in ("background", "border", "color", "box-shadow")):
+                continue
             problems.append(
                 f"main.css:{line} scoped button definition {part[:50]!r} "
                 f"(define it once, at top level)")
+    # An ancestor selector that repaints buttons also beats the family on
+    # specificity: `.view-home button` (0,1,1) outranks `.btn-primary` (0,1,0),
+    # which is how the front page's Search button lost its fill and its edge and
+    # read as loose text. An ancestor may set cursor, spacing or type size; it
+    # must not set background, border or colour on a button.
+    PAINT = ("background", "border", "color")
+    for m in re.finditer(r"(?m)^([^{}\n]*\bbutton\b[^{}\n]*)\{([^}]*)\}", css):
+        selector = m.group(1).strip()
+        body = m.group(2)
+        line = css[:m.start()].count("\n") + 1
+        if ".btn-" in selector:
+            continue
+        if not any(re.search(rf"(?m)^\s*{k}[\w-]*\s*:", body) for k in PAINT):
+            continue
+        problems.append(
+            f"main.css:{line} {selector[:46]!r} repaints buttons, which overrides "
+            f"the .btn-* family on specificity (set only cursor/size here)")
+
     # A button that acts on a form - Save, Test, Finish, Clear - must use the
     # family. Widget keys, the calculator keypad and the history clear control
     # are their own controls by design and are not in scope.

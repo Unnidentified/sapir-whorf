@@ -43,7 +43,16 @@
                 </form>
             </div>
         </div>
-        <a href="/settings" class="home-settings-btn" title="{{l("settings_tab")}}"></a>
+        {{* The icon is inlined rather than used as a CSS mask. As a mask its
+            fill colour was the alpha channel, and an opaque fill at 26x18 came
+            out as a solid block instead of a sliders glyph - the owner's
+            screenshot showed exactly that. Inline SVG painted with
+            currentColor follows the palette and cannot decalibrate. *}}
+        <a href="/settings" class="home-settings-btn" title="{{l("settings_tab")}}" aria-label="{{l("settings_tab")}}">
+            <svg viewBox="0 0 21 14" width="21" height="14" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M13.5,2 C13.5,1.647 13.58,1 13.7,1 L5,1 L5,3 L13.7,3 C13.58,3 13.5,2.353 13.5,2 Z M19.7,1 C19.27,0 18.12,-1 16.75,-1 C15.01,-1 13.6,0.343 13.6,2 C13.6,3.657 15.01,5 16.75,5 C18.12,5 19.27,4 19.7,3 L21,3 L21,1 L19.7,1 Z M13.5,10 C13.5,10.353 13.42,11 13.3,11 L21,11 L21,9 L13.3,9 C13.42,9 13.5,9.647 13.5,10 Z M11.4,10 C11.4,11.657 9.99,13 8.25,13 C6.88,13 5.73,12 5.29,11 L3,11 L3,9 L5.29,9 C5.73,8 6.88,7 8.25,7 C9.99,7 11.4,8.343 11.4,10 Z"/>
+            </svg>
+        </a>
         <script src="/static/autocomplete.js" defer></script>
         <footer class="home-footer">
             <a href="{{git_remote}}" class="version-link" target="_blank" rel="noopener noreferrer">{{version}}</a>

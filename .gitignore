@@ -39,3 +39,4 @@ tests/test_l3_secrets
 secrets/
 tests/test_provider_order
 tests/test_m4_cse
+tests/test_search_cache_key

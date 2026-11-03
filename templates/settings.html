@@ -277,7 +277,7 @@
                                 {{if a[24]}}<button type="button" class="btn-secondary" disabled>{{l("authorize_button")}}</button><span class="settings-account-hint">{{a[22]}}</span>{{endif}}
                             </div>
                             {{if a[23]}}
-                            <form action="/settings/account-code" method="GET" class="settings-account-code" autocomplete="off">
+                            <form action="/settings/account-code" method="POST" class="settings-account-code" autocomplete="off">
                                 <input type="hidden" name="card" value="{{a[0]}}">
                                 <input type="hidden" name="n" value="{{form_nonce}}">
                                 <input type="hidden" name="state" value="{{a[21]}}">
@@ -286,7 +286,7 @@
                             </form>
                             {{endif}}
                             <p class="settings-account-links">{{a[3]}} {{if a[16]}}<a href="{{a[16]}}" target="_blank" rel="noopener noreferrer">{{a[17]}}</a>{{endif}}</p>
-                            <form action="/settings/account-save" method="GET" class="settings-account-form" autocomplete="off">
+                            <form action="/settings/account-save" method="POST" class="settings-account-form" autocomplete="off">
                                 <input type="hidden" name="card" value="{{a[0]}}">
                                 <input type="hidden" name="n" value="{{form_nonce}}">
                         {{endif}}
@@ -311,6 +311,7 @@
                                 {{endif}}
                                 <div class="settings-account-actions">
                                     <button type="submit" class="btn-secondary" name="action" value="test" id="test_{{a[0]}}">{{l("test_button")}}</button>
+                                    <button type="submit" class="btn-secondary" name="action" value="clear" formnovalidate>{{l("clear_button")}}</button>
                                     <button type="submit" class="btn-primary" name="action" value="save">{{l("save_server_settings")}}</button>
                                 </div>
                             </form>

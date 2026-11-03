@@ -1,5 +1,6 @@
 #include "Search.h"
 #include "ImageProxy.h"
+#include "SearchCacheKey.h"
 #include "../Cache/Cache.h"
 #include "../Infobox/Calculator.h"
 #include "../Infobox/Translate.h"
@@ -854,10 +855,15 @@ static void append_source_note(TemplateContext *ctx, const char *note) {
 
 static char *build_search_request_cache_key(const char *query,
                                             const char *engine_id, int page,
-                                            const char *client_key) {
+                                            const char *client_key,
+                                            const char *category) {
+  /* The category belongs in the key. Without it, cat=media and cat=web shared
+     one entry, so a media request could be answered with a cached set of web
+     rows - measured: with only arxiv enabled, ?q=linux+kernel&cat=media served
+     10 cached web results instead of saying no engine serves that category. */
   char scope_key[BUFFER_SIZE_MEDIUM];
-  snprintf(scope_key, sizeof(scope_key), "search_request:%s:%s",
-           engine_id ? engine_id : "all", client_key ? client_key : "unknown");
+  search_cache_scope(scope_key, sizeof(scope_key), engine_id, client_key,
+                     category);
   return cache_compute_key(query, page, scope_key);
 }
 
@@ -1477,7 +1483,7 @@ int results_handler(UrlParams *params) {
   weights_load_from_cookie();
 
   char *request_cache_key = build_search_request_cache_key(
-      raw_query, selected_engine_id, page, client_key);
+      raw_query, selected_engine_id, page, client_key, cat);
   int request_is_cached = 0;
 
   if (request_cache_key && get_cache_ttl_search() > 0) {

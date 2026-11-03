@@ -519,6 +519,13 @@ translate-check: tests/test_j4_translate
 categories-check:
 	@./tests/test_j5_categories.sh
 
+# the search cache key must carry the category, or two result sets collide
+searchcache-check: tests/test_search_cache_key
+	@./tests/test_search_cache_key
+
+tests/test_search_cache_key: tests/test_search_cache_key.c src/Routes/SearchCacheKey.c
+	@$(CC) -Isrc -o $@ $^ || { echo "search cache key test build failed"; exit 1; }
+
 # J5.5: the per-engine weight editor and the cookie behind it
 weights-check:
 	@./tests/test_j5_weights.sh
@@ -670,6 +677,6 @@ dist:
 		| grep -q '^0$$' && echo "dist: no build artefacts or junk" || echo "dist: WARNING artefacts present"
 	@./tools/dist_check.sh /tmp/omnisearch-$(VERSION).tar.gz
 
-check: check-themes registry-lint provider-order-check m4check m1check fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check toggle-check k6-check k3-check k12-check terms-check hrefs-check defs-check categories-check context-check translate-check places-check weights-check k7-check k7check l1check l2check l3check l3accounts-check l4check l5check l6check k11check k4check k4videos-check k5check ua-check answers-check junk-check smoke
+check: check-themes registry-lint provider-order-check m4check m1check fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check answersfanout-check widget-check searxng-check optin-check toggle-check k6-check k3-check k12-check terms-check hrefs-check defs-check categories-check searchcache-check context-check translate-check places-check weights-check k7-check k7check l1check l2check l3check l3accounts-check l4check l5check l6check k11check k4check k4videos-check k5check ua-check answers-check junk-check smoke
 
 .PHONY: m1check m4check provider-order-check l5check l6check k12-check k3-check toggle-check terms-check hrefs-check answersfanout-check widget-check searxng-check optin-check all run clean rebuild info verify asan dist check check-themes registry-lint provider-order-check m4check m1check fixtures canonical config-check render-check engines-check suspend-check cse-check answer-check ua-check answers-check junk-check eval-offline record-replay smoke eval eval-strict install install-launchd install-systemd install-openrc install-runit install-s6 install-dinit uninstall
