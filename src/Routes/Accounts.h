@@ -33,6 +33,8 @@ int accounts_save_handler(UrlParams *params);
 int accounts_test_handler(UrlParams *params);
 int accounts_authorize_handler(UrlParams *params);
 int accounts_code_handler(UrlParams *params);
+/* Reddit's redirect target when the saved URI points back at this instance */
+int accounts_reddit_callback_handler(UrlParams *params);
 
 /* The admin gate's answer, kept here so both handlers use one rule. */
 int accounts_require_admin(UrlParams *params);

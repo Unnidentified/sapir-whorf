@@ -574,6 +574,8 @@ l4check:
 # L5: Reddit through the owner's own OAuth app, against a local stand-in
 l5check:
 	@./tests/test_l5_reddit.sh
+	@./tests/test_l5b_callback.sh
+	@./tests/test_icon_placement.sh
 
 # L6: the ids this project has shipped, and the placeholder filter with the
 # description fetcher switched off

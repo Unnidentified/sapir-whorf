@@ -131,7 +131,7 @@ typedef struct {
 
 static const FieldText FIELD_TEXT[] = {
     {"reddit_client_id", "Client ID", "Under the app's name at reddit.com/prefs/apps"},
-    {"reddit_redirect_uri", "Redirect URI", "Exactly as registered, e.g. myapp://callback"},
+    {"reddit_redirect_uri", "Redirect URI", ""}, /* filled in per request below */
     {"reddit_user_agent", "User-Agent", "Your app's own string, e.g. org.example.app/1.0"},
     {"reddit_username", "Reddit username", "Optional: only if your app has no User-Agent of its own"},
     {"reddit_client_secret", "Client secret", "Not needed for an installed app"},
@@ -214,6 +214,61 @@ enum { ACCOUNT_COLS = 27 };
    23 "1" when the Authorise link exists | 24 "1" when it must be disabled |
    25 "1" opens the Advanced block | 26 "1" closes it */
 
+/* The redirect URI to register in the Reddit app, and what to say about the one
+   already saved.
+
+   Reddit sends the ?code= to whatever URI the app was registered with. If that
+   URI is a custom scheme such as redreader://rr_oauth_redir, the browser hands
+   it to whichever program owns the scheme - and nothing was listening, so the
+   owner pressed Allow, the browser went nowhere, and the page came back
+   unchanged. The only URI this server can finish the exchange on is its own, so
+   the card names that one, computed from the Host header of this very request.
+
+   The hint has two jobs: tell a first-time owner what to paste into Reddit, and
+   tell an owner whose saved URI is a custom scheme why Allow did nothing. */
+static void redirect_hint(char *out, size_t cap) {
+  out[0] = '\0';
+  const char *host = beaker_get_header("Host");
+  if (!host || !host[0])
+    host = "127.0.0.1:8087";
+  const char *ours = NULL;
+  char saved[512] = "";
+  const char *s = "";
+  secrets_get(SK_REDDIT_REDIRECT_URI, &s);
+  snprintf(saved, sizeof(saved), "%s", s ? s : "");
+  (void)ours;
+  if (saved[0]) {
+    /* does it come back to us? it must be http(s) and carry our host */
+    int same_host = 0;
+    if (strncmp(saved, "http://", 7) == 0)
+      same_host = strncmp(saved + 7, host, strlen(host)) == 0;
+    else if (strncmp(saved, "https://", 8) == 0)
+      same_host = strncmp(saved + 8, host, strlen(host)) == 0;
+    if (!same_host) {
+      int custom = !(strncmp(saved, "http://", 7) == 0 ||
+                     strncmp(saved, "https://", 8) == 0);
+      if (custom)
+        snprintf(out, cap,
+                 "%s cannot come back to this server - no browser delivers that "
+                 "scheme here, so Allow does nothing. Register "
+                 "http://%s/settings/reddit-callback instead, then use Authorise "
+                 "and the code is finished for you.",
+                 saved, host);
+      else
+        snprintf(out, cap,
+                 "%s is not this server. Reddit would send the code somewhere "
+                 "that cannot use it. Register http://%s/settings/reddit-callback "
+                 "instead.", saved, host);
+      return;
+    }
+    snprintf(out, cap, "Saved, and it comes back here. Authorise finishes the "
+                       "exchange on its own.");
+    return;
+  }
+  snprintf(out, cap, "Paste this exact value into the Reddit app: "
+                     "http://%s/settings/reddit-callback", host);
+}
+
 AccountCards accounts_build(const char *locale_id) {
   (void)locale_id;
   AccountCards cards;
@@ -293,6 +348,12 @@ AccountCards accounts_build(const char *locale_id) {
           strdup(card->fields[f + 1] ? "" : "1");
       /* 13: the hint under the field; 14: "optional" when a blank is fine */
       cards.rows[row][13] = strdup(ft && ft->hint ? ft->hint : "");
+      if (card->fields[f] && strcmp(card->fields[f], "reddit_redirect_uri") == 0) {
+        char hint[512];
+        redirect_hint(hint, sizeof(hint));
+        free(cards.rows[row][13]);
+        cards.rows[row][13] = strdup(hint);
+      }
       cards.rows[row][14] = strdup(card->secret[f] ? "optional" : "");
       /* 15: the Authorise link, built here rather than routed through this
          server - the browser goes straight to Reddit. Empty when the fields it
@@ -564,6 +625,63 @@ int accounts_authorize_handler(UrlParams *query) {
     return 0;
   }
   send_redirect(url);
+  return 0;
+}
+
+/* L5b: Reddit can redirect straight back to this server.
+
+   The card used to offer only two outcomes: a custom scheme such as
+   redreader://rr_oauth_redir, which no browser can deliver anywhere, or pasting
+   the URL by hand. The owner pressed Allow on Reddit's page and the browser
+   went to redreader:// - nothing was listening, so nothing happened at all and
+   the page simply returned to where it started.
+
+   When the saved redirect URI points at this instance, Reddit's ?code= arrives
+   HERE instead, and this handler finishes the exchange without the owner
+   copying anything. The state nonce is checked by reddit_exchange_code, so a
+   code minted for another request is refused. */
+int accounts_reddit_callback_handler(UrlParams *params) {
+  const char *code = "";
+  const char *state = "";
+  const char *error = "";
+  for (int i = 0; params && i < params->count; i++) {
+    const char *k = params->params[i].key;
+    if (strcmp(k, "code") == 0)
+      code = params->params[i].value;
+    else if (strcmp(k, "state") == 0)
+      state = params->params[i].value;
+    else if (strcmp(k, "error") == 0)
+      error = params->params[i].value;
+  }
+  if (error[0]) {
+    char dest[256];
+    snprintf(dest, sizeof(dest), "/settings?codeerr=%s#accounts",
+             strcmp(error, "access_denied") == 0 ? "denied" : "failed");
+    send_redirect(dest);
+    return 0;
+  }
+  /* The state is a guard nonce this process issued (accounts_build mints it
+     with guard_new_nonce), so the callback can check it directly. Without this
+     a code minted for someone else's authorisation would be exchanged: a
+     foreign state was accepted, measured by test_l5b_callback.sh. */
+  if (!guard_nonce_valid(state)) {
+    send_redirect("/settings?codeerr=failed#accounts");
+    return 0;
+  }
+  char why[256] = "";
+  char who[64] = "";
+  if (reddit_exchange_code(code, state, why, sizeof(why), who, sizeof(who)) == 0) {
+    if (!who[0])
+      reddit_whoami(who, sizeof(who), why, sizeof(why));
+    char dest[320];
+    if (who[0])
+      snprintf(dest, sizeof(dest), "/settings?codeok=%s#accounts", who);
+    else
+      snprintf(dest, sizeof(dest), "/settings?codeok=1#accounts");
+    send_redirect(dest);
+    return 0;
+  }
+  send_redirect("/settings?codeerr=failed#accounts");
   return 0;
 }
 

@@ -278,6 +278,7 @@ int settings_handler(UrlParams *params) {
      instead of the blank 500 they used to get. */
   context_set(&ctx, "too_many_notice", (toomany && toomany[0]) ? "1" : "");
 
+  const char *write_message = "";
   /* M1: the write nonce, and the banner for a refusal that came back as one.
      The nonce costs one context slot; the banner reuses it by carrying the
      message rather than a flag. */
@@ -301,8 +302,43 @@ int settings_handler(UrlParams *params) {
       message = beaker_get_locale_value(locale, "err_needs_token");
     else if (strcmp(err, "authwhy") == 0)
       message = beaker_get_locale_value(locale, "err_auth_why");
-    context_set(&ctx, "write_error", message ? message : "");
+    else if (strcmp(err, "denied") == 0)
+      message = beaker_get_locale_value(locale, "err_code_denied");
+    else if (strcmp(err, "failed") == 0)
+      message = beaker_get_locale_value(locale, "err_code_failed");
+    write_message = message ? message : "";
   }
+  /* L5b: the callback route finishes the exchange and lands here with ?codeok=
+     (the account name, or 1 when the name is unknown) or ?codeerr=. Say so on
+     the page, because the owner pressed Allow on reddit.com and this is the
+     first thing they see on return. */
+  {
+    const char *ok = "";
+    const char *cerr = "";
+    if (params)
+      for (int i = 0; i < params->count; i++) {
+        if (strcmp(params->params[i].key, "codeok") == 0)
+          ok = params->params[i].value;
+        if (strcmp(params->params[i].key, "codeerr") == 0)
+          cerr = params->params[i].value;
+      }
+    char line[256] = "";
+    if (ok[0]) {
+      if (strcmp(ok, "1") == 0)
+        snprintf(line, sizeof(line), "%s",
+                 beaker_get_locale_value(locale, "code_ok_plain"));
+      else
+        snprintf(line, sizeof(line), "Connected as u/%s", ok);
+    } else if (cerr[0] && !write_message[0]) {
+      const char *m = beaker_get_locale_value(
+          locale, strcmp(cerr, "denied") == 0 ? "err_code_denied"
+                                              : "err_code_failed");
+      snprintf(line, sizeof(line), "%s", m ? m : "");
+    }
+    if (line[0])
+      write_message = line;
+  }
+  context_set(&ctx, "write_error", write_message);
   context_set(&ctx, "theme", theme);
   context_set(&ctx, "title_font", get_title_font());
   /* one key: the templates want the multiplier, and nothing else read the
