@@ -227,7 +227,7 @@ The upstream author asks the following, and it is reproduced here rather than dr
 > **Disclaimer**
 > I request that none of this code, in part or in full, be hosted on GitHub, SourceForge, or any other proprietary platform. This request is made out of respect for both me, the developer and for you, the user.
 
-That is a request, not a condition of the licence: GPL-2.0 permits redistribution on any platform. It is recorded here because the person who wrote it deserves to be quoted accurately rather than silently overruled. Anyone redistributing this code should read it and make their own decision knowingly.
+That's not a condition of the licence: GPL-2.0 permits redistribution on any platform. It is recorded here because the person who wrote it deserves to be quoted accurately rather than silently overruled. Anyone redistributing this code should read it and make their own decision knowingly.
 
 ---
 
